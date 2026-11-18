@@ -251,7 +251,7 @@ mod judged_tests {
         std::fs::create_dir_all(&device).unwrap();
         std::fs::write(device.join("type"), format!("{kind}\n")).unwrap();
         std::fs::create_dir_all(sys.join("class/net")).unwrap();
-        std::os::unix::fs::symlink(&device, sys.join("class/net").join(name))
+        tcsos::linux::fs::symlink(&device, sys.join("class/net").join(name))
             .unwrap();
     }
 

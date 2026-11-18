@@ -17,11 +17,7 @@
 //! * [`crate::node::payload::network`] -- the address family, socket type and
 //!   protocol tables the two socket kinds draw on
 
-use std::io;
-use std::os::fd::BorrowedFd;
-use std::os::unix::io::RawFd;
-
-use nix::poll::{poll, PollFd, PollFlags};
+use tcsos::wait::{Ready, Source, Watch};
 use tcsprotocol::graph::terminals::Stream;
 use tcsprotocol::{
     EndpointConfig, NetworkConfig, NetworkProtocol, SendsFrom, TcsError,
@@ -102,18 +98,18 @@ pub fn bind_failed(what: &str, addr: &str, e: std::io::Error) -> TcsError {
 
 /// Trait for endpoints that can wait for events
 pub trait EndpointWaitable {
-    /// Gets the I/O file descriptor.
+    /// Gets what the endpoint's I/O is waited on through.
     ///
     /// # Returns
     ///
-    /// The descriptor the endpoint's I/O is done on, which it still owns.
-    fn io_fd(&self) -> RawFd;
+    /// The source of the endpoint's I/O, which it still owns.
+    fn io_source(&self) -> Source;
 
     /// Waits for an event on this endpoint or on the command pipe.
     ///
     /// # Arguments
     ///
-    /// * `cmd_fd`     - The command pipe's read end.
+    /// * `cmd`        - The command wakeup's source.
     /// * `timeout_ms` - How long to wait, in milliseconds; negative for ever.
     ///
     /// # Returns
@@ -125,7 +121,7 @@ pub trait EndpointWaitable {
     /// `TcsError::Io` where the wait itself fails.
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult>;
 }
@@ -227,55 +223,40 @@ pub trait EndpointWritable: EndpointWaitable {
 /// Waits for either the endpoint or the command pipe to have something.
 ///
 /// Shared by every kind of endpoint: what differs between them is what
-/// the descriptor refers to, not how it is waited on.
+/// the source is of, not how it is waited on.
 ///
 /// # Arguments
 ///
-/// * `io_fd`      - The endpoint's descriptor, which must stay open for the
+/// * `io`         - The endpoint's source, which must stay open for the
 ///                  call.
-/// * `cmd_fd`     - The command pipe's read end, waited on for input; it too
-///                  must stay open.
-/// * `io_events`  - What to wait for on `io_fd`.
+/// * `cmd`        - The command wakeup's source, waited on for input; it
+///                  too must stay open.
+/// * `io_events`  - What to wait for on `io`.
 /// * `timeout_ms` - How long to wait, in milliseconds; negative for ever.
 ///
 /// # Returns
 ///
 /// Which of the two is ready; `WaitResult::Timeout` where neither became
-/// ready in time, and `WaitResult::Error` where `poll` woke for something
-/// that was neither, such as a hang-up or an error on `io_fd`.
+/// ready in time, and `WaitResult::Error` where the wait woke for something
+/// that was neither, such as a hang-up or an error on `io`.
 ///
 /// # Errors
 ///
-/// `TcsError::Io` where `poll` fails.
+/// `TcsError::Io` where the wait fails.
 pub(crate) fn wait_for_fds(
-    io_fd: RawFd,
-    cmd_fd: RawFd,
-    io_events: PollFlags,
+    io: Source,
+    cmd: Source,
+    io_events: Ready,
     timeout_ms: i32,
 ) -> TcsResult<WaitResult> {
-    // SAFETY: borrow_raw needs each descriptor to stay open for as long as
-    // the borrow lasts, which is this call. Every caller passes its own
-    // endpoint's descriptor and its command pipe's, both owned by the
-    // handler that is calling and so open until it returns; nothing here
-    // closes either, and the borrows end when poll does.
-    let io_borrowed = unsafe { BorrowedFd::borrow_raw(io_fd) };
-    // SAFETY: as for `io_fd` above.
-    let cmd_borrowed = unsafe { BorrowedFd::borrow_raw(cmd_fd) };
+    let mut set = [Watch::new(io, io_events), Watch::new(cmd, Ready::READ)];
 
-    let mut poll_fds = [
-        PollFd::new(&io_borrowed, io_events),
-        PollFd::new(&cmd_borrowed, PollFlags::POLLIN),
-    ];
-
-    match poll(&mut poll_fds, timeout_ms) {
+    match tcsos::wait::wait_ms(&mut set, timeout_ms) {
         Ok(0) => Ok(WaitResult::Timeout),
         Ok(_) => {
-            let io_ready = poll_fds[0]
-                .revents()
-                .is_some_and(|r| r.intersects(io_events));
-            let cmd_ready = poll_fds[1]
-                .revents()
-                .is_some_and(|r| r.contains(PollFlags::POLLIN));
+            let io_ready = (set[0].got.read && io_events.read)
+                || (set[0].got.write && io_events.write);
+            let cmd_ready = set[1].got.read;
 
             match (io_ready, cmd_ready) {
                 (true, true) => Ok(WaitResult::Both),
@@ -284,7 +265,7 @@ pub(crate) fn wait_for_fds(
                 (false, false) => Ok(WaitResult::Error),
             }
         }
-        Err(e) => Err(TcsError::Io(io::Error::from_raw_os_error(e as i32))),
+        Err(e) => Err(TcsError::Io(e)),
     }
 }
 
@@ -819,16 +800,16 @@ impl CcsdsReader {
 }
 
 impl EndpointWaitable for CcsdsReader {
-    fn io_fd(&self) -> RawFd {
-        self.inner.io_fd()
+    fn io_source(&self) -> Source {
+        self.inner.io_source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        self.inner.wait_for_event(cmd_fd, timeout_ms)
+        self.inner.wait_for_event(cmd, timeout_ms)
     }
 }
 
@@ -916,16 +897,16 @@ impl CcsdsWriter {
 }
 
 impl EndpointWaitable for CcsdsWriter {
-    fn io_fd(&self) -> RawFd {
-        self.inner.io_fd()
+    fn io_source(&self) -> Source {
+        self.inner.io_source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        self.inner.wait_for_event(cmd_fd, timeout_ms)
+        self.inner.wait_for_event(cmd, timeout_ms)
     }
 }
 
@@ -967,14 +948,7 @@ mod tests {
             port: 0,
         };
         let inner = UdpEndpoint::new("uplink", &at).expect("bound");
-        // SAFETY: the endpoint's own descriptor, borrowed while it is open
-        // and not kept.
-        let borrowed = unsafe { BorrowedFd::borrow_raw(inner.io_fd()) };
-        let here = socket2::SockRef::from(&borrowed)
-            .local_addr()
-            .ok()
-            .and_then(|at| at.as_socket())
-            .expect("where it is bound");
+        let here = inner.local_addr().expect("where it is bound");
         let mut reader = CcsdsReader::of(Box::new(inner), 0x123);
 
         let ground = UdpSocket::bind("127.0.0.1:0").expect("a ground");

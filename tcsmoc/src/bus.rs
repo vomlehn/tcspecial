@@ -49,11 +49,11 @@
 //! the peer's coming and going or about something refused.
 
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
-use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
+use tcsos::wait::{Ready, Waitable, Watch};
 
 use tcsprotocol::graph::parameters::{ci_config_of, flatten};
 use tcsprotocol::graph::telemetry::{msgids, Carries, MsgIdUse};
@@ -143,19 +143,15 @@ fn loopback(what: &str) -> Result<UdpSocket, String> {
 ///
 /// # Arguments
 ///
-/// * `fds`  - What to wait on; each one's `revents` is set.
+/// * `fds`  - What to wait on; each one's `got` is set.
 /// * `wait` - The longest to wait.
-fn wait_on(fds: &mut [libc::pollfd], wait: Duration) {
-    for fd in fds.iter_mut() {
-        fd.revents = 0;
-    }
-    let timeout = i32::try_from(wait.as_millis()).unwrap_or(i32::MAX);
-    // SAFETY: poll needs an array of as many pollfds as it is told, writable
-    // for the call: the count is the slice's own length. An interrupted or
-    // failed poll leaves every `revents` nought, which reads as nothing
-    // ready, and the caller's loop asks again.
-    unsafe {
-        libc::poll(fds.as_mut_ptr(), fds.len() as libc::nfds_t, timeout);
+fn wait_on(fds: &mut [Watch], wait: Duration) {
+    // An interrupted or failed wait reads as nothing ready, and the caller's
+    // loop asks again.
+    if tcsos::wait::wait(fds, Some(wait)).is_err() {
+        for fd in fds.iter_mut() {
+            fd.got = Ready::default();
+        }
     }
 }
 
@@ -432,26 +428,22 @@ impl Keeper {
     /// Keeps the peer for as long as the process runs.
     fn run(&mut self) {
         let mut fds = [
-            self.socket.as_raw_fd(),
-            self.spacecraft.as_raw_fd(),
-            self.nodes.as_raw_fd(),
+            self.socket.source(),
+            self.spacecraft.source(),
+            self.nodes.source(),
         ]
-        .map(|fd| libc::pollfd {
-            fd,
-            events: libc::POLLIN,
-            revents: 0,
-        });
+        .map(|fd| Watch::new(fd, Ready::READ));
         loop {
             self.tick(Instant::now());
             let wait = self.liveness.until_due(Instant::now()).min(TICK);
             wait_on(&mut fds, wait);
-            if fds[0].revents & libc::POLLIN != 0 {
+            if fds[0].got.read {
                 self.take_from_bus(Instant::now());
             }
-            if fds[1].revents & libc::POLLIN != 0 {
+            if fds[1].got.read {
                 self.command(false);
             }
-            if fds[2].revents & libc::POLLIN != 0 {
+            if fds[2].got.read {
                 self.command(true);
             }
         }
@@ -897,15 +889,11 @@ impl Hub {
     ///
     /// * `stop` - Set when the simulated end is to stop.
     fn run(&mut self, stop: &AtomicBool) {
-        let mut fds = [libc::pollfd {
-            fd: self.socket.as_raw_fd(),
-            events: libc::POLLIN,
-            revents: 0,
-        }];
+        let mut fds = [Watch::new(self.socket.source(), Ready::READ)];
         while !stop.load(Ordering::SeqCst) {
             self.tick(Instant::now());
             wait_on(&mut fds, TICK);
-            if fds[0].revents & libc::POLLIN != 0 {
+            if fds[0].got.read {
                 self.take(Instant::now());
             }
         }

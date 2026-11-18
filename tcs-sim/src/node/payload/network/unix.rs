@@ -26,11 +26,11 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::io::{Read, Write};
-use std::os::unix::net::{UnixDatagram, UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
+use tcsos::linux::net::{UnixDatagram, UnixListener, UnixStream};
 
 use crate::payload::{
     a_packet, could_not_simulate, hangs_up, ignore_this_request, lateness,
@@ -89,8 +89,7 @@ fn clear_a_dead_socket(path: &Path) -> Result<(), String> {
         Err(_) => return Ok(()),
     };
 
-    use std::os::unix::fs::FileTypeExt;
-    if !found.file_type().is_socket() {
+    if !tcsos::linux::net::is_a_socket(&found) {
         return Err(format!(
             "{} already exists and is not a socket, so the simulator will not \
              take its place",
@@ -662,9 +661,6 @@ mod tests {
     /// outside the filesystem, so that it can be answered.
     #[test]
     fn an_asked_datagram_device_waits_at_its_path_and_answers_the_asker() {
-        use std::os::linux::net::SocketAddrExt;
-        use std::os::unix::net::SocketAddr;
-
         let path = a_path("asked");
         std::fs::remove_file(&path).ok();
         let mut device = SimulatedPayload::new(PayloadConfig {
@@ -695,7 +691,8 @@ mod tests {
         // The vehicle's end, named outside the filesystem as it is aboard.
         let name = format!("tcs-sim-asked-{}", std::process::id());
         let vehicle = UnixDatagram::bind_addr(
-            &SocketAddr::from_abstract_name(name.as_bytes()).expect("a name"),
+            &tcsos::linux::net::abstract_address(name.as_bytes())
+                .expect("a name"),
         )
         .expect("the vehicle's end binds");
         vehicle

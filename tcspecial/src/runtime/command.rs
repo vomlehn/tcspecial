@@ -58,15 +58,13 @@
 
 use std::fmt::Write as _;
 use std::net::{SocketAddr, UdpSocket};
-use std::os::unix::io::AsRawFd;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use log::{error, trace, warn};
-use nix::poll::{poll, PollFd, PollFlags};
-use std::os::fd::BorrowedFd;
+use tcsos::wait::{Ready, Waitable, Wakeup, Watch};
 
 use tcsprotocol::config_digest::{ConfigDigest, ConfigVersion};
 use tcsprotocol::{
@@ -80,7 +78,7 @@ use crate::beacon_send::BeaconSend;
 use crate::runtime::bus::{Arrival, Bus, BusReader, Publisher, Took};
 use crate::runtime::held::Held;
 use crate::runtime::matched::Matched;
-use crate::runtime::node_state::{NodeStates, Wakeup};
+use crate::runtime::node_state::NodeStates;
 use crate::runtime::system::{Work, Workbench};
 use crate::telemetry_log::TelemetryLog;
 
@@ -537,32 +535,27 @@ impl Serving {
         let mut buffer = vec![0u8; COMMAND_BYTES];
 
         while !self.stopping.load(Ordering::SeqCst) {
-            // SAFETY: every descriptor here is owned by something that
-            // outlives the poll -- the two sockets by `links`, the wakeup by
-            // the Arc this holds.
+            // Every source here is owned by something that outlives the
+            // wait -- the two sockets by `links`, the wakeup by the Arc this
+            // holds.
             //
             // On the stack, the two links and the wakeup: waiting allocates
             // nothing.
-            let borrowed: [BorrowedFd; 3] = unsafe {
-                [
-                    BorrowedFd::borrow_raw(links[0].socket.as_raw_fd()),
-                    BorrowedFd::borrow_raw(links[1].socket.as_raw_fd()),
-                    BorrowedFd::borrow_raw(self.wakeup.io_fd()),
-                ]
-            };
-            let mut set: [PollFd; 3] = [
-                PollFd::new(&borrowed[0], PollFlags::POLLIN),
-                PollFd::new(&borrowed[1], PollFlags::POLLIN),
-                PollFd::new(&borrowed[2], PollFlags::POLLIN),
+            let mut set: [Watch; 3] = [
+                Watch::new(links[0].socket.source(), Ready::READ),
+                Watch::new(links[1].socket.source(), Ready::READ),
+                Watch::new(self.wakeup.source(), Ready::READ),
             ];
 
             // No timeout: the stop is in the set, so there is nothing to wake
             // up for that is not in it. A signal interrupting the wait is not
             // an error -- it is what arrives when a child of this process
             // exits -- so it waits again.
-            match poll(&mut set, -1) {
+            match tcsos::wait::wait(&mut set, None) {
                 Ok(_) => {}
-                Err(nix::errno::Errno::EINTR) => continue,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                    continue
+                }
                 Err(e) => {
                     error!("the command links cannot be waited on: {e}");
                     return;
@@ -575,10 +568,8 @@ impl Serving {
 
             // By index, because taking a command counts its answer on the
             // link it arrived on.
-            for (which, polled) in set.iter().take(links.len()).enumerate() {
-                let ready = polled
-                    .revents()
-                    .is_some_and(|events| events.contains(PollFlags::POLLIN));
+            for (which, watched) in set.iter().take(links.len()).enumerate() {
+                let ready = watched.got.read;
                 let (first, second) = links.split_at_mut(1);
                 let (link, other) = match which {
                     0 => (&mut first[0], &second[0]),
@@ -613,24 +604,20 @@ impl Serving {
             let timeout =
                 i32::try_from(until.as_millis() + 1).unwrap_or(i32::MAX);
 
-            // SAFETY: the bus's socket is owned by the reader and the wakeup
-            // by the Arc this holds, both of which outlive the poll.
+            // The bus's socket is owned by the reader and the wakeup by the
+            // Arc this holds, both of which outlive the wait.
             //
             // On the stack, as the UDP links' set is: waiting allocates
             // nothing.
-            let borrowed: [BorrowedFd; 2] = unsafe {
-                [
-                    BorrowedFd::borrow_raw(reader.fd()),
-                    BorrowedFd::borrow_raw(self.wakeup.io_fd()),
-                ]
-            };
-            let mut set: [PollFd; 2] = [
-                PollFd::new(&borrowed[0], PollFlags::POLLIN),
-                PollFd::new(&borrowed[1], PollFlags::POLLIN),
+            let mut set: [Watch; 2] = [
+                Watch::new(reader.source(), Ready::READ),
+                Watch::new(self.wakeup.source(), Ready::READ),
             ];
-            match poll(&mut set, timeout) {
+            match tcsos::wait::wait_ms(&mut set, timeout) {
                 Ok(_) => {}
-                Err(nix::errno::Errno::EINTR) => continue,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+                    continue
+                }
                 Err(e) => {
                     error!("the software bus cannot be waited on: {e}");
                     return;
@@ -639,10 +626,7 @@ impl Serving {
             if self.stopping.load(Ordering::SeqCst) {
                 return;
             }
-            let ready = set[0]
-                .revents()
-                .is_some_and(|events| events.contains(PollFlags::POLLIN));
-            if !ready {
+            if !set[0].got.read {
                 continue;
             }
             if let Took::Command(arrival) = reader.take(Instant::now()) {

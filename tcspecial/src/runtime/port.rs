@@ -41,11 +41,8 @@
 //! reported those would bury the real faults in them.
 
 use std::collections::VecDeque;
-use std::os::fd::BorrowedFd;
-use std::os::unix::io::RawFd;
 use std::time::{Duration, Instant};
-
-use nix::poll::{poll, PollFd, PollFlags};
+use tcsos::wait::{Ready, Source, Watch};
 
 use tcsapp::parent::ReadInto;
 use tcsprotocol::graph::interface::speaks_first;
@@ -600,18 +597,18 @@ impl EndpointPort {
 
     /// The descriptor a read waits on, for a loop that waits rather than
     /// polls.
-    pub fn io_fd(&self) -> RawFd {
-        self.reader.io_fd()
+    pub fn io_source(&self) -> Source {
+        self.reader.io_source()
     }
 
     /// Waits until there is something to read, a command, or the time is
     /// up.
     pub fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        self.reader.wait_for_event(cmd_fd, timeout_ms)
+        self.reader.wait_for_event(cmd, timeout_ms)
     }
 
     /// Makes one read of this node, as far as `want` bytes: what is there,
@@ -793,20 +790,14 @@ impl EndpointPort {
     ///
     /// A message naming the node, where the poll failed.
     fn ready_to_read(&self) -> Result<bool, String> {
-        // SAFETY: a descriptor the reader owns, borrowed for the call and not
-        // kept.
-        let borrowed = unsafe { BorrowedFd::borrow_raw(self.reader.io_fd()) };
-        let mut fds = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+        // A source the reader owns, for the call.
+        let mut set = [Watch::new(self.reader.io_source(), Ready::READ)];
 
-        match poll(&mut fds, 0) {
+        match tcsos::wait::wait_ms(&mut set, 0) {
             Ok(0) => Ok(false),
-            Ok(_) => Ok(fds[0].revents().is_some_and(|events| {
-                // Readable, and also an end or an error: a descriptor at its
-                // end is read, which is how an end is noticed at all.
-                events.intersects(
-                    PollFlags::POLLIN | PollFlags::POLLHUP | PollFlags::POLLERR,
-                )
-            })),
+            // Readable, and also an end or an error: a source at its end is
+            // read, which is how an end is noticed at all.
+            Ok(_) => Ok(set[0].got.read || set[0].got.trouble),
             Err(e) => Err(format!(
                 "{}: cannot ask whether there is anything to read: {e}",
                 self.what
@@ -1763,9 +1754,9 @@ impl Port for AppPort {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::fd::AsRawFd;
     use std::path::Path;
     use std::sync::{Arc, Mutex};
+    use tcsos::wait::Waitable;
 
     use tcsprotocol::graph::Graph;
     use tcsprotocol::{TcsError, TcsResult};
@@ -1831,13 +1822,13 @@ mod tests {
     }
 
     impl EndpointWaitable for Half {
-        fn io_fd(&self) -> RawFd {
-            self.1.as_raw_fd()
+        fn io_source(&self) -> Source {
+            self.1.source()
         }
 
         fn wait_for_event(
             &self,
-            _cmd_fd: RawFd,
+            _cmd: Source,
             _timeout_ms: i32,
         ) -> TcsResult<WaitResult> {
             Ok(WaitResult::IoReady)
@@ -2013,45 +2004,10 @@ mod tests {
     #[test]
     fn a_line_on_a_pseudo_terminal_is_read_a_whole_read_at_a_time() {
         use std::io::Write;
-        use std::os::unix::io::FromRawFd;
         use tcsprotocol::graph::{Destinations, Link, Node};
 
-        // SAFETY: posix_openpt takes only flags and has no preconditions;
-        // its result is checked before it is used.
-        let master_fd =
-            unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-        assert!(
-            master_fd >= 0,
-            "no pty: {}",
-            std::io::Error::last_os_error()
-        );
-        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
-        // `master_fd` was just opened, is checked above, and nothing else
-        // takes ownership of it; the uses below only borrow it while the File
-        // is alive.
-        let mut master = unsafe { std::fs::File::from_raw_fd(master_fd) };
-        // SAFETY: grantpt needs an open pty master, which `master_fd` is,
-        // owned by the File above for the rest of the test.
-        assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
-        // SAFETY: as for grantpt.
-        assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
-        let mut name = [0 as libc::c_char; 128];
-        assert_eq!(
-            // SAFETY: ptsname_r needs an open pty master and a buffer it can
-            // write of the length it is given: `name` is a local array, and
-            // its own length is what is passed.
-            unsafe {
-                libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
-            },
-            0
-        );
-        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
-        // borrow. ptsname_r returned 0, so it wrote a terminated name into
-        // `name` (it fails with ERANGE rather than truncate), and `name`
-        // outlives the CStr, which is copied out at once.
-        let line = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
-            .to_string_lossy()
-            .into_owned();
+        let (mut master, line) =
+            tcsos::linux::pty::open().expect("a pseudo-terminal");
 
         let gps = Node {
             name: "gps".to_string(),
@@ -2688,20 +2644,11 @@ mod tests {
     /// that endpoint.
     #[test]
     fn a_quiet_node_does_not_block_the_pass() {
-        use std::ffi::CString;
         use tcsprotocol::DeviceConfig;
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pipe");
-        let name =
-            CString::new(path.to_str().expect("a path")).expect("a name");
-        assert_eq!(
-            // SAFETY: mkfifo needs a NUL-terminated path alive for the call,
-            // which `name` is: a CString, held to the end of the test.
-            unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
-            0,
-            "a named pipe"
-        );
+        tcsos::linux::fs::make_fifo(&path).expect("a named pipe");
 
         let config = EndpointConfig::Device(DeviceConfig {
             path: path.to_string_lossy().to_string(),
@@ -2740,21 +2687,11 @@ mod tests {
     /// as the endpoint is concerned.
     #[test]
     fn a_device_file_opened_by_the_factory_carries_both_ways() {
-        use std::ffi::CString;
         use tcsprotocol::DeviceConfig;
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("pipe");
-        let name =
-            CString::new(path.to_str().expect("a path")).expect("a name");
-        assert_eq!(
-            // SAFETY: mkfifo needs a NUL-terminated path alive for the call,
-            // which `name` is: a CString, held to the end of the test.
-            unsafe { libc::mkfifo(name.as_ptr(), 0o600) },
-            0,
-            "a named pipe: {}",
-            std::io::Error::last_os_error()
-        );
+        tcsos::linux::fs::make_fifo(&path).expect("a named pipe");
 
         let config = EndpointConfig::Device(DeviceConfig {
             path: path.to_string_lossy().to_string(),
@@ -2774,7 +2711,7 @@ mod tests {
         assert_eq!(&buffer[..got], b"293.15");
 
         // And the descriptor a waiting loop would poll.
-        assert!(port.io_fd() >= 0);
+        assert_ne!(port.io_source(), Source::NONE);
     }
 
     /// A computation holds its result until it is taken.
@@ -3277,7 +3214,6 @@ mod tests {
     mod app {
         use super::*;
         use std::io::Write;
-        use std::os::unix::fs::PermissionsExt;
 
         /// A simulated app, written in shell.
         ///
@@ -3304,11 +3240,8 @@ mod tests {
             let mut file = std::fs::File::create(&path).expect("a program");
             write!(file, "#!/bin/sh\nexec cat {redirect}\n")
                 .expect("a program");
-            std::fs::set_permissions(
-                &path,
-                std::fs::Permissions::from_mode(0o755),
-            )
-            .expect("a program that can be run");
+            tcsos::fs::set_mode(&path, 0o755)
+                .expect("a program that can be run");
             path
         }
 
@@ -3513,11 +3446,8 @@ mod tests {
             )
             .expect("a program");
             drop(file);
-            std::fs::set_permissions(
-                &path,
-                std::fs::Permissions::from_mode(0o755),
-            )
-            .expect("a program that can be run");
+            tcsos::fs::set_mode(&path, 0o755)
+                .expect("a program that can be run");
 
             let mut bay = node("bay", "app_pl", &path);
             bay.attributes.insert(
@@ -3567,11 +3497,8 @@ mod tests {
             // Closed before it is run: a program still open for writing is a
             // program the kernel refuses to execute.
             drop(file);
-            std::fs::set_permissions(
-                &path,
-                std::fs::Permissions::from_mode(0o755),
-            )
-            .expect("a program that can be run");
+            tcsos::fs::set_mode(&path, 0o755)
+                .expect("a program that can be run");
 
             let mut port = crate::when_not_busy(|| {
                 AppPort::open(&node("bay", "app_pl", &path))

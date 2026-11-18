@@ -39,12 +39,11 @@
 //! writes the state file, which allocates, as every change to that file
 //! does, once for each child.
 
-use std::ffi::{CString, OsString};
-use std::os::unix::ffi::OsStrExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use log::{error, info, warn};
+use tcsos::child::{Ended, Spawner};
 use tcsprotocol::simulate::Mode;
 
 use crate::runtime::choose::Boot;
@@ -96,16 +95,10 @@ pub fn is_child() -> bool {
 ///
 /// The first thing a child does.
 pub fn child_follows_supervisor() {
-    // SAFETY: prctl with a signal number, and getppid, take and return
-    // integers only.
-    unsafe {
-        libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM as libc::c_ulong);
-    }
     let supervisor = std::env::var(CHILD_VAR)
         .ok()
-        .and_then(|said| said.parse::<libc::pid_t>().ok());
-    // SAFETY: as above.
-    if supervisor.is_some_and(|pid| unsafe { libc::getppid() } != pid) {
+        .and_then(|said| said.parse::<u32>().ok());
+    if !tcsos::child::follow_parent(supervisor) {
         eprintln!("tcspecial: its supervisor has ended, so it does not start");
         std::process::exit(BAD);
     }
@@ -160,164 +153,6 @@ fn after_bad(state: &mut State) -> Option<tcsprotocol::ConfigDigest> {
     popped
 }
 
-/// The two stop signals and SIGCHLD, as a set.
-///
-/// # Arguments
-///
-/// * `child` - Whether SIGCHLD is in it.
-///
-/// # Returns
-///
-/// The set.
-fn signals(child: bool) -> libc::sigset_t {
-    // SAFETY: a set made empty and then given signals, on the stack.
-    unsafe {
-        let mut set: libc::sigset_t = std::mem::zeroed();
-        libc::sigemptyset(&mut set);
-        libc::sigaddset(&mut set, libc::SIGINT);
-        libc::sigaddset(&mut set, libc::SIGTERM);
-        if child {
-            libc::sigaddset(&mut set, libc::SIGCHLD);
-        }
-        set
-    }
-}
-
-/// What every child is started with, made once.
-struct Spawning {
-    /// The program, this one.
-    program: CString,
-    /// Its arguments, its own name first, as this process was given them:
-    /// held for `argv` to point into.
-    _args: Vec<CString>,
-    /// This process's environment, with [`CHILD_VAR`] added: held for
-    /// `envp` to point into.
-    _env: Vec<CString>,
-    /// The arguments, as `posix_spawn` takes them, ending in a null.
-    argv: Vec<*mut libc::c_char>,
-    /// `--no-memlock`, held for `unlocked` to point into.
-    _no_memlock: CString,
-    /// The arguments with `--no-memlock` after the program's name, for a
-    /// child that is to run unlocked.
-    unlocked: Vec<*mut libc::c_char>,
-    /// The environment, as `posix_spawn` takes it, ending in a null.
-    envp: Vec<*mut libc::c_char>,
-}
-
-impl Spawning {
-    /// Makes what every child is started with.
-    ///
-    /// # Returns
-    ///
-    /// It.
-    ///
-    /// # Errors
-    ///
-    /// Why not: a nul in the program's name, an argument or the
-    /// environment.
-    fn new() -> Result<Spawning, String> {
-        let program = std::env::current_exe()
-            .unwrap_or_else(|_| PathBuf::from("/proc/self/exe"));
-        let c = |said: &[u8]| {
-            CString::new(said).map_err(|_| {
-                "a nul in the program's name, an argument or the environment"
-                    .to_string()
-            })
-        };
-        let args = std::env::args_os()
-            .map(|arg: OsString| c(arg.as_bytes()))
-            .collect::<Result<Vec<_>, _>>()?;
-        let mut env = std::env::vars_os()
-            .filter(|(name, _)| name != CHILD_VAR)
-            .map(|(name, value)| {
-                let mut pair = name.as_bytes().to_vec();
-                pair.push(b'=');
-                pair.extend_from_slice(value.as_bytes());
-                c(&pair)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        env.push(c(format!("{CHILD_VAR}={}", std::process::id()).as_bytes())?);
-        // Pointers into the strings, whose bytes stay where they are when
-        // the vectors holding them move.
-        let pointers = |all: &[CString]| {
-            all.iter()
-                .map(|one| one.as_ptr() as *mut libc::c_char)
-                .chain(std::iter::once(std::ptr::null_mut()))
-                .collect::<Vec<_>>()
-        };
-        let no_memlock = c(b"--no-memlock")?;
-        let mut unlocked = pointers(&args);
-        unlocked.insert(1.min(args.len()), no_memlock.as_ptr() as *mut _);
-        Ok(Spawning {
-            program: c(program.as_os_str().as_bytes())?,
-            argv: pointers(&args),
-            envp: pointers(&env),
-            _no_memlock: no_memlock,
-            unlocked,
-            _args: args,
-            _env: env,
-        })
-    }
-
-    /// Starts a child, with SIGINT and SIGTERM blocked in it as they are
-    /// here, so that one sent before its signal thread runs is taken by
-    /// that thread rather than ending it, and SIGCHLD not.
-    ///
-    /// # Arguments
-    ///
-    /// * `unlocked` - Whether the child is to run with `--no-memlock`.
-    ///
-    /// # Returns
-    ///
-    /// The child's process id.
-    ///
-    /// # Errors
-    ///
-    /// What `posix_spawn` failed with.
-    fn start(&self, unlocked: bool) -> std::io::Result<libc::pid_t> {
-        let argv = if unlocked { &self.unlocked } else { &self.argv };
-        let mask = signals(false);
-        let mut pid: libc::pid_t = 0;
-        // SAFETY: the attributes are made, used and destroyed here; the
-        // program, the arguments, the environment and the vectors of them
-        // are nul-terminated and outlive the call, which copies them. Every
-        // descriptor tcspecial opens is closed on exec, so the child is
-        // handed what this process was handed and nothing else.
-        let started = unsafe {
-            let mut attr: libc::posix_spawnattr_t = std::mem::zeroed();
-            libc::posix_spawnattr_init(&mut attr);
-            libc::posix_spawnattr_setsigmask(&mut attr, &mask);
-            libc::posix_spawnattr_setflags(
-                &mut attr,
-                libc::POSIX_SPAWN_SETSIGMASK as libc::c_short,
-            );
-            let started = libc::posix_spawn(
-                &mut pid,
-                self.program.as_ptr(),
-                std::ptr::null(),
-                &attr,
-                argv.as_ptr(),
-                self.envp.as_ptr(),
-            );
-            libc::posix_spawnattr_destroy(&mut attr);
-            started
-        };
-        if started != 0 {
-            return Err(std::io::Error::from_raw_os_error(started));
-        }
-        Ok(pid)
-    }
-}
-
-/// How a child ended.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Ended {
-    /// It exited with this status.
-    Exited(i32),
-    /// A signal ended it.
-    Signalled(i32),
-}
-
 /// Says whether a child that ended so was stopped.
 ///
 /// SIGINT and SIGTERM are taken by a thread of the child's own, and end it
@@ -333,70 +168,7 @@ enum Ended {
 ///
 /// Whether it exited with [`GOOD`] or was ended by SIGINT or SIGTERM.
 fn stopped(ended: Ended) -> bool {
-    matches!(
-        ended,
-        Ended::Exited(GOOD) | Ended::Signalled(libc::SIGINT | libc::SIGTERM)
-    )
-}
-
-/// Waits for `pid` to end, passing SIGINT and SIGTERM on to it.
-///
-/// # Arguments
-///
-/// * `pid`      - The child.
-/// * `stopping` - Set where a stop signal was taken, and passed on.
-///
-/// # Returns
-///
-/// How it ended.
-fn wait_for(pid: libc::pid_t, stopping: &mut bool) -> Ended {
-    let set = signals(true);
-    let look = libc::timespec {
-        tv_sec: 0,
-        tv_nsec: LOOK.as_nanos() as libc::c_long,
-    };
-    loop {
-        let mut status: libc::c_int = 0;
-        // SAFETY: `status` is this frame's own, and `pid` is the child this
-        // process started and nothing else waits for.
-        let waited = unsafe { libc::waitpid(pid, &mut status, libc::WNOHANG) };
-        if waited == pid {
-            return if libc::WIFEXITED(status) {
-                Ended::Exited(libc::WEXITSTATUS(status))
-            } else {
-                Ended::Signalled(libc::WTERMSIG(status))
-            };
-        }
-        // SAFETY: waiting on a set and a timeout that live across the call.
-        let taken =
-            unsafe { libc::sigtimedwait(&set, std::ptr::null_mut(), &look) };
-        if taken == libc::SIGINT || taken == libc::SIGTERM {
-            *stopping = true;
-            // SAFETY: a signal sent to the child this process started.
-            unsafe { libc::kill(pid, taken) };
-        }
-    }
-}
-
-/// Waits for `delay`, unless a stop signal comes first.
-///
-/// # Arguments
-///
-/// * `delay` - How long.
-///
-/// # Returns
-///
-/// Whether a stop signal came.
-fn pause(delay: Duration) -> bool {
-    let set = signals(false);
-    let wait = libc::timespec {
-        tv_sec: delay.as_secs() as libc::time_t,
-        tv_nsec: delay.subsec_nanos() as libc::c_long,
-    };
-    // SAFETY: waiting on a set and a timeout that live across the call.
-    let taken =
-        unsafe { libc::sigtimedwait(&set, std::ptr::null_mut(), &wait) };
-    taken == libc::SIGINT || taken == libc::SIGTERM
+    ended == Ended::Exited(GOOD) || ended.by_a_stop()
 }
 
 /// Changes the state file at `path`, saying in the log where it cannot be.
@@ -435,10 +207,7 @@ fn changed<T>(path: &Path, change: impl FnOnce(&mut State) -> T) -> Option<T> {
 pub fn run(path: &str, mode: Mode) -> i32 {
     // Blocked before anything else, so that a stop sent from now on waits
     // to be taken here, or by the child, which starts with them blocked.
-    let all = signals(true);
-    // SAFETY: blocking signals in this, the only thread, with a set that
-    // lives across the call.
-    unsafe { libc::sigprocmask(libc::SIG_BLOCK, &all, std::ptr::null_mut()) };
+    tcsos::child::block_stops_and_children();
 
     let boot = match Boot::of_command_line(Path::new(path)) {
         Ok((boot, _)) => boot,
@@ -457,7 +226,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
             return BAD;
         }
     }
-    let spawning = match Spawning::new() {
+    let spawning = match Spawner::new(CHILD_VAR, "--no-memlock") {
         Ok(spawning) => spawning,
         Err(why) => {
             error!("supervisor: no child can be started: {why}");
@@ -485,7 +254,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
             Ok(pid) => pid,
             Err(e) => {
                 error!("supervisor: no child can be started: {e}");
-                if !mode.is_flight() || pause(delay) {
+                if !mode.is_flight() || tcsos::child::pause(delay) {
                     return BAD;
                 }
                 delay = (delay * 2).min(MOST_DELAY);
@@ -494,7 +263,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
         };
         info!("supervisor: child {pid} started");
         let mut stopping = false;
-        let ended = wait_for(pid, &mut stopping);
+        let ended = tcsos::child::wait_for(pid, LOOK, &mut stopping);
         if stopping {
             info!("supervisor: stopped, child {pid} {ended:?}");
             return if stopped(ended) { GOOD } else { BAD };
@@ -566,7 +335,7 @@ pub fn run(path: &str, mode: Mode) -> i32 {
                              nothing beneath it: starting it again in {} s",
                             delay.as_secs()
                         );
-                        if pause(delay) {
+                        if tcsos::child::pause(delay) {
                             return GOOD;
                         }
                         delay = (delay * 2).min(MOST_DELAY);
@@ -627,10 +396,12 @@ mod tests {
     #[test]
     fn a_stop_signal_is_a_stop() {
         assert!(stopped(Ended::Exited(GOOD)));
-        assert!(stopped(Ended::Signalled(libc::SIGTERM)));
-        assert!(stopped(Ended::Signalled(libc::SIGINT)));
-        assert!(!stopped(Ended::Signalled(libc::SIGSEGV)));
-        assert!(!stopped(Ended::Signalled(libc::SIGKILL)));
+        use tcsos::child::signal;
+
+        assert!(stopped(Ended::Signalled(signal::TERMINATE)));
+        assert!(stopped(Ended::Signalled(signal::INTERRUPT)));
+        assert!(!stopped(Ended::Signalled(signal::SEGMENTATION)));
+        assert!(!stopped(Ended::Signalled(signal::KILL)));
         assert!(!stopped(Ended::Exited(RESTART)));
         assert!(!stopped(Ended::Exited(BAD)));
     }

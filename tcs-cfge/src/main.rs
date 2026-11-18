@@ -14986,7 +14986,6 @@ mod tests {
     /// every edit fails, and a window that came back on each of them would be
     /// a window nobody could type past.
     fn an_error_is_put_where_it_cannot_be_missed() {
-        use std::os::unix::fs::PermissionsExt;
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
@@ -15059,10 +15058,7 @@ mod tests {
 
         // One that failed is put in front of them, and says why.
         let shut = |mode: u32| {
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(mode);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, mode).unwrap();
         };
         shut(0o500);
         editor.borrow_mut().edit(Edit::AddNode {
@@ -16488,7 +16484,6 @@ mod tests {
     /// failed: leaving a session's work in a process that is ending is the one
     /// way this editor could lose anything.
     fn leaving_offers_to_write_what_the_files_do_not_have() {
-        use std::os::unix::fs::PermissionsExt;
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
@@ -16553,10 +16548,7 @@ mod tests {
 
         // A write that failed, so there is something to offer.
         let shut = |mode: u32| {
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(mode);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, mode).unwrap();
         };
         shut(0o500);
         editor.borrow_mut().edit(Edit::AddNode {

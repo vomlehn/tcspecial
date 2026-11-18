@@ -46,11 +46,10 @@
 //! arrives wherever tcspecial's own complaints do.
 
 use std::io::{Read, Write};
-use std::os::fd::AsRawFd;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
-use nix::poll::{poll, PollFd, PollFlags};
+use tcsos::wait::{Ready, Waitable, Watch};
 
 use crate::runtime::node_state::Abandon;
 use tcsprotocol::link_text::{read_text, write_text};
@@ -271,37 +270,26 @@ impl Process {
                 ));
             }
 
-            // SAFETY: both descriptors are owned by something that outlives
-            // the call -- the child's pipe by `running`, the node's wakeup by
-            // the Arc inside `abandon` -- and neither is kept.
-            let borrowed = unsafe {
-                std::os::fd::BorrowedFd::borrow_raw(running.stdout.as_raw_fd())
-            };
-            let woken = self
-                .abandon
-                .io_fd()
-                // SAFETY: as above: the wakeup is held open by `abandon`,
-                // which `self` keeps for longer than this borrow.
-                .map(|fd| unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) });
+            // Both sources are owned by something that outlives the call --
+            // the child's pipe by `running`, the node's wakeup by the Arc
+            // inside `abandon`.
+            //
             // On the stack: the program's output, and the node's wakeup
             // where it has one.
+            let output = Watch::new(running.stdout.source(), Ready::READ);
             let mut both;
             let mut alone;
-            let fds: &mut [PollFd] = match woken.as_ref() {
+            let set: &mut [Watch] = match self.abandon.source() {
                 Some(woken) => {
-                    both = [
-                        PollFd::new(&borrowed, PollFlags::POLLIN),
-                        PollFd::new(woken, PollFlags::POLLIN),
-                    ];
+                    both = [output, Watch::new(woken, Ready::READ)];
                     &mut both
                 }
                 None => {
-                    alone = [PollFd::new(&borrowed, PollFlags::POLLIN)];
+                    alone = [output];
                     &mut alone
                 }
             };
-            let waiting = left.as_millis().min(i32::MAX as u128) as i32;
-            match poll(fds, waiting) {
+            match tcsos::wait::wait(set, Some(left)) {
                 Ok(0) => continue,
                 Ok(_) => {}
                 Err(e) => {
@@ -314,11 +302,7 @@ impl Process {
             // stopping the node is what the ground asked for, and the program
             // is put down by the disabling itself. What it must not do is
             // wait out the rest of a deadline that may be seconds long.
-            if fds
-                .get(1)
-                .and_then(|fd| fd.revents())
-                .is_some_and(|events| events.contains(PollFlags::POLLIN))
-            {
+            if set.get(1).is_some_and(|woken| woken.got.read) {
                 return Ok(false);
             }
 
@@ -710,7 +694,6 @@ mod tests {
     /// If it cannot be written or made executable.
     fn program(script: &str) -> (tempfile::TempDir, String) {
         use std::io::Write as _;
-        use std::os::unix::fs::PermissionsExt;
 
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("computation");
@@ -719,8 +702,7 @@ mod tests {
         write!(file, "#!/bin/sh\n{script}").expect("the program is written");
         file.flush().expect("flushed");
         drop(file);
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-            .expect("and made runnable");
+        tcsos::fs::set_mode(&path, 0o755).expect("and made runnable");
 
         let name = path.to_str().expect("a path").to_string();
         (where_, name)

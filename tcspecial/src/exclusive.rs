@@ -30,26 +30,12 @@
 //! of it rather than part.
 
 use std::fs::{File, OpenOptions};
-use std::io;
-use std::os::fd::AsRawFd;
-use std::os::unix::fs::FileTypeExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use log::warn;
+use tcsos::fs::Taken;
 use tcsprotocol::{TcsError, TcsResult};
-
-/// Whether a lock was taken.
-#[derive(Debug)]
-enum Taken {
-    /// It was, and is held for as long as the descriptor is open.
-    Yes,
-    /// Another open of the file holds it.
-    Elsewhere,
-    /// The file cannot be locked, the kernel says why: a file system or a
-    /// driver without locks.
-    Cannot(io::Error),
-}
 
 /// Takes `file` whole for this process, without waiting.
 ///
@@ -61,36 +47,11 @@ enum Taken {
 ///
 /// Whether it was taken.
 fn whole(file: &File) -> Taken {
-    // SAFETY: flock on a descriptor `file` holds open, with no pointer.
-    let said =
-        unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
-    taken(said)
-}
-
-/// Takes the byte at `at` of `file` for this open of it, without waiting.
-///
-/// # Arguments
-///
-/// * `file` - The open file, opened for writing.
-/// * `at`   - Which byte.
-///
-/// # Returns
-///
-/// Whether it was taken.
-fn one_byte(file: &File, at: u16) -> Taken {
-    // SAFETY: flock is plain data, for which zero is a valid value.
-    let mut lock: libc::flock = unsafe { std::mem::zeroed() };
-    lock.l_type = libc::F_WRLCK as libc::c_short;
-    lock.l_whence = libc::SEEK_SET as libc::c_short;
-    lock.l_start = libc::off_t::from(at);
-    lock.l_len = 1;
-    // l_pid stays nought, as an open file description lock requires.
-    //
-    // SAFETY: F_OFD_SETLK on a descriptor `file` holds open, with a pointer
-    // to a flock that lives across the call.
-    let said =
-        unsafe { libc::fcntl(file.as_raw_fd(), libc::F_OFD_SETLK, &lock) };
-    taken(said)
+    match file.try_lock() {
+        Ok(()) => Taken::Yes,
+        Err(std::fs::TryLockError::WouldBlock) => Taken::Elsewhere,
+        Err(std::fs::TryLockError::Error(e)) => Taken::Cannot(e),
+    }
 }
 
 /// Tries `take` until it is not held elsewhere, for a moment at most.
@@ -126,26 +87,6 @@ const HELD_FOR: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// How often it is tried in that time.
 const TRY_EVERY: std::time::Duration = std::time::Duration::from_millis(10);
-
-/// What a lock call's result says.
-///
-/// # Arguments
-///
-/// * `said` - What `flock` or `fcntl` returned.
-///
-/// # Returns
-///
-/// Whether the lock was taken, from `errno` where it was not.
-fn taken(said: libc::c_int) -> Taken {
-    if said == 0 {
-        return Taken::Yes;
-    }
-    let e = io::Error::last_os_error();
-    match e.raw_os_error() {
-        Some(libc::EWOULDBLOCK) | Some(libc::EACCES) => Taken::Elsewhere,
-        _ => Taken::Cannot(e),
-    }
-}
 
 /// The refusal of a device another process holds.
 ///
@@ -186,9 +127,9 @@ fn held_elsewhere(what: &str, whose: &str) -> TcsError {
 /// `TcsError::Endpoint`, naming the node and the device, if another
 /// process holds it.
 pub fn device(what: &str, path: &str, file: &File) -> TcsResult<()> {
-    let is_device = file.metadata().is_ok_and(|meta| {
-        meta.file_type().is_char_device() || meta.file_type().is_block_device()
-    });
+    let is_device = file
+        .metadata()
+        .is_ok_and(|meta| tcsos::fs::is_device(&meta));
     if !is_device {
         return Ok(());
     }
@@ -251,7 +192,7 @@ pub fn on_bus(
     file: &File,
 ) -> TcsResult<()> {
     let whose = || format!("the address {address:#04X} on {bus}");
-    match retried(|| one_byte(file, address)) {
+    match retried(|| tcsos::fs::lock_one_byte(file, address)) {
         Taken::Yes => Ok(()),
         Taken::Elsewhere => Err(held_elsewhere(what, &whose())),
         Taken::Cannot(e) => {

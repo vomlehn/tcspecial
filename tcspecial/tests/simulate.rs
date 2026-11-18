@@ -66,8 +66,8 @@ fn stderr_of(command: &mut Command) -> String {
             .expect("what it said")
             .contains("starting it again")
         {
-            // SAFETY: a signal to a child this test started.
-            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGTERM) };
+            // A child this test started.
+            let _ = tcsos::process::terminate(child.id());
             child.wait().expect("it stops");
             break;
         }
@@ -139,41 +139,7 @@ payloads:
 ///
 /// If no pseudo-terminal can be had.
 fn pseudo_terminal() -> (File, String) {
-    use std::os::unix::io::FromRawFd;
-
-    // SAFETY: posix_openpt takes only flags and has no preconditions; its
-    // result is checked before it is used.
-    let master_fd =
-        unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-    assert!(
-        master_fd >= 0,
-        "no pty: {}",
-        std::io::Error::last_os_error()
-    );
-    // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
-    // `master_fd` was just opened, is checked above, and nothing else takes
-    // ownership of it; the uses below only borrow it while the File is alive.
-    let master = unsafe { File::from_raw_fd(master_fd) };
-    // SAFETY: grantpt needs an open pty master, which `master_fd` is, owned by
-    // the File above for the rest of the test.
-    assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
-    // SAFETY: as for grantpt.
-    assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
-    let mut name = [0 as libc::c_char; 128];
-    assert_eq!(
-        // SAFETY: ptsname_r needs an open pty master and a buffer it can write
-        // of the length it is given: `name` is a local array, and its own
-        // length is what is passed.
-        unsafe { libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len()) },
-        0
-    );
-    // SAFETY: from_ptr needs a NUL-terminated string that outlives the borrow.
-    // ptsname_r returned 0, so it wrote a terminated name into `name`, and
-    // `name` outlives the CStr, which is copied out at once.
-    let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
-        .to_string_lossy()
-        .into_owned();
-    (master, slave)
+    tcsos::linux::pty::open().expect("a pseudo-terminal")
 }
 
 /// The payloads section of a serial payload on a pseudo-terminal.

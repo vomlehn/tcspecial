@@ -61,10 +61,9 @@
 
 use std::fs::File;
 use std::io;
-use std::os::fd::{AsRawFd, FromRawFd, RawFd};
-use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
+use tcsos::interfaces::Stream as UnixStream;
 
 use crate::{is_handed_over, is_open, packet, Interface};
 
@@ -487,16 +486,11 @@ pub fn complain(message: &str) {
     }
     // Held rather than owned: this does not close the interface, which an app
     // that goes on to use it would need and a `File` would close as it went
-    // out of scope.
-    //
-    // SAFETY: from_raw_fd needs an open descriptor, which descriptor 2 was
-    // just found to be. Nothing owns it, the interfaces not having been
-    // taken (MOVED is set when they are), and the ManuallyDrop means this
-    // File never closes it either.
-    let mut errors = std::mem::ManuallyDrop::new(unsafe {
-        File::from_raw_fd(Interface::Errors.fd())
+    // out of scope. Nothing owns it, the interfaces not having been taken
+    // (MOVED is set when they are).
+    tcsos::interfaces::with_slot(Interface::Errors.fd(), |errors| {
+        let _ = packet::write(errors, message.as_bytes());
     });
-    let _ = packet::write(&mut *errors, message.as_bytes());
 }
 
 /// The error interface where `inherited` moved it, for [`complain`] and for
@@ -600,7 +594,7 @@ fn take_once(taken: &AtomicBool) -> Result<(), String> {
 ///
 /// Called only from an `inherited`, once [`taking`] has said the interfaces
 /// are its to take, which it says once: the interface is moved to a
-/// descriptor of its own (see [`moved`]), owned from here on and closed when
+/// descriptor of its own (see [`not_moved`]), owned from here on and closed when
 /// the handle is dropped.
 ///
 /// # Arguments
@@ -615,10 +609,8 @@ fn take_once(taken: &AtomicBool) -> Result<(), String> {
 ///
 /// Why not, if it could not be moved.
 fn stream(interface: Interface) -> Result<UnixStream, String> {
-    let fd = moved(interface)?;
-    // SAFETY: from_raw_fd needs an open descriptor that nothing else owns,
-    // and `moved` has just made this one: nothing else has its number.
-    Ok(unsafe { UnixStream::from_raw_fd(fd) })
+    tcsos::interfaces::take_stream(interface.fd())
+        .map_err(|e| not_moved(interface, e))
 }
 
 /// And the one that is only written, which need be no more than a file.
@@ -637,41 +629,29 @@ fn stream(interface: Interface) -> Result<UnixStream, String> {
 ///
 /// Why not, if it could not be moved.
 fn file(interface: Interface) -> Result<File, String> {
-    let fd = moved(interface)?;
-    // SAFETY: as for `stream`.
-    Ok(unsafe { File::from_raw_fd(fd) })
+    tcsos::interfaces::take_file(interface.fd())
+        .map_err(|e| not_moved(interface, e))
 }
 
-/// Gives an interface a descriptor of its own, the lowest above 2, closed on
-/// exec, so that it is not std's stdin, stdout or stderr as well and a
-/// program the app starts does not inherit it. Its standard descriptor is
-/// left as it was, for [`quiet`] to cover.
+/// What an interface that could not be given a descriptor of its own --
+/// the lowest above 2, closed on exec, so that it is not std's stdin,
+/// stdout or stderr as well and a program the app starts does not inherit
+/// it -- is said to be.
 ///
 /// # Arguments
 ///
 /// * `interface` - The interface.
+/// * `e`         - Why not.
 ///
 /// # Returns
 ///
-/// The new descriptor.
-///
-/// # Errors
-///
-/// Why not, if the system would not make one.
-fn moved(interface: Interface) -> Result<RawFd, String> {
-    // SAFETY: F_DUPFD_CLOEXEC makes a new descriptor from an open one and
-    // reads nothing through a pointer; `taking` has checked this one is
-    // open, and one that is not would fail with EBADF.
-    let fd = unsafe { libc::fcntl(interface.fd(), libc::F_DUPFD_CLOEXEC, 3) };
-    if fd == -1 {
-        return Err(format!(
-            "{} could not be moved off descriptor {}: {}",
-            interface.name(),
-            interface.fd(),
-            io::Error::last_os_error()
-        ));
-    }
-    Ok(fd)
+/// The sentence.
+fn not_moved(interface: Interface, e: io::Error) -> String {
+    format!(
+        "{} could not be moved off descriptor {}: {e}",
+        interface.name(),
+        interface.fd()
+    )
 }
 
 /// Takes the standard streams off the interfaces, now that each has a
@@ -698,25 +678,9 @@ fn quiet(name: &str, errors: &Errors) -> Result<(), String> {
     std::panic::set_hook(Box::new(move |info| {
         complain(&format!("{name}: {info}"));
     }));
-    let null = File::options()
-        .read(true)
-        .write(true)
-        .open("/dev/null")
-        .map_err(|e| format!("/dev/null could not be opened: {e}"))?;
-    for fd in 0..=2 {
-        // SAFETY: dup2 puts a copy of an open descriptor at a number, closing
-        // what was there, and reads nothing through a pointer. `null` is
-        // open, and what is closed at 0, 1 and 2 nothing owns: the
-        // interfaces' handles hold the descriptors `moved` made, and std's
-        // standard streams name these numbers without owning them -- which
-        // is the point, as they now reach /dev/null.
-        if unsafe { libc::dup2(null.as_raw_fd(), fd) } == -1 {
-            return Err(format!(
-                "/dev/null could not be put at descriptor {fd}: {}",
-                io::Error::last_os_error()
-            ));
-        }
-    }
+    tcsos::interfaces::quiet_standard_slots().map_err(|e| {
+        format!("/dev/null could not be put over the standard descriptors: {e}")
+    })?;
     Ok(())
 }
 

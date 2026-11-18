@@ -24,9 +24,9 @@
 //! refuses one that layout cannot have made.
 
 use std::net::UdpSocket;
-use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::time::{Duration, Instant};
+use tcsos::wait::{Ready, Waitable, Watch};
 
 use tcsprotocol::ccsds::{self, PacketType};
 use tcsprotocol::consolidation::Layout;
@@ -85,7 +85,7 @@ pub struct GatewayReceiver {
     layouts: Vec<Option<Layout>>,
     /// What a receive waits on, one for each port and in the same order:
     /// made once, when the node is opened.
-    fds: Vec<libc::pollfd>,
+    fds: Vec<Watch>,
     /// Which port the next receive looks at first, so that one busy source
     /// cannot keep the others waiting.
     next: usize,
@@ -287,11 +287,7 @@ impl GatewayReceiver {
         }
         let fds = ports
             .iter()
-            .map(|(_, socket)| libc::pollfd {
-                fd: socket.as_raw_fd(),
-                events: libc::POLLIN,
-                revents: 0,
-            })
+            .map(|(_, socket)| Watch::new(socket.source(), Ready::READ))
             .collect();
         Ok(GatewayReceiver {
             name: name.to_string(),
@@ -336,7 +332,7 @@ impl GatewayReceiver {
         // Allocates, once, as the node is gated: the match's list of
         // sockets to empty.
         for (_, socket) in &self.ports {
-            matched.queued_on(socket.as_raw_fd());
+            matched.queued_on(socket.source());
         }
         self.gate = Some(matched);
     }
@@ -572,36 +568,20 @@ impl GatewayReceiver {
         wait: Option<Duration>,
         out: &mut [u8],
     ) -> Result<Option<Arrival>, String> {
-        for fd in &mut self.fds {
-            fd.revents = 0;
-        }
-        let timeout = match wait {
-            None => -1,
-            Some(wait) => i32::try_from(wait.as_millis()).unwrap_or(i32::MAX),
-        };
-
         let ready = loop {
-            // SAFETY: poll needs an array of as many pollfds as it is told,
-            // writable for the call: the count is the Vec's own length. Each
-            // descriptor is one of `self.ports`' sockets, which `fds` was
+            // Each source is one of `self.ports`' sockets, which `fds` was
             // built from in `binding` and which nothing replaces or closes
-            // while `self` lives.
-            let ready = unsafe {
-                libc::poll(
-                    self.fds.as_mut_ptr(),
-                    self.fds.len() as libc::nfds_t,
-                    timeout,
-                )
-            };
-            if ready >= 0 {
-                break ready;
-            }
-            let error = std::io::Error::last_os_error();
-            if error.kind() != std::io::ErrorKind::Interrupted {
-                return Err(format!(
-                    "\"{}\": waiting for data failed: {error}",
-                    self.name
-                ));
+            // while `self` lives. Waiting allocates nothing: the set is
+            // made once.
+            match tcsos::wait::wait(&mut self.fds, wait) {
+                Ok(ready) => break ready,
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                Err(error) => {
+                    return Err(format!(
+                        "\"{}\": waiting for data failed: {error}",
+                        self.name
+                    ))
+                }
             }
         };
         if ready == 0 {
@@ -612,34 +592,20 @@ impl GatewayReceiver {
         let count = self.ports.len();
         for step in 0..count {
             let at = (self.next + step) % count;
-            if self.fds[at].revents & libc::POLLIN == 0 {
+            if !self.fds[at].got.read {
                 continue;
             }
             let (source, socket) = &self.ports[at];
-            // MSG_TRUNC, so that what comes back is the datagram's length
-            // and not what fitted: one cut short is told from one that
-            // happened to fill the buffer.
-            //
-            // SAFETY: recv needs an open socket and a buffer writable for the
-            // length it is given: the socket is borrowed from `self.ports`,
-            // and the buffer and its length are both `out`'s. MSG_TRUNC
-            // changes what is returned, not how much is written.
-            let got = unsafe {
-                libc::recv(
-                    socket.as_raw_fd(),
-                    out.as_mut_ptr().cast(),
-                    out.len(),
-                    libc::MSG_TRUNC,
-                )
-            };
+            // The datagram's length and not what fitted: one cut short is
+            // told from one that happened to fill the buffer.
+            let got = tcsos::net::receive_whole_length(socket, out);
             self.next = (at + 1) % count;
-            let Ok(length) = usize::try_from(got) else {
-                return Err(format!(
-                    "\"{}\": reading what \"{source}\" sent failed: {}",
-                    self.name,
-                    std::io::Error::last_os_error()
-                ));
-            };
+            let length = got.map_err(|e| {
+                format!(
+                    "\"{}\": reading what \"{source}\" sent failed: {e}",
+                    self.name
+                )
+            })?;
             return Ok(Some(Arrival { source: at, length }));
         }
         Ok(None)
@@ -653,7 +619,7 @@ impl Drop for GatewayReceiver {
     fn drop(&mut self) {
         if let Some(matched) = self.gate.as_ref() {
             for (_, socket) in &self.ports {
-                matched.no_longer_queued_on(socket.as_raw_fd());
+                matched.no_longer_queued_on(socket.source());
             }
         }
     }

@@ -55,12 +55,11 @@
 
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-use std::os::fd::{AsRawFd, OwnedFd};
-use std::os::unix::net::UnixStream;
-use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process::{Child, Command, ExitStatus, Stdio};
+use std::process::{Child, Command, ExitStatus};
 use std::time::{Duration, Instant};
+use tcsos::interfaces::Stream as UnixStream;
+use tcsos::wait::{Ready, Waitable, Watch};
 
 use crate::{packet, Interface};
 
@@ -385,7 +384,7 @@ impl End {
                     Some(left)
                 }
             };
-            self.ready(libc::POLLIN, left)?;
+            self.ready(Ready::READ, left)?;
         }
     }
 
@@ -444,7 +443,7 @@ impl End {
                 }
                 Ok(some) => gone += some,
                 Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    self.ready(libc::POLLOUT, None)?;
+                    self.ready(Ready::WRITE, None)?;
                 }
                 Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
                 Err(e) => return Err(e),
@@ -470,34 +469,21 @@ impl End {
     /// Whatever `poll` fails with, other than being interrupted.
     fn ready(
         &self,
-        for_what: libc::c_short,
+        for_what: Ready,
         how_long: Option<Duration>,
     ) -> io::Result<()> {
-        let mut asking = libc::pollfd {
-            fd: self.socket.as_raw_fd(),
-            events: for_what,
-            revents: 0,
-        };
-        let waiting = match how_long {
-            // Milliseconds, rounded up, because `poll` counts in those: a
-            // wait rounded down to nothing would be a loop that spins.
-            Some(how_long) => {
-                how_long.as_millis().min(i32::MAX as u128).max(1) as i32
-            }
-            None => -1,
-        };
+        // Rounded up to a millisecond, because the wait counts in those: a
+        // wait rounded down to nothing would be a loop that spins.
+        let how_long =
+            how_long.map(|how_long| how_long.max(Duration::from_millis(1)));
         loop {
-            // SAFETY: poll needs an array of as many pollfds as it is told,
-            // writable for the call: `asking` is one local pollfd, and the
-            // count is 1. Its descriptor is `self.socket`'s, open for as long
-            // as `self` is borrowed.
-            let said = unsafe { libc::poll(&mut asking, 1, waiting) };
-            if said >= 0 {
-                return Ok(());
-            }
-            let e = io::Error::last_os_error();
-            if e.kind() != io::ErrorKind::Interrupted {
-                return Err(e);
+            // The socket is `self.socket`'s, open for as long as `self` is
+            // borrowed.
+            let mut asking = [Watch::new(self.socket.source(), for_what)];
+            match tcsos::wait::wait(&mut asking, how_long) {
+                Ok(_) => return Ok(()),
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                Err(e) => return Err(e),
             }
         }
     }
@@ -569,61 +555,31 @@ pub fn start(
     let payload = supports
         .payload
         .then(|| {
-            UnixStream::pair().map_err(|e| named("the payload interface", e))
+            tcsos::interfaces::pair()
+                .map_err(|e| named("the payload interface", e))
         })
         .transpose()?;
     let gateway = supports
         .gateway
         .then(|| {
-            UnixStream::pair().map_err(|e| named("the gateway interface", e))
+            tcsos::interfaces::pair()
+                .map_err(|e| named("the gateway interface", e))
         })
         .transpose()?;
-    let errors =
-        UnixStream::pair().map_err(|e| named("the error interface", e))?;
+    let errors = tcsos::interfaces::pair()
+        .map_err(|e| named("the error interface", e))?;
 
     let mut command = Command::new(executable);
     command.args(arguments);
-    unblocking(&mut command);
-    // Each of the three descriptors is set from this end's own pair, or to
-    // nothing where the app does not support it -- and the nothing is closed
-    // below, `Stdio::null` being a descriptor that is open on /dev/null.
-    match &payload {
-        Some((_, theirs)) => command.stdin(childs_half(theirs)),
-        None => command.stdin(Stdio::null()),
-    };
-    match &gateway {
-        Some((_, theirs)) => command.stdout(childs_half(theirs)),
-        None => command.stdout(Stdio::null()),
-    };
-    command.stderr(childs_half(&errors.1));
-
-    // What the app does not support, closed in the child. After the stdio is
-    // in place, which is the order the standard library does it in, and before
-    // the program is anything but this one: `close` is as much as may be done
-    // between a fork and an exec, and it is all that is wanted.
-    let shut: Vec<i32> = [
-        (!supports.payload).then_some(Interface::Payload.fd()),
-        (!supports.gateway).then_some(Interface::Gateway.fd()),
-    ]
-    .into_iter()
-    .flatten()
-    .collect();
-    if !shut.is_empty() {
-        // SAFETY: pre_exec needs a closure that is safe to run between fork
-        // and exec, in a child that may have one thread: nothing that
-        // allocates, locks or is not async-signal-safe. This walks a Vec it
-        // owns, allocated before the fork, and calls close, which is
-        // async-signal-safe; and the descriptors it closes are the child's
-        // copies, which nothing in the child owns or uses again before exec.
-        unsafe {
-            command.pre_exec(move || {
-                for fd in &shut {
-                    libc::close(*fd);
-                }
-                Ok(())
-            });
-        }
-    }
+    // Each of the three is this end's own pair's other end, or nothing where
+    // the app does not support it: see tcsos::interfaces::hand_over.
+    tcsos::interfaces::hand_over(
+        &mut command,
+        payload.as_ref().map(|(_, theirs)| theirs),
+        gateway.as_ref().map(|(_, theirs)| theirs),
+        &errors.1,
+    )
+    .map_err(|e| named("the interfaces could not be handed over", e))?;
 
     let child = command.spawn().map_err(|e| {
         format!(
@@ -657,49 +613,7 @@ pub fn start(
 ///
 /// * `command` - The command, not yet spawned.
 pub fn unblocking(command: &mut Command) {
-    // SAFETY: pre_exec needs a closure that is safe to run between fork and
-    // exec, in a child that may have one thread. sigemptyset fills a set on
-    // this closure's own stack, and sigprocmask sets the calling thread's
-    // mask, the child's only thread: both are async-signal-safe, and
-    // neither allocates or locks.
-    unsafe {
-        command.pre_exec(|| {
-            let mut none: libc::sigset_t = std::mem::zeroed();
-            libc::sigemptyset(&mut none);
-            if libc::sigprocmask(libc::SIG_SETMASK, &none, std::ptr::null_mut())
-                != 0
-            {
-                return Err(io::Error::last_os_error());
-            }
-            Ok(())
-        });
-    }
-}
-
-/// Gives the child's half of a pair, as what a command wants for a
-/// descriptor.
-///
-/// Cloned rather than moved out of the pair, so that `start` can hold the
-/// pair until it has every one of them: a half given away before the spawn
-/// could not be given back if the next pair failed to be made.
-///
-/// # Arguments
-///
-/// * `stream` - The child's half of the pair.
-///
-/// # Returns
-///
-/// A clone of it, for the child's descriptor.
-///
-/// # Panics
-///
-/// If the half cannot be cloned.
-fn childs_half(stream: &UnixStream) -> Stdio {
-    let held = stream
-        .try_clone()
-        .map(OwnedFd::from)
-        .expect("a socket pair's own half can be held");
-    Stdio::from(held)
+    tcsos::interfaces::unblocking(command);
 }
 
 impl Running {
@@ -961,25 +875,9 @@ mod tests {
         };
         // Blocked in this thread alone, as tcspecial's signal set is; given
         // back as the test ends, so the thread is as it was.
-        // SAFETY: sets this thread's own mask, with sets on this stack.
-        let before = unsafe {
-            let mut set: libc::sigset_t = std::mem::zeroed();
-            libc::sigemptyset(&mut set);
-            libc::sigaddset(&mut set, libc::SIGINT);
-            libc::sigaddset(&mut set, libc::SIGTERM);
-            let mut before: libc::sigset_t = std::mem::zeroed();
-            libc::pthread_sigmask(libc::SIG_BLOCK, &set, &mut before);
-            before
-        };
-        let (without, with) = (blocked(false), blocked(true));
-        // SAFETY: as above, putting back what was there.
-        unsafe {
-            libc::pthread_sigmask(
-                libc::SIG_SETMASK,
-                &before,
-                std::ptr::null_mut(),
-            )
-        };
+        let (without, with) = tcsos::signals::with_stops_blocked(|| {
+            (blocked(false), blocked(true))
+        });
         assert_eq!(without, "SigBlk:\t0000000000004002", "inherited");
         assert_eq!(with, "SigBlk:\t0000000000000000");
     }
@@ -988,7 +886,7 @@ mod tests {
 
     /// This end of an interface, and the other end to write on.
     fn pair() -> (End, UnixStream) {
-        let (mine, theirs) = UnixStream::pair().expect("a socket pair");
+        let (mine, theirs) = tcsos::interfaces::pair().expect("a socket pair");
         (End::of(mine).expect("an end"), theirs)
     }
 

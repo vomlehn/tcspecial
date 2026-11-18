@@ -37,10 +37,10 @@
 //! UDP command links' lines do.
 
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
-use std::os::fd::{AsRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
+use tcsos::wait::{Source, Waitable};
 
 use log::{error, info, warn};
 use tcsprotocol::graph::telemetry::{Carries, MsgIdUse};
@@ -502,9 +502,9 @@ pub struct BusReader {
 }
 
 impl BusReader {
-    /// The socket's descriptor, for a poll.
-    pub fn fd(&self) -> RawFd {
-        self.shared.socket.as_raw_fd()
+    /// What the socket is waited on through.
+    pub fn source(&self) -> Source {
+        self.shared.socket.source()
     }
 
     /// How long until the peer is due an announcement, a heartbeat or a

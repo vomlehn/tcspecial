@@ -133,13 +133,12 @@ pub fn run_serial_node(
 mod tests {
     use super::*;
     use crate::payload::{PayloadProtocol, SimulatedPayload};
-    use crate::pty::make_raw;
     use std::fs::File;
-    use std::os::unix::fs::symlink;
-    use std::os::unix::io::AsRawFd;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::AtomicU32;
     use std::time::Duration;
+    use tcsos::linux::fs::symlink;
+    use tcsos::linux::pty::make_raw;
 
     /// Makes a path in the temporary directory unique to this process and
     /// test thread.
@@ -236,7 +235,7 @@ mod tests {
             .write(true)
             .open(&path)
             .expect("the line opens");
-        make_raw(port.as_raw_fd()).expect("it takes raw terms");
+        make_raw(&port).expect("it takes raw terms");
 
         let mut got = Vec::new();
         let mut buf = [0u8; 64];

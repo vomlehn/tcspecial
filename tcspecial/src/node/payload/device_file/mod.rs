@@ -15,12 +15,11 @@
 //!
 //! See [`crate::endpoint`] for the traits.
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::path::Path;
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{DeviceConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
@@ -52,25 +51,17 @@ impl DeviceEndpoint {
     /// `TcsError::Endpoint`, naming the node and the path, if the file
     /// cannot be opened.
     pub fn new(what: &str, config: &DeviceConfig) -> TcsResult<Self> {
-        let file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            // Not this process's terminal. A device that is a tty -- a real
-            // serial port, or a pty tcs-sim made to simulate one -- becomes the
-            // controlling terminal of a process that opens it without this, and
-            // then a read from a background process group raises SIGTTIN and a
-            // hangup raises SIGHUP: a handler stopped or killed for reasons
-            // that have nothing to do with its payload.
-            .custom_flags(libc::O_NOCTTY)
-            // Named, because a bare `No such file or directory` says neither
-            // which handler could not start nor what it was reaching for.
-            .open(&config.path)
-            .map_err(|e| {
-                TcsError::Endpoint(format!(
-                    "{what}: {} cannot be opened: {e}",
-                    config.path
-                ))
-            })?;
+        // Not this process's terminal: see tcsos::linux::fs::open_device.
+        // Named, because a bare `No such file or directory` says neither
+        // which handler could not start nor what it was reaching for.
+        let file =
+            tcsos::linux::fs::open_device(Path::new(&config.path), true, true)
+                .map_err(|e| {
+                    TcsError::Endpoint(format!(
+                        "{what}: {} cannot be opened: {e}",
+                        config.path
+                    ))
+                })?;
         crate::exclusive::device(what, &config.path, &file)?;
 
         Ok(Self {
@@ -101,16 +92,16 @@ impl DeviceEndpoint {
 }
 
 impl EndpointWaitable for DeviceEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.file.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.file.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 

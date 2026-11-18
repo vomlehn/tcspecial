@@ -483,11 +483,11 @@ name = "beacon_example"
 version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
- "libc",
  "slint",
  "slint-build",
  "tcs-ui",
  "tcsmoc",
+ "tcsos",
  "tcsprotocol",
 ]
 
@@ -1860,7 +1860,7 @@ dependencies = [
  "input",
  "libseat",
  "memmap2",
- "nix 0.31.3",
+ "nix",
  "raw-window-handle",
  "xkbcommon",
 ]
@@ -2983,17 +2983,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee6cda3051665f1fb8d9e08fc35c96d5a244fb1be711a03b71118828afc9a873"
 dependencies = [
  "jni-sys 0.3.1",
-]
-
-[[package]]
-name = "nix"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
-dependencies = [
- "bitflags 2.13.2",
- "cfg-if",
- "libc",
 ]
 
 [[package]]
@@ -4843,7 +4832,6 @@ version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
  "jsonschema",
- "libc",
  "md5",
  "path-clean",
  "png",
@@ -4856,6 +4844,7 @@ dependencies = [
  "slint",
  "slint-build",
  "tcs-diagram",
+ "tcsos",
  "tcsprotocol",
  "tcsverify",
  "tempfile",
@@ -4881,7 +4870,6 @@ name = "tcs-moc"
 version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
- "libc",
  "png",
  "serde",
  "slint",
@@ -4889,6 +4877,7 @@ dependencies = [
  "tcs-ui",
  "tcs-verify",
  "tcsmoc",
+ "tcsos",
  "tcspecial",
  "tcsprotocol",
  "tcsverify",
@@ -4900,16 +4889,15 @@ name = "tcs-sim"
 version = "0.1.0"
 dependencies = [
  "i-slint-backend-testing",
- "libc",
  "png",
  "rand",
  "rand_distr",
  "serde",
- "signal-hook",
  "slint",
  "slint-build",
  "tcs-verify",
  "tcsmoc",
+ "tcsos",
  "tcsprotocol",
  "tcsverify",
  "tempfile",
@@ -4927,6 +4915,7 @@ dependencies = [
 name = "tcs-verify"
 version = "0.1.0"
 dependencies = [
+ "tcsos",
  "tcsprotocol",
  "tcsverify",
  "tempfile",
@@ -4936,7 +4925,7 @@ dependencies = [
 name = "tcsapp"
 version = "0.1.0"
 dependencies = [
- "libc",
+ "tcsos",
  "tempfile",
 ]
 
@@ -4953,8 +4942,8 @@ dependencies = [
 name = "tcsmoc"
 version = "0.1.0"
 dependencies = [
- "libc",
  "serde",
+ "tcsos",
  "tcsprotocol",
  "tempfile",
  "thiserror 1.0.69",
@@ -4970,13 +4959,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcsos"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "signal-hook",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "tcspecial"
 version = "0.1.0"
 dependencies = [
  "env_logger",
- "libc",
  "log",
- "nix 0.27.1",
  "serde",
  "slint",
  "slint-build",
@@ -4985,6 +4981,7 @@ dependencies = [
  "tcsapp",
  "tcslog",
  "tcsmoc",
+ "tcsos",
  "tcsprotocol",
  "tcsverify",
  "tempfile",
@@ -4996,12 +4993,12 @@ name = "tcsprotocol"
 version = "0.1.0"
 dependencies = [
  "leb128",
- "libc",
  "md5",
  "quick-xml 0.42.0",
  "serde",
  "serde_json",
  "serde_norway",
+ "tcsos",
  "tcsxtce",
  "tempfile",
  "thiserror 1.0.69",

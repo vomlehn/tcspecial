@@ -18,12 +18,11 @@
 //! See [`crate::endpoint`] for the traits.
 
 use std::io::{self, Read, Write};
-use std::os::unix::io::{AsRawFd, RawFd};
-use std::os::unix::net::{UnixDatagram, UnixStream};
 use std::path::{Path, PathBuf};
+use tcsos::linux::net::{autobind, UnixDatagram, UnixStream};
+use tcsos::wait::{Ready, Source, Waitable};
 
 use log::info;
-use nix::poll::PollFlags;
 use tcsprotocol::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
@@ -97,16 +96,16 @@ impl UnixStreamEndpoint {
 }
 
 impl EndpointWaitable for UnixStreamEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.stream.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.stream.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -148,9 +147,8 @@ pub struct UnixDatagramEndpoint {
     ///
     /// Shared between the two endpoints of a conduit pair, so that the one
     /// writing sends where the one reading learnt.
-    peer: std::sync::Arc<
-        std::sync::Mutex<Option<std::os::unix::net::SocketAddr>>,
-    >,
+    peer:
+        std::sync::Arc<std::sync::Mutex<Option<tcsos::linux::net::SocketAddr>>>,
     /// Where the configuration says the device is, for a node that is
     /// spoken to first.
     ///
@@ -316,16 +314,16 @@ impl UnixDatagramEndpoint {
 }
 
 impl EndpointWaitable for UnixDatagramEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.socket.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -412,41 +410,6 @@ impl EndpointWritable for UnixDatagramEndpoint {
     }
 }
 
-/// Binds a socket to a name the kernel chooses in the abstract namespace.
-///
-/// Linux's autobind: a bind that gives the address family and no name. The
-/// name is unique, so two nodes, or two runs, never contend for one, and it
-/// is not a file, so nothing outlives the socket. std has no call for it.
-///
-/// # Arguments
-///
-/// * `socket` - The unbound socket to bind.
-///
-/// # Errors
-///
-/// What `bind` failed with.
-fn autobind(socket: &UnixDatagram) -> io::Result<()> {
-    // SAFETY: an all-zero sockaddr_un is a valid value of it, and bind reads
-    // only the family from it, the length given covering nothing more.
-    let mut address: libc::sockaddr_un = unsafe { std::mem::zeroed() };
-    address.sun_family = libc::AF_UNIX as libc::sa_family_t;
-    let length = std::mem::size_of::<libc::sa_family_t>() as libc::socklen_t;
-    // SAFETY: the descriptor is the socket's own and open for as long as it
-    // is borrowed, and the address is valid for the length given.
-    let bound = unsafe {
-        libc::bind(
-            socket.as_raw_fd(),
-            &address as *const libc::sockaddr_un as *const libc::sockaddr,
-            length,
-        )
-    };
-    if bound == 0 {
-        Ok(())
-    } else {
-        Err(io::Error::last_os_error())
-    }
-}
-
 /// Removes a socket file nothing is listening on, so that a bind can have
 /// the path.
 ///
@@ -503,14 +466,13 @@ fn clear_a_dead_socket(what: &str, path: &Path) -> TcsResult<()> {
 
 /// Whether what is at a path is a socket.
 fn is_a_socket(found: &std::fs::Metadata) -> bool {
-    use std::os::unix::fs::FileTypeExt;
-    found.file_type().is_socket()
+    tcsos::linux::net::is_a_socket(found)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::net::UnixListener;
+    use tcsos::linux::net::UnixListener;
     use tcsprotocol::NetworkProtocol;
 
     /// Gives a path for a test's socket, unique to the process and thread.
@@ -693,8 +655,6 @@ mod tests {
     /// at, though not one in the filesystem.
     #[test]
     fn an_asked_datagram_device_is_answered_back() {
-        use std::os::linux::net::SocketAddrExt;
-
         let device_path = a_path("asked-device");
         std::fs::remove_file(&device_path).ok();
         let device =
@@ -711,7 +671,7 @@ mod tests {
         let (n, from) = device.recv_from(&mut asked).expect("the device reads");
         assert_eq!(&asked[..n], b"READ");
         assert!(
-            from.as_abstract_name().is_some(),
+            tcsos::linux::net::abstract_name(&from).is_some(),
             "the vehicle's end should have a name to be answered at: {from:?}"
         );
 

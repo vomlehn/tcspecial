@@ -38,7 +38,6 @@
 //! segment renamed in the directory, said once, for the next start to send.
 
 use std::ffi::{CStr, CString};
-use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
@@ -57,7 +56,7 @@ pub const PENDING_SUFFIX: &str = ".segsend";
 
 /// The longest path a segment can be handed over by, with the pending suffix
 /// and the terminating nul: the kernel's own limit on a path.
-const NAME_BYTES: usize = libc::PATH_MAX as usize;
+const NAME_BYTES: usize = tcsos::fs::PATH_BYTES;
 
 /// How many segments can be waiting for `segsend` at once.
 ///
@@ -86,7 +85,7 @@ impl Name {
     /// The name, nul-terminated, or `None` where it is longer than a path may
     /// be or has a nul in it.
     fn of(path: &Path, suffix: &str) -> Option<Name> {
-        let path = path.as_os_str().as_bytes();
+        let path = path.as_os_str().as_encoded_bytes();
         let suffix = suffix.as_bytes();
         let length = path.len() + suffix.len();
         if length >= NAME_BYTES || path.contains(&0) || suffix.contains(&0) {
@@ -143,8 +142,8 @@ impl SegSend {
     /// What is wrong, said in words, where `program`'s name has a nul in it
     /// or the thread cannot be started.
     pub fn start(program: &Path) -> Result<SegSend, String> {
-        let program_c =
-            CString::new(program.as_os_str().as_bytes()).map_err(|_| {
+        let program_c = CString::new(program.as_os_str().as_encoded_bytes())
+            .map_err(|_| {
                 format!("{} has a nul in its name", program.display())
             })?;
         let (queue, waiting) = sync_channel::<Name>(WAITING);
@@ -266,13 +265,7 @@ impl tcslog::WriteCallbacks for Handoff {
                 "a segment's name is too long to rename",
             ));
         };
-        // SAFETY: both are nul-terminated buffers that outlive the call.
-        if unsafe {
-            libc::rename(from.as_c_str().as_ptr(), to.as_c_str().as_ptr())
-        } != 0
-        {
-            return Err(std::io::Error::last_os_error());
-        }
+        tcsos::fs::rename(from.as_c_str(), to.as_c_str())?;
 
         match queue.try_send(to) {
             Ok(()) => {
@@ -329,7 +322,7 @@ fn left_pending(dir: &Path) -> Result<Vec<PathBuf>, String> {
         .map(|entry| entry.path())
         .filter(|path| {
             path.file_name().is_some_and(|name| {
-                name.as_bytes().ends_with(PENDING_SUFFIX.as_bytes())
+                name.as_encoded_bytes().ends_with(PENDING_SUFFIX.as_bytes())
             })
         })
         .collect();
@@ -350,7 +343,7 @@ fn left_pending(dir: &Path) -> Result<Vec<PathBuf>, String> {
 /// * `waiting` - The queue the names arrive on.
 fn send_each(program: &CStr, shown: &str, waiting: Receiver<Name>) {
     while let Ok(name) = waiting.recv() {
-        match run(program, &name) {
+        match tcsos::child::run(program, name.as_c_str()) {
             Ok(0) => {}
             Ok(status) => error!(
                 "{shown} {} ended with status {status}; what it did with the \
@@ -359,102 +352,6 @@ fn send_each(program: &CStr, shown: &str, waiting: Receiver<Name>) {
             ),
             Err(e) => error!("{shown} {} could not be run: {e}", name.shown()),
         }
-    }
-}
-
-extern "C" {
-    /// The process's environment, which `segsend` is started with: it is
-    /// part of how a mission's own program is told where to send.
-    static environ: *const *mut libc::c_char;
-}
-
-/// Runs `program` with `name` as its one argument and waits for it.
-///
-/// # Arguments
-///
-/// * `program` - The program to run.
-/// * `name`    - Its one argument, the segment to hand over.
-///
-/// # Returns
-///
-/// How it ended, as a shell would say: its exit status, or 128 and the
-/// signal that ended it.
-///
-/// # Errors
-///
-/// What `posix_spawn` or `waitpid` failed with.
-fn run(program: &CStr, name: &Name) -> std::io::Result<i32> {
-    let argv: [*mut libc::c_char; 3] = [
-        program.as_ptr() as *mut libc::c_char,
-        name.as_c_str().as_ptr() as *mut libc::c_char,
-        std::ptr::null_mut(),
-    ];
-    let mut pid: libc::pid_t = 0;
-    // Started with no signal blocked, as every program tcspecial starts is
-    // (see "Its signals" in tcsapp::parent): the thread this runs in has the
-    // stop signals blocked, as every thread of tcspecial's has, and the
-    // block would otherwise pass to it.
-    // SAFETY: the attributes and the empty set are this frame's own; the
-    // attributes are destroyed once made, whatever comes after, and on a
-    // failure to make or set them the program is not started.
-    let mut attributes: libc::posix_spawnattr_t = unsafe { std::mem::zeroed() };
-    let made = unsafe { libc::posix_spawnattr_init(&mut attributes) };
-    if made != 0 {
-        return Err(std::io::Error::from_raw_os_error(made));
-    }
-    let set = unsafe {
-        let mut none: libc::sigset_t = std::mem::zeroed();
-        libc::sigemptyset(&mut none);
-        match libc::posix_spawnattr_setsigmask(&mut attributes, &none) {
-            0 => libc::posix_spawnattr_setflags(
-                &mut attributes,
-                libc::POSIX_SPAWN_SETSIGMASK as libc::c_short,
-            ),
-            failed => failed,
-        }
-    };
-    if set != 0 {
-        // SAFETY: made by posix_spawnattr_init above, and used no more.
-        unsafe { libc::posix_spawnattr_destroy(&mut attributes) };
-        return Err(std::io::Error::from_raw_os_error(set));
-    }
-    // SAFETY: the program, the argument and the vector of them are
-    // nul-terminated and outlive the call, which copies them, as it does the
-    // attributes; no file actions are given, and every descriptor tcspecial
-    // opens is closed on exec.
-    let started = unsafe {
-        libc::posix_spawn(
-            &mut pid,
-            program.as_ptr(),
-            std::ptr::null(),
-            &attributes,
-            argv.as_ptr(),
-            environ,
-        )
-    };
-    // SAFETY: made by posix_spawnattr_init above, and used no more.
-    unsafe { libc::posix_spawnattr_destroy(&mut attributes) };
-    if started != 0 {
-        return Err(std::io::Error::from_raw_os_error(started));
-    }
-
-    let mut status: libc::c_int = 0;
-    loop {
-        // SAFETY: `status` is this frame's own, and `pid` is a child this
-        // thread started and nothing else waits for.
-        let waited = unsafe { libc::waitpid(pid, &mut status, 0) };
-        if waited == pid {
-            break;
-        }
-        let e = std::io::Error::last_os_error();
-        if e.kind() != std::io::ErrorKind::Interrupted {
-            return Err(e);
-        }
-    }
-    if libc::WIFEXITED(status) {
-        Ok(libc::WEXITSTATUS(status))
-    } else {
-        Ok(128 + libc::WTERMSIG(status))
     }
 }
 
@@ -504,8 +401,6 @@ fn usable(program: &Path) -> Result<(), String> {
          them), or take log.directory out of the configuration's tcspecial \
          section"
     );
-    let name = CString::new(program.as_os_str().as_bytes())
-        .map_err(|_| format!("{} has a nul in its name", program.display()))?;
     match std::fs::metadata(program) {
         Ok(found) if found.is_file() => {}
         Ok(_) => {
@@ -518,8 +413,7 @@ fn usable(program: &Path) -> Result<(), String> {
             return Err(format!("{} is not there: {fix}", program.display()))
         }
     }
-    // SAFETY: a nul-terminated name that outlives the call.
-    if unsafe { libc::access(name.as_ptr(), libc::X_OK) } != 0 {
+    if !tcsos::fs::may_run(program) {
         return Err(format!(
             "{} cannot be run by this user: make it executable, or {fix}",
             program.display()
@@ -531,7 +425,6 @@ fn usable(program: &Path) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
     use std::time::{Duration, Instant};
     use tcslog::WriteCallbacks;
 
@@ -565,11 +458,7 @@ mod tests {
             ),
         )
         .expect("written");
-        std::fs::set_permissions(
-            &program,
-            std::fs::Permissions::from_mode(0o755),
-        )
-        .expect("made executable");
+        tcsos::fs::set_mode(&program, 0o755).expect("made executable");
         crate::when_not_busy(|| {
             std::process::Command::new(&program)
                 .status()
@@ -689,32 +578,12 @@ mod tests {
              sys.exit(2)\n",
         )
         .expect("written");
-        std::fs::set_permissions(
-            &script,
-            std::fs::Permissions::from_mode(0o755),
-        )
-        .expect("made executable");
+        tcsos::fs::set_mode(&script, 0o755).expect("made executable");
         let name = Name::of(&script, "").expect("a name");
 
-        // SAFETY: sets this thread's own mask, with sets on this stack, and
-        // puts back what was there before the assertion.
-        let before = unsafe {
-            let mut set: libc::sigset_t = std::mem::zeroed();
-            libc::sigemptyset(&mut set);
-            libc::sigaddset(&mut set, libc::SIGINT);
-            libc::sigaddset(&mut set, libc::SIGTERM);
-            let mut before: libc::sigset_t = std::mem::zeroed();
-            libc::pthread_sigmask(libc::SIG_BLOCK, &set, &mut before);
-            before
-        };
-        let ended = run(c"/usr/bin/env", &name);
-        unsafe {
-            libc::pthread_sigmask(
-                libc::SIG_SETMASK,
-                &before,
-                std::ptr::null_mut(),
-            )
-        };
+        let ended = tcsos::signals::with_stops_blocked(|| {
+            tcsos::child::run(c"/usr/bin/env", name.as_c_str())
+        });
         assert_eq!(ended.expect("it runs"), 0, "it found a signal blocked");
     }
 
@@ -728,11 +597,7 @@ mod tests {
         assert!(said.contains("log.directory"), "{said}");
 
         std::fs::write(&missing, b"#!/bin/sh\n").expect("written");
-        std::fs::set_permissions(
-            &missing,
-            std::fs::Permissions::from_mode(0o644),
-        )
-        .expect("made unexecutable");
+        tcsos::fs::set_mode(&missing, 0o644).expect("made unexecutable");
         let said = usable(&missing).expect_err("it cannot be run");
         assert!(said.contains("executable"), "{said}");
     }

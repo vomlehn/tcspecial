@@ -25,10 +25,7 @@
 //! cargo test -p tcspecial --test kernel-dummies -- --nocapture
 //! ```
 
-use std::io;
-use std::mem;
 use std::net::{SocketAddr, UdpSocket};
-use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -370,13 +367,7 @@ fn virtual_can() -> Result<String, String> {
         }
         // A bus that is there and down binds a socket and then fails every
         // send, so only one that is up will do.
-        let flags =
-            std::fs::read_to_string(format!("/sys/class/net/{name}/flags"))
-                .unwrap_or_default();
-        let flags =
-            u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16)
-                .unwrap_or(0);
-        if flags & libc::IFF_UP as u32 != 0 {
+        if tcsos::linux::can::is_up(&name) {
             return Ok(name);
         }
     }
@@ -386,141 +377,67 @@ fn virtual_can() -> Result<String, String> {
     ))
 }
 
-/// A raw CAN socket on a bus, hearing one identifier: the far end of a CAN
-/// payload, as the motor would be.
-///
-/// Written here with the kernel's calls rather than with tcspecial's own CAN
-/// endpoint, so that a mistake in that endpoint is not made again at this
-/// end, where it would agree with itself and pass.
-struct Bus(OwnedFd);
+/// A member of a virtual bus, filtered to one identifier and sending with
+/// it: the far end of a CAN payload, as tcs-sim's CAN device is.
+struct Bus(tcsos::linux::can::Bus);
 
 impl Bus {
-    /// Opens a socket on `interface`, filtered to `can_id`.
+    /// Joins a bus.
     ///
     /// # Arguments
     ///
-    /// * `interface` - The CAN interface's name.
-    /// * `can_id`    - The one identifier the socket receives.
+    /// * `interface` - The bus.
+    /// * `can_id`    - The identifier received and sent with.
     ///
     /// # Returns
     ///
-    /// The socket.
+    /// The member, reading without waiting, so that a test looking for a
+    /// frame can go on sending while it looks.
     ///
     /// # Panics
     ///
-    /// If any step of it fails.
+    /// If the socket cannot be put on the bus.
     fn on(interface: &str, can_id: u32) -> Bus {
-        let name = std::ffi::CString::new(interface).expect("a name");
-        // SAFETY: the name is a valid C string for the length of the call.
-        let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-        assert_ne!(index, 0, "{interface}: {}", io::Error::last_os_error());
-
-        // SAFETY: a socket call with constant arguments; checked below.
-        let fd = unsafe {
-            libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW)
-        };
-        assert!(fd >= 0, "a CAN socket: {}", io::Error::last_os_error());
-        // SAFETY: socket has just made this descriptor, and nothing else
-        // owns it.
-        let socket = unsafe { OwnedFd::from_raw_fd(fd) };
-
-        let filter = libc::can_filter {
+        let settings = tcsos::linux::can::Settings {
             can_id,
-            can_mask: libc::CAN_EFF_MASK | libc::CAN_EFF_FLAG,
+            extended: false,
+            fd: false,
+            loopback: true,
         };
-        // SAFETY: one can_filter, which is what CAN_RAW_FILTER reads, living
-        // for the call.
-        let set = unsafe {
-            libc::setsockopt(
-                socket.as_raw_fd(),
-                libc::SOL_CAN_RAW,
-                libc::CAN_RAW_FILTER,
-                &filter as *const libc::can_filter as *const libc::c_void,
-                mem::size_of::<libc::can_filter>() as libc::socklen_t,
-            )
-        };
-        assert_eq!(set, 0, "a filter: {}", io::Error::last_os_error());
-
-        // SAFETY: zeroed and then filled in; a raw socket's bind reads only
-        // the family and the interface's index.
-        let mut addr: libc::sockaddr_can = unsafe { mem::zeroed() };
-        addr.can_family = libc::AF_CAN as libc::sa_family_t;
-        addr.can_ifindex = index as libc::c_int;
-        // SAFETY: the address is of the length given and lives for the call.
-        let bound = unsafe {
-            libc::bind(
-                socket.as_raw_fd(),
-                &addr as *const libc::sockaddr_can as *const libc::sockaddr,
-                mem::size_of::<libc::sockaddr_can>() as libc::socklen_t,
-            )
-        };
-        assert_eq!(bound, 0, "bound: {}", io::Error::last_os_error());
-
-        // Read without waiting, so that a test looking for a frame can go
-        // on sending while it looks.
-        // SAFETY: both take the descriptor by value; `socket` keeps it open.
-        let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
-        // SAFETY: as above.
-        let set = unsafe {
-            libc::fcntl(
-                socket.as_raw_fd(),
-                libc::F_SETFL,
-                flags | libc::O_NONBLOCK,
-            )
-        };
-        assert!(flags >= 0 && set >= 0, "non-blocking");
-        Bus(socket)
+        Bus(tcsos::linux::can::Bus::join(interface, &settings)
+            .unwrap_or_else(|refused| panic!("{interface}: {refused:?}")))
     }
 
-    /// Puts one classic frame on the bus.
+    /// Sends one classic frame.
     ///
     /// # Arguments
     ///
-    /// * `can_id` - The identifier it carries, a base one.
-    /// * `data`   - Up to eight bytes.
+    /// * `can_id` - The identifier, which is the one this member was made
+    ///              with.
+    /// * `data`   - What it carries.
+    ///
+    /// # Panics
+    ///
+    /// If the frame does not go.
     fn send(&self, can_id: u32, data: &[u8]) {
-        // The kernel's can_frame: the identifier, the length, three bytes
-        // of padding, and the data eight bytes in.
-        let mut frame = [0u8; 16];
-        frame[..4].copy_from_slice(&can_id.to_ne_bytes());
-        frame[4] = data.len() as u8;
-        frame[8..8 + data.len()].copy_from_slice(data);
-        // SAFETY: writing the 16 bytes of a buffer 16 bytes long.
-        let sent = unsafe {
-            libc::write(
-                self.0.as_raw_fd(),
-                frame.as_ptr() as *const libc::c_void,
-                frame.len(),
-            )
-        };
-        assert_eq!(sent, 16, "a frame: {}", io::Error::last_os_error());
+        let _ = can_id;
+        assert_eq!(self.0.send(data).expect("a frame"), data.len());
     }
 
-    /// Takes a frame that has arrived, if one has.
+    /// A frame's data, where one has arrived.
     ///
     /// # Returns
     ///
-    /// Its data, or `None` where nothing is waiting.
+    /// The data, or `None` where nothing has.
     fn received(&self) -> Option<Vec<u8>> {
-        let mut frame = [0u8; 16];
-        // SAFETY: reading at most 16 bytes into a buffer 16 bytes long.
-        let got = unsafe {
-            libc::read(
-                self.0.as_raw_fd(),
-                frame.as_mut_ptr() as *mut libc::c_void,
-                frame.len(),
-            )
-        };
-        if got != 16 {
-            return None;
+        let mut data = [0u8; tcsos::linux::can::CLASSIC_BYTES];
+        match self.0.receive(&mut data) {
+            Ok(0) | Err(_) => None,
+            Ok(got) => Some(data[..got].to_vec()),
         }
-        let length = (frame[4] as usize).min(8);
-        Some(frame[8..8 + length].to_vec())
     }
 }
 
-/// The motor's status frames reach the ground, and the ground's commands
-/// reach the motor as frames, over the kernel's virtual bus.
 #[test]
 fn a_can_payload_is_flown_over_a_virtual_bus() {
     let interface = match virtual_can() {

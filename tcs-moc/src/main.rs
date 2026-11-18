@@ -654,24 +654,11 @@ fn child_args(
 ///
 /// * `command` - The child's command, not yet started.
 fn dies_with_the_moc(command: &mut Command) {
-    use std::os::unix::process::CommandExt;
-
-    let moc = std::process::id() as libc::pid_t;
-    // SAFETY: prctl and getppid are async-signal-safe, and touch nothing of
-    // this process's but the child's own death signal.
-    unsafe {
-        command.pre_exec(move || {
-            if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM) == -1 {
-                return Err(std::io::Error::last_os_error());
-            }
-            if libc::getppid() != moc {
-                return Err(std::io::Error::other(
-                    "the MOC that started it has already ended",
-                ));
-            }
-            Ok(())
-        });
-    }
+    tcsos::child::dies_with_parent(
+        command,
+        tcsos::child::Ending::Terminate,
+        "the MOC that started it has already ended",
+    );
 }
 
 /// Where an installed MOC's child is: beside the MOC.
@@ -1153,26 +1140,15 @@ static STOPPING: std::sync::atomic::AtomicBool =
 /// Both signals, because the two ways a program is stopped are a person at a
 /// console and a service manager: one that answered only one of them would be
 /// killed outright by the other.
-pub(crate) fn listen_for_stop() {
-    // SAFETY: the handler does one thing -- an atomic store -- which is
-    // async-signal-safe. `libc::signal` is used rather than `sigaction`
-    // because that is all this needs and it is what tcspecial uses.
-    unsafe {
-        let handler = note_the_stop as *const () as libc::sighandler_t;
-        libc::signal(libc::SIGINT, handler);
-        libc::signal(libc::SIGTERM, handler);
-    }
-}
-
-/// What a signal does: sets a flag and returns.
 ///
-/// Nothing else, which is the rule for a signal handler. Killing the children
-/// and exiting are not things to do here -- `exit` runs whatever the process
-/// registered to run at exit, and a window's event loop is not a thing to
-/// unwind from a handler -- so the timer that repaints the panels notices
-/// within a second and does it from the event loop.
-extern "C" fn note_the_stop(_signal: libc::c_int) {
-    ask_to_stop();
+/// A signal sets a flag and nothing else, which is the rule for a signal
+/// handler. Killing the children and exiting are not things to do there --
+/// `exit` runs whatever the process registered to run at exit, and a
+/// window's event loop is not a thing to unwind from a handler -- so the
+/// timer that repaints the panels notices within a second and does it from
+/// the event loop.
+pub(crate) fn listen_for_stop() {
+    tcsos::signals::set_flag_on_stop(&STOPPING);
 }
 
 /// Ask the MOC to stop, as a signal does: see `stop_if_asked`.
@@ -1211,7 +1187,6 @@ mod tests {
     /// starts a child and returns stands in for a MOC killed outright.
     #[test]
     fn a_child_is_stopped_when_what_started_it_ends() {
-        use std::os::unix::process::ExitStatusExt;
         use std::time::Instant;
 
         let mut child = thread::spawn(|| {
@@ -1225,7 +1200,11 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             if let Some(status) = child.try_wait().expect("waited on") {
-                assert_eq!(status.signal(), Some(libc::SIGTERM), "{status}");
+                assert_eq!(
+                    tcsos::process::ended_by(&status),
+                    Some(tcsos::signals::TERMINATE),
+                    "{status}"
+                );
                 return;
             }
             if Instant::now() > deadline {

@@ -16,8 +16,9 @@ tcsprotocol = { path = "../../tcsprotocol" }
 # The panel, and what to show on it.
 tcs-ui = { path = "../../tcs-ui" }
 slint = "1.3"
-# The vehicle the window starts is told to die with it, which is a prctl.
-libc = "0.2"
+# The vehicle the window starts is told to die with it: see
+# tcsos::child::dies_with_parent.
+tcsos = { path = "../../tcsos" }
 
 [dev-dependencies]
 # Opens the window headlessly, so that a test can read what is on it. The

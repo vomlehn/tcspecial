@@ -860,26 +860,12 @@ fn listen_for_stop() {
     if crate::runtime::signals::listening() {
         return;
     }
-    // Where none was started, as in a test, by a handler.
-    //
-    // SAFETY: the handler does one thing -- an atomic store -- which is
-    // async-signal-safe. `libc::signal` is used rather than `sigaction`
-    // because that is all this needs and it is what is available here.
-    unsafe {
-        let handler = stop as *const () as libc::sighandler_t;
-        libc::signal(libc::SIGINT, handler);
-        libc::signal(libc::SIGTERM, handler);
-    }
-}
-
-/// What a signal does: sets a flag and returns.
-///
-/// Nothing else, which is the rule for a signal handler: the loop notices
-/// within one pause, finishes the pass it is making and flushes its logs.
-/// Stopping inside a pass would leave a log part way through a record and a
-/// heater in a state nothing decided.
-extern "C" fn stop(_signal: libc::c_int) {
-    STOPPING.store(true, Ordering::Relaxed);
+    // Where none was started, as in a test, by a handler, which sets the
+    // flag and nothing else, the rule for a signal handler: the loop notices
+    // within one pause, finishes the pass it is making and flushes its logs.
+    // Stopping inside a pass would leave a log part way through a record and
+    // a heater in a state nothing decided.
+    tcsos::signals::set_flag_on_stop(&STOPPING);
 }
 
 /// Runs the configuration in `path` under `mode` and says what to exit
@@ -986,7 +972,7 @@ vehicle:
     #[test]
     fn a_stop_is_noticed() {
         assert!(!asked_to_stop(), "nothing has asked yet");
-        stop(libc::SIGTERM);
+        STOPPING.store(true, Ordering::Relaxed);
         assert!(asked_to_stop());
         // Left as it was found, this being a flag the whole process shares.
         STOPPING.store(false, Ordering::Relaxed);

@@ -24,7 +24,6 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::fs::File;
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -43,33 +42,16 @@ use crate::payload::{
 const I2C_ADAPTERS: &str = "/sys/bus/i2c/devices";
 const STUB_NAME: &str = "SMBus stub driver";
 
-/// Requests of an open bus, from `linux/i2c-dev.h`. The same numbers
-/// tcspecial's I2C endpoint uses, for the same reasons.
-const I2C_SLAVE: libc::c_ulong = 0x0703;
-const I2C_SMBUS: libc::c_ulong = 0x0720;
-
-const I2C_SMBUS_WRITE: u8 = 0;
-const I2C_SMBUS_READ: u8 = 1;
-const I2C_SMBUS_I2C_BLOCK_DATA: u32 = 8;
-
 /// The most bytes one SMBus block transfer carries, so the most a segment of a
 /// packet can be on this kind of endpoint.
-pub(crate) const I2C_SMBUS_BLOCK_MAX: usize = 32;
+pub(crate) const I2C_SMBUS_BLOCK_MAX: usize = tcsos::linux::i2c::BLOCK_MAX;
 
 /// The register the device's data goes into: the same one tcspecial reads.
 const DATA_REGISTER: u8 = 0;
 
-/// One SMBus transfer, as `linux/i2c-dev.h` describes it.
-#[repr(C)]
-struct SmbusTransfer {
-    read_write: u8,
-    command: u8,
-    size: u32,
-    data: *mut SmbusData,
-}
-
-#[repr(C)]
+/// One SMBus block, as the kernel holds it.
 struct SmbusData {
+    /// Its length, then its data.
     block: [u8; I2C_SMBUS_BLOCK_MAX + 2],
 }
 
@@ -125,16 +107,9 @@ impl SimulatedBus {
             },
         )?;
 
-        // SAFETY: the bus is open, and the request takes an integer by value.
-        if unsafe {
-            libc::ioctl(bus.as_raw_fd(), I2C_SLAVE, address as libc::c_int)
-        } < 0
-        {
-            return Err(format!(
-                "{stub} would not take the address {address:#04X}: {}",
-                std::io::Error::last_os_error()
-            ));
-        }
+        tcsos::linux::i2c::set_address(&bus, address).map_err(|e| {
+            format!("{stub} would not take the address {address:#04X}: {e}")
+        })?;
 
         let simulated = Self { bus, named, linked };
 
@@ -181,7 +156,7 @@ impl SimulatedBus {
         };
         bytes.block[0] = 1;
 
-        if let Err(e) = block_write(self.bus.as_raw_fd(), &mut bytes) {
+        if let Err(e) = block_write(&self.bus, &mut bytes) {
             return Err(format!(
                 "{stub} has no chip at {address:#04X} ({e}): the stub's chips \
                  are fixed when it is loaded, so load it with this one -- sudo \
@@ -262,26 +237,19 @@ fn find_stub(adapters: &Path) -> Result<String, String> {
 ///
 /// # Arguments
 ///
-/// * `fd`    - The bus, addressed to the chip.
+/// * `bus`   - The bus, addressed to the chip.
 /// * `bytes` - The block: its first byte the length, then the data.
 ///
 /// # Errors
 ///
 /// The system's error if the transfer fails.
-fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
-    let mut transfer = SmbusTransfer {
-        read_write: I2C_SMBUS_WRITE,
-        command: DATA_REGISTER,
-        size: I2C_SMBUS_I2C_BLOCK_DATA,
-        data: bytes as *mut SmbusData,
-    };
-
-    // SAFETY: the bus is open and the transfer points at a live block for the
-    // duration of the call.
-    if unsafe { libc::ioctl(fd, I2C_SMBUS, &mut transfer) } < 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    Ok(())
+fn block_write(bus: &File, bytes: &mut SmbusData) -> std::io::Result<()> {
+    tcsos::linux::i2c::transfer_block(
+        bus,
+        true,
+        DATA_REGISTER,
+        &mut bytes.block,
+    )
 }
 
 /// Makes one SMBus block read of the data register's bank: what is in it
@@ -289,27 +257,21 @@ fn block_write(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
 ///
 /// # Arguments
 ///
-/// * `fd`    - The bus, addressed to the chip.
+/// * `bus`   - The bus, addressed to the chip.
 /// * `bytes` - Filled with the block: its first byte the length, then the
 ///             data.
 ///
 /// # Errors
 ///
 /// The system's error if the transfer fails.
-fn block_read(fd: RawFd, bytes: &mut SmbusData) -> std::io::Result<()> {
+fn block_read(bus: &File, bytes: &mut SmbusData) -> std::io::Result<()> {
     bytes.block[0] = I2C_SMBUS_BLOCK_MAX as u8;
-    let mut transfer = SmbusTransfer {
-        read_write: I2C_SMBUS_READ,
-        command: DATA_REGISTER,
-        size: I2C_SMBUS_I2C_BLOCK_DATA,
-        data: bytes as *mut SmbusData,
-    };
-
-    // SAFETY: as for `block_write`.
-    if unsafe { libc::ioctl(fd, I2C_SMBUS, &mut transfer) } < 0 {
-        return Err(std::io::Error::last_os_error());
-    }
-    Ok(())
+    tcsos::linux::i2c::transfer_block(
+        bus,
+        false,
+        DATA_REGISTER,
+        &mut bytes.block,
+    )
 }
 
 /// What the bank holds, as last looked at, so that what the vehicle writes to
@@ -351,7 +313,7 @@ impl Watched {
     /// What the bank holds, if it changed since this end last looked or
     /// wrote; `None` if it did not, on the first look, or if it cannot be
     /// read.
-    fn changed(&mut self, fd: RawFd) -> Option<SmbusData> {
+    fn changed(&mut self, fd: &File) -> Option<SmbusData> {
         let mut now = SmbusData {
             block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
         };
@@ -363,7 +325,7 @@ impl Watched {
     }
 
     /// What this end just wrote, which is not the vehicle's.
-    fn after_our_write(&mut self, fd: RawFd) {
+    fn after_our_write(&mut self, fd: &File) {
         self.known = block_read(fd, &mut self.held).is_ok();
     }
 }
@@ -408,7 +370,7 @@ pub fn run_i2c_node(
     // Packets that have gone, which the faults that are counted rather than
     // random ask about.
     let mut sent = 0u64;
-    let fd = bus.bus.as_raw_fd();
+    let fd = &bus.bus;
     let mut watched = Watched::new();
 
     while running.load(Ordering::SeqCst) {

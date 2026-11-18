@@ -24,9 +24,8 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::Read;
-use std::os::unix::io::{AsRawFd, RawFd};
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{IioConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
@@ -118,16 +117,16 @@ impl IioEndpoint {
 }
 
 impl EndpointWaitable for IioEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.file.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.file.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 

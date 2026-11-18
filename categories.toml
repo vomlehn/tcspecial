@@ -8,6 +8,7 @@
 # What flies, and what the MOC is built on.
 operational = [
 	"tcspecial",
+	"tcsos",
 	"tcsprotocol",
 	"tcsmoc",
 	"tcsmoc-c",

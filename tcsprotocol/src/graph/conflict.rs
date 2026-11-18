@@ -280,9 +280,7 @@ fn shared(claim: &Claim) -> (Severity, &'static str) {
     match claim {
         Claim::Path(path) => match std::fs::metadata(path) {
             Ok(meta) => {
-                use std::os::unix::fs::FileTypeExt;
-                let kind = meta.file_type();
-                if kind.is_char_device() || kind.is_block_device() {
+                if tcsos::fs::is_device(&meta) {
                     (
                         Severity::Error,
                         "it is a device, which the second tcspecial to open \

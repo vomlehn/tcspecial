@@ -151,7 +151,6 @@ impl AppAllVeh {
 mod tests {
     use super::*;
     use std::io::Write;
-    use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
 
     use tcsprotocol::node::vehicle::Restart;
@@ -179,8 +178,7 @@ mod tests {
         let path = where_.join("simulated_app");
         let mut file = std::fs::File::create(&path).expect("a program");
         file.write_all(b"#!/bin/sh\nexec cat\n").expect("a program");
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755))
-            .expect("a program that can be run");
+        tcsos::fs::set_mode(&path, 0o755).expect("a program that can be run");
         path
     }
 

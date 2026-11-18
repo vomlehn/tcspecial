@@ -6,10 +6,10 @@ license.workspace = true
 description = "The file interfaces a tcspecial app node's program is run with"
 
 [dependencies]
-# For the two things std does not offer: asking whether a descriptor is open,
-# and closing one in the child between the fork and the exec. Everything else
-# here -- the socket pairs, the spawning, the reading and writing -- is std.
-libc = "0.2"
+# How the system hands a program its interfaces, and how the program takes
+# them: see tcsos::interfaces. Everything else here -- the packets, the
+# spawning, the reading and writing -- is std.
+tcsos = { path = "../tcsos" }
 
 [dev-dependencies]
 tempfile = "3"

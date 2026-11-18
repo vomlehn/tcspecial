@@ -1367,8 +1367,6 @@ tcs-cfge:
     /// the way out of the program.
     #[test]
     fn work_the_files_do_not_have_is_owed_until_it_is_written() {
-        use std::os::unix::fs::PermissionsExt;
-
         let where_ = tempfile::tempdir().expect("a directory");
         let locked = where_.path().join("locked");
         std::fs::create_dir(&locked).unwrap();
@@ -1376,10 +1374,7 @@ tcs-cfge:
         let mut editor = Editor::new(&path);
 
         let shut = |mode: u32| {
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(mode);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, mode).unwrap();
         };
 
         shut(0o500);
@@ -1791,7 +1786,7 @@ tcs-cfge:
                 if kind.is_symlink() {
                     let target =
                         std::fs::read_link(entry.path()).expect("its target");
-                    std::os::unix::fs::symlink(target, &to).expect("linked");
+                    tcsos::linux::fs::symlink(target, &to).expect("linked");
                 } else {
                     std::fs::copy(entry.path(), &to).expect("copied");
                 }
@@ -1836,8 +1831,6 @@ tcs-cfge:
     /// after it is written to the copy.
     #[test]
     fn save_as_writes_the_configuration_elsewhere_and_carries_on() {
-        use std::os::unix::fs::PermissionsExt;
-
         let where_ = tempfile::tempdir().expect("a directory");
         std::fs::create_dir(where_.path().join("old")).expect("a directory");
         let (path, sim) = thermostat_example(&where_.path().join("old"));
@@ -1847,13 +1840,8 @@ tcs-cfge:
         assert_eq!(editor.trouble(), None, "{:?}", editor.trouble());
 
         let shut = path.parent().expect("its directory").to_path_buf();
-        let mode = |mode| {
-            std::fs::set_permissions(
-                &shut,
-                std::fs::Permissions::from_mode(mode),
-            )
-            .expect("permissions set")
-        };
+        let mode =
+            |mode| tcsos::fs::set_mode(&shut, mode).expect("permissions set");
         mode(0o555);
         editor.edit(add("temp_9", "i2c"));
         let failed = editor.trouble().map(str::to_string);
@@ -2380,11 +2368,7 @@ tcs-cfge:
         assert!(editor.trouble().is_none());
 
         {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(0o500);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, 0o500).unwrap();
         }
 
         editor.edit(add("b", "spi"));
@@ -2399,11 +2383,7 @@ tcs-cfge:
         assert_eq!(editor.undo_depth(), 2);
 
         {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(0o700);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, 0o700).unwrap();
         }
 
         // And once it can be written, the trouble clears.
@@ -2434,19 +2414,11 @@ tcs-cfge:
         editor.edit(add("a", "i2c"));
 
         {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(0o500);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, 0o500).unwrap();
         }
         editor.edit(add("b", "spi"));
         {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions =
-                std::fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(0o700);
-            std::fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, 0o700).unwrap();
         }
 
         // The file has the first node and the history both edits; the
@@ -2769,7 +2741,7 @@ tcs-cfge:
                 let to = into.join(&directory).join(&name);
                 if entry.file_type().expect("a type").is_symlink() {
                     let target = std::fs::read_link(entry.path()).expect("it");
-                    std::os::unix::fs::symlink(target, &to).expect("linked");
+                    tcsos::linux::fs::symlink(target, &to).expect("linked");
                 } else if entry.file_type().expect("a type").is_file() {
                     std::fs::copy(entry.path(), &to).expect("copied");
                 }

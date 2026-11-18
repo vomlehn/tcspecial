@@ -34,8 +34,8 @@ struct Running(Child);
 
 impl Drop for Running {
     fn drop(&mut self) {
-        // SAFETY: a signal to a child this test started.
-        unsafe { libc::kill(self.0.id() as libc::pid_t, libc::SIGTERM) };
+        // A child this test started.
+        let _ = tcsos::process::terminate(self.0.id());
         let _ = self.0.wait();
     }
 }

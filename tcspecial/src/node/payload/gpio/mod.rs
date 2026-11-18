@@ -33,21 +33,17 @@
 //! what is passed on -- and only where a level comes from and where a drive
 //! goes differ.
 //!
-//! The kernel's structures are declared here, unlike the CAN endpoint's:
-//! `libc` has no GPIO character-device definitions. Their sizes are asserted
-//! against the kernel's own in the tests below, because a structure of the
-//! wrong size is an ioctl that reads past what it was given and nothing else
-//! would notice.
+//! The kernel's side of a chip -- its structures and ioctls -- is
+//! `tcsos::linux::gpio`'s, on Linux alone: elsewhere only simulated lines
+//! can be had.
 
-use std::fs::{File, OpenOptions};
 use std::io::ErrorKind;
 use std::net::{SocketAddr, UdpSocket};
-use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{
     graph::terminals::Stream,
     link_type::Basic,
@@ -60,111 +56,15 @@ use crate::endpoint::{
     WaitResult,
 };
 
-/// The kernel's limits on one line request, from `linux/gpio.h`.
-const GPIO_V2_LINES_MAX: usize = 64;
-const GPIO_MAX_NAME_SIZE: usize = 32;
-const GPIO_V2_LINE_NUM_ATTRS_MAX: usize = 10;
-
-/// `GPIO_V2_GET_LINE_IOCTL`, which is `_IOWR(0xB4, 0x07, struct
-/// gpio_v2_line_request)`.
-const GPIO_V2_GET_LINE_IOCTL: libc::c_ulong = 0xc250_b407;
-
-/// Line flags, from `enum gpio_v2_line_flag`.
-const GPIO_V2_LINE_FLAG_INPUT: u64 = 1 << 2;
-const GPIO_V2_LINE_FLAG_OUTPUT: u64 = 1 << 3;
-const GPIO_V2_LINE_FLAG_BIAS_PULL_UP: u64 = 1 << 8;
-const GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN: u64 = 1 << 9;
-
-/// `GPIO_V2_LINE_GET_VALUES_IOCTL`, which is `_IOWR(0xB4, 0x0E, struct
-/// gpio_v2_line_values)` -- the same structure the values are set with, asked
-/// of the request this node already holds rather than of a second one.
-const GPIO_V2_LINE_GET_VALUES_IOCTL: libc::c_ulong = 0xc010_b40e;
-
-/// `GPIO_V2_LINE_SET_VALUES_IOCTL`, which is `_IOWR(0xB4, 0x0F, struct
-/// gpio_v2_line_values)` -- sixteen bytes of two `u64`.
-const GPIO_V2_LINE_SET_VALUES_IOCTL: libc::c_ulong = 0xc010_b40f;
-
-/// What a line is driven to, and which lines the request is about.
-///
-/// `gpio_v2_line_values`: the bits of `bits` are the values, the bits of
-/// `mask` say which lines they apply to. Both are indexed by the line's place
-/// in the request rather than by its offset on the chip, which is the one
-/// thing about this structure that is easy to get wrong -- lines 3, 4 and 5 of
-/// a chip are bits 0, 1 and 2 here.
-#[repr(C)]
+/// What lines are driven to, and which lines it is about: a bit of each
+/// for each line by its place in the request rather than by its offset on
+/// the chip -- lines 3, 4 and 5 of a chip are bits 0, 1 and 2 here.
 #[derive(Debug, Default, Clone, Copy)]
 struct LineValues {
+    /// The values.
     bits: u64,
+    /// Which lines they are of.
     mask: u64,
-}
-
-/// `GPIO_V2_LINE_ATTR_ID_DEBOUNCE`.
-const GPIO_V2_LINE_ATTR_ID_DEBOUNCE: u32 = 3;
-
-/// `struct gpio_v2_line_attribute`, whose union this uses as a debounce
-/// period: a `u32` in a field eight bytes wide.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-struct LineAttribute {
-    id: u32,
-    padding: u32,
-    value: u64,
-}
-
-/// `struct gpio_v2_line_config_attribute`.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-struct ConfigAttribute {
-    attr: LineAttribute,
-    mask: u64,
-}
-
-/// `struct gpio_v2_line_config`.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct LineConfig {
-    flags: u64,
-    num_attrs: u32,
-    padding: [u32; 5],
-    attrs: [ConfigAttribute; GPIO_V2_LINE_NUM_ATTRS_MAX],
-}
-
-impl Default for LineConfig {
-    fn default() -> Self {
-        Self {
-            flags: 0,
-            num_attrs: 0,
-            padding: [0; 5],
-            attrs: [ConfigAttribute::default(); GPIO_V2_LINE_NUM_ATTRS_MAX],
-        }
-    }
-}
-
-/// `struct gpio_v2_line_request`.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-struct LineRequest {
-    offsets: [u32; GPIO_V2_LINES_MAX],
-    consumer: [libc::c_char; GPIO_MAX_NAME_SIZE],
-    config: LineConfig,
-    num_lines: u32,
-    event_buffer_size: u32,
-    padding: [u32; 5],
-    fd: i32,
-}
-
-impl Default for LineRequest {
-    fn default() -> Self {
-        Self {
-            offsets: [0; GPIO_V2_LINES_MAX],
-            consumer: [0; GPIO_MAX_NAME_SIZE],
-            config: LineConfig::default(),
-            num_lines: 0,
-            event_buffer_size: 0,
-            padding: [0; 5],
-            fd: -1,
-        }
-    }
 }
 
 /// What the two halves of one request tell each other.
@@ -191,15 +91,9 @@ struct Shared {
 
 /// Where the lines are: a chip's, or tcs-sim's over UDP.
 enum Lines {
-    /// A chip's.
-    Chip {
-        /// The chip's character device, kept open: the line request belongs
-        /// to it for as long as it lives.
-        _chip: File,
-        /// The request's own descriptor, which the events are read from and
-        /// the line states driven through.
-        request: File,
-    },
+    /// A chip's, through the kernel's GPIO interface: Linux alone.
+    #[cfg(target_os = "linux")]
+    Chip(tcsos::linux::gpio::Lines),
     /// tcs-sim's, at the node's `sim_address`.
     Udp(UdpLines),
 }
@@ -287,49 +181,6 @@ fn mask_of(offsets: &[u32], these: &[u32]) -> u64 {
         .enumerate()
         .filter(|(_, offset)| these.contains(offset))
         .fold(0, |mask, (n, _)| mask | (1u64 << n))
-}
-
-/// Reads what every line of the request is, now.
-///
-/// One ioctl on the descriptor the events are read from: the request is
-/// already open and already names the lines, so nothing is opened and nothing
-/// is asked twice. The kernel answers with a bit per line, in the order the
-/// lines were asked for.
-///
-/// # Arguments
-///
-/// * `what` - The handler, for what a complaint says.
-/// * `fd`   - The line request's descriptor.
-/// * `mask` - Which lines of the request to ask about, by place.
-///
-/// # Returns
-///
-/// A bit per line, bit 0 the first line asked for, set where the line is
-/// asserted.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the kernel will not say.
-fn levels_of(what: &str, fd: RawFd, mask: u64) -> TcsResult<u64> {
-    let mut values = LineValues { bits: 0, mask };
-
-    // SAFETY: a structure laid out as the kernel's own -- the tests below
-    // hold it to the kernel's size -- living across a call on a descriptor
-    // the caller owns.
-    let result = unsafe {
-        libc::ioctl(
-            fd,
-            GPIO_V2_LINE_GET_VALUES_IOCTL,
-            &mut values as *mut LineValues,
-        )
-    };
-    if result < 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: cannot read what the lines are: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
-    Ok(values.bits)
 }
 
 impl UdpLines {
@@ -446,7 +297,7 @@ impl UdpLines {
     /// `TcsError::Endpoint` for a datagram that is not a state of the lines;
     /// `TcsError::Io` for a socket that fails.
     fn take(&self, what: &str, count: usize) -> TcsResult<()> {
-        let mut datagram = [0u8; GPIO_V2_LINES_MAX + 1];
+        let mut datagram = [0u8; LINES_MAX + 1];
         loop {
             let n = match self.socket.recv(&mut datagram) {
                 Ok(n) => n,
@@ -472,15 +323,16 @@ impl UdpLines {
 }
 
 impl Lines {
-    /// The descriptor to wait on.
+    /// What to wait on.
     ///
     /// # Returns
     ///
-    /// The request's descriptor, or the socket's.
-    fn fd(&self) -> RawFd {
+    /// The request's source, or the socket's.
+    fn source(&self) -> Source {
         match self {
-            Lines::Chip { request, .. } => request.as_raw_fd(),
-            Lines::Udp(udp) => udp.socket.as_raw_fd(),
+            #[cfg(target_os = "linux")]
+            Lines::Chip(chip) => chip.source(),
+            Lines::Udp(udp) => udp.socket.source(),
         }
     }
 
@@ -495,10 +347,8 @@ impl Lines {
     /// `TcsError::Io` if a descriptor cannot be duplicated.
     fn try_clone(&self) -> TcsResult<Self> {
         Ok(match self {
-            Lines::Chip { _chip, request } => Lines::Chip {
-                _chip: _chip.try_clone()?,
-                request: request.try_clone()?,
-            },
+            #[cfg(target_os = "linux")]
+            Lines::Chip(chip) => Lines::Chip(chip.try_clone()?),
             Lines::Udp(udp) => Lines::Udp(udp.try_clone()?),
         })
     }
@@ -531,31 +381,15 @@ impl GpioEndpoint {
     /// give up the lines, or the simulated lines cannot be reached.
     pub fn new(what: &str, config: &GpioConfig) -> TcsResult<Self> {
         let offsets = config.lines();
-        let request = request_for(what, config, &offsets)?;
+        if offsets.is_empty() || offsets.len() > LINES_MAX {
+            return Err(TcsError::Config(format!(
+                "{what}: {} lines is not between 1 and {LINES_MAX}",
+                offsets.len()
+            )));
+        }
         let lines = match config.sim_address {
             Some(at) => Lines::Udp(UdpLines::open(what, at)?),
-            None => {
-                let chip = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(&config.path)
-                    .map_err(|e| {
-                        TcsError::Endpoint(format!(
-                            "{what}: cannot open the GPIO chip {}: {e}",
-                            config.path
-                        ))
-                    })?;
-                let request = ask_for_lines(
-                    what,
-                    chip.as_raw_fd(),
-                    request,
-                    &config.path,
-                )?;
-                Lines::Chip {
-                    _chip: chip,
-                    request,
-                }
-            }
+            None => on_the_chip(what, config, &offsets)?,
         };
 
         // Watched lines are reported on, and the driven lines of a
@@ -653,160 +487,132 @@ impl GpioEndpoint {
     }
 }
 
-/// Builds the request this configuration asks for.
+/// The most lines one request may hold: the kernel's limit, which the
+/// simulated lines keep to as well, so that a configuration a desk runs is
+/// one a vehicle can.
+const LINES_MAX: usize = 64;
+
+/// How the kernel is to set a node's lines.
 ///
-/// One request for every line: watched lines flagged as inputs, with the
-/// edges, bias and debounce asked for, and driven lines as outputs.
+/// Driven lines ask for none of the watching terms, which the
+/// configuration refuses to state for them: an output has nothing to hold
+/// or debounce. Watched lines are asked for as plain inputs, with no edge
+/// detection: what they are is taken when a report is due, and nothing else
+/// is read. The debounce, where the file asks for one, applies to every
+/// watched line, a bit for each.
 ///
 /// # Arguments
 ///
-/// * `what`    - The handler, for what a complaint says and as the
-///               consumer the lines are held under.
-/// * `config`  - The lines and how they are to be configured.
-/// * `offsets` - Every line of the request, in the order it is asked for.
+/// * `config`  - The node's configuration.
+/// * `offsets` - Every line of the request, in its order.
 ///
 /// # Returns
 ///
-/// The request, ready for `GPIO_V2_GET_LINE_IOCTL`.
+/// The settings.
+#[cfg(target_os = "linux")]
+fn settings_for(
+    config: &GpioConfig,
+    offsets: &[u32],
+) -> tcsos::linux::gpio::Settings {
+    use tcsos::linux::gpio::{Bias as Pull, Settings};
+
+    if config.inputs.is_empty() {
+        return Settings::Output;
+    }
+    Settings::Input {
+        bias: match config.bias {
+            Bias::None => Pull::None,
+            Bias::PullUp => Pull::PullUp,
+            Bias::PullDown => Pull::PullDown,
+        },
+        debounce: config
+            .debounce
+            .map(|steady| (steady, mask_of(offsets, &config.inputs))),
+    }
+}
+
+/// Asks the chip for the node's lines.
+///
+/// # Arguments
+///
+/// * `what`    - The handler, for what a complaint says, and whose the
+///               lines are held as.
+/// * `config`  - The node's configuration.
+/// * `offsets` - Every line of the request, in its order.
+///
+/// # Returns
+///
+/// The lines.
 ///
 /// # Errors
 ///
-/// `TcsError::Config` if there are no lines or more than
-/// `GPIO_V2_LINES_MAX`.
-fn request_for(
+/// `TcsError::Endpoint` if the chip cannot be opened, refuses the request
+/// or gives no descriptor, or the descriptor cannot be made non-blocking.
+#[cfg(target_os = "linux")]
+fn on_the_chip(
     what: &str,
     config: &GpioConfig,
     offsets: &[u32],
-) -> TcsResult<LineRequest> {
-    if offsets.is_empty() || offsets.len() > GPIO_V2_LINES_MAX {
-        return Err(TcsError::Config(format!(
-            "{what}: {} lines is not between 1 and {GPIO_V2_LINES_MAX}",
-            offsets.len()
-        )));
-    }
+) -> TcsResult<Lines> {
+    use tcsos::linux::gpio::Refused;
 
-    let mut request = LineRequest::default();
-    for (n, line) in offsets.iter().enumerate() {
-        request.offsets[n] = *line;
-    }
-    request.num_lines = offsets.len() as u32;
-
-    // Whose lines these are, which is what `gpioinfo` shows beside them: a
-    // line held by something unnamed is the hardest kind of conflict to find.
-    for (n, byte) in what.bytes().take(GPIO_MAX_NAME_SIZE - 1).enumerate() {
-        request.consumer[n] = byte as libc::c_char;
-    }
-
-    // Driven lines ask for none of the watching terms, which the
-    // configuration refuses to state for them: an output has nothing to hold
-    // or debounce.
-    if config.inputs.is_empty() {
-        request.config.flags = GPIO_V2_LINE_FLAG_OUTPUT;
-        return Ok(request);
-    }
-
-    let bias = match config.bias {
-        Bias::None => 0,
-        Bias::PullUp => GPIO_V2_LINE_FLAG_BIAS_PULL_UP,
-        Bias::PullDown => GPIO_V2_LINE_FLAG_BIAS_PULL_DOWN,
-    };
-    // Asked for as a plain input, with no edge detection: what the lines
-    // are is taken when a report is due, and nothing else is read.
-    request.config.flags = GPIO_V2_LINE_FLAG_INPUT | bias;
-
-    // The debounce the kernel does, where the file asked for one, applied to
-    // every line of the request: a bit per line.
-    if let Some(steady) = config.debounce {
-        request.config.attrs[0] = ConfigAttribute {
-            attr: LineAttribute {
-                id: GPIO_V2_LINE_ATTR_ID_DEBOUNCE,
-                padding: 0,
-                // The kernel's own attribute counts microseconds, which
-                // is where a length of time becomes a number.
-                value: steady.as_micros() as u64,
-            },
-            mask: mask_of(offsets, &config.inputs),
-        };
-        request.config.num_attrs = 1;
-    }
-
-    Ok(request)
+    let path = &config.path;
+    let settings = settings_for(config, offsets);
+    tcsos::linux::gpio::Lines::request(path, offsets, what, &settings)
+        .map(Lines::Chip)
+        .map_err(|refused| {
+            TcsError::Endpoint(match refused {
+                Refused::HowMany(n) => {
+                    format!(
+                        "{what}: {n} lines is not between 1 and {LINES_MAX}"
+                    )
+                }
+                Refused::Open(e) => {
+                    format!("{what}: cannot open the GPIO chip {path}: {e}")
+                }
+                Refused::Request(e) => format!(
+                    "{what}: {path} will not give up its lines: {e}. A line \
+                     is given to one request at a time, so this is commonly \
+                     a line another program holds"
+                ),
+                Refused::NoDescriptor => format!(
+                    "{what}: {path} took the request and gave no descriptor"
+                ),
+                Refused::NonBlocking(e) => format!(
+                    "{what}: cannot make {path}'s line request non-blocking: \
+                     {e}"
+                ),
+            })
+        })
 }
 
-/// Makes the request, and hands back the descriptor the events arrive on.
+/// Where the system has no GPIO chips to ask -- a web page -- lines that
+/// are not simulated cannot be had.
 ///
 /// # Arguments
 ///
 /// * `what`    - The handler, for what a complaint says.
-/// * `chip`    - The chip's open character device.
-/// * `request` - The request, which the kernel fills with the descriptor.
-/// * `path`    - Where the chip is, for what a complaint says.
+/// * `config`  - The node's configuration.
+/// * `_offsets` - Every line of the request, in its order.
 ///
 /// # Returns
 ///
-/// The line request's descriptor, non-blocking.
+/// Never.
 ///
 /// # Errors
 ///
-/// `TcsError::Endpoint` if the chip refuses the request, gives no
-/// descriptor, or the descriptor cannot be made non-blocking.
-fn ask_for_lines(
+/// Always `TcsError::Endpoint`, saying that only simulated lines can be.
+#[cfg(not(target_os = "linux"))]
+fn on_the_chip(
     what: &str,
-    chip: RawFd,
-    mut request: LineRequest,
-    path: &str,
-) -> TcsResult<File> {
-    // SAFETY: the structure is laid out as the kernel's own -- the tests
-    // below hold it to the kernel's sizes -- and lives across the call, which
-    // writes the descriptor into it.
-    let asked =
-        unsafe { libc::ioctl(chip, GPIO_V2_GET_LINE_IOCTL, &mut request) };
-    if asked < 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: {path} will not give up its lines: {}. A line is given to \
-             one request at a time, so this is commonly a line another program \
-             holds",
-            std::io::Error::last_os_error()
-        )));
-    }
-
-    if request.fd < 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: {path} took the request and gave no descriptor"
-        )));
-    }
-
-    // Owned at once, so that a failure below closes it rather than leaving
-    // the lines held by a descriptor nobody has.
-    // SAFETY: the kernel has just given this descriptor, and nothing else
-    // owns it.
-    let lines = unsafe { File::from_raw_fd(request.fd) };
-
-    // Read without waiting, as every other endpoint does, and for a sharper
-    // reason here: a read gathers every event that is waiting, so a blocking
-    // descriptor would have it wait for the next one after collecting the
-    // last -- a conduit stopped until a line happened to change again, with
-    // the events it had already gathered unreported.
-    // SAFETY: both calls take the descriptor by value and return a status,
-    // and `lines` keeps it open across them.
-    let flags = unsafe { libc::fcntl(lines.as_raw_fd(), libc::F_GETFL) };
-    if flags < 0
-        // SAFETY: as for F_GETFL: `lines` keeps the descriptor open.
-        || unsafe {
-            libc::fcntl(
-                lines.as_raw_fd(),
-                libc::F_SETFL,
-                flags | libc::O_NONBLOCK,
-            )
-        } < 0
-    {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: cannot make {path}'s line request non-blocking: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
-
-    Ok(lines)
+    config: &GpioConfig,
+    _offsets: &[u32],
+) -> TcsResult<Lines> {
+    Err(TcsError::Endpoint(format!(
+        "{what}: the GPIO chip {} cannot be reached here, where only \
+         simulated lines can be: run with --simulate",
+        config.path
+    )))
 }
 
 /// Reads what arrived as the number the lines are to be driven to.
@@ -910,16 +716,16 @@ fn values_for(driven: u64, wanted: u64) -> LineValues {
 }
 
 impl EndpointWaitable for GpioEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.lines.fd()
+    fn io_source(&self) -> Source {
+        self.lines.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -995,9 +801,13 @@ impl EndpointReadable for GpioEndpoint {
         }
         self.shared.asked.store(false, Ordering::Release);
         let bits = match &self.lines {
-            Lines::Chip { request, .. } => {
-                levels_of(&self.what, request.as_raw_fd(), self.watched)?
-            }
+            #[cfg(target_os = "linux")]
+            Lines::Chip(chip) => chip.levels(self.watched).map_err(|e| {
+                TcsError::Endpoint(format!(
+                    "{}: cannot read what the lines are: {e}",
+                    self.what
+                ))
+            })?,
             Lines::Udp(udp) => udp.levels(self.watched),
         };
         self.wind();
@@ -1033,25 +843,14 @@ impl EndpointWritable for GpioEndpoint {
         let values = values_for(self.driven, wanted);
 
         match &self.lines {
-            Lines::Chip { request, .. } => {
-                // SAFETY: a structure laid out as the kernel's own -- the
-                // tests below hold it to the kernel's size -- living across a
-                // call on a descriptor this owns.
-                let result = unsafe {
-                    libc::ioctl(
-                        request.as_raw_fd(),
-                        GPIO_V2_LINE_SET_VALUES_IOCTL,
-                        &values,
-                    )
-                };
-                if result < 0 {
-                    return Err(TcsError::Endpoint(format!(
-                        "{}: cannot drive the lines of {}: {}",
-                        self.what,
-                        self.path,
-                        std::io::Error::last_os_error()
-                    )));
-                }
+            #[cfg(target_os = "linux")]
+            Lines::Chip(chip) => {
+                chip.drive(values.bits, values.mask).map_err(|e| {
+                    TcsError::Endpoint(format!(
+                        "{}: cannot drive the lines of {}: {e}",
+                        self.what, self.path
+                    ))
+                })?
             }
             Lines::Udp(udp) => {
                 udp.drive(&self.what, self.offsets.len(), &values)?
@@ -1073,26 +872,6 @@ impl EndpointWritable for GpioEndpoint {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::mem;
-
-    /// Every structure is the size the kernel's own is.
-    ///
-    /// Measured from `linux/gpio.h` on the machine this was written on: 16,
-    /// 24, 272, 592 and 16 bytes. A structure of the wrong size is an ioctl
-    /// that reads or writes past what it was handed, and nothing else in a
-    /// test would notice.
-    #[test]
-    fn the_structures_are_what_the_kernel_reads() {
-        assert_eq!(mem::size_of::<LineAttribute>(), 16);
-        assert_eq!(mem::size_of::<ConfigAttribute>(), 24);
-        assert_eq!(mem::size_of::<LineConfig>(), 272);
-        assert_eq!(mem::size_of::<LineRequest>(), 592);
-        assert_eq!(mem::size_of::<LineValues>(), 16);
-
-        // And the alignment the kernel's 64-bit fields need.
-        assert_eq!(mem::align_of::<LineRequest>(), 8);
-        assert_eq!(mem::align_of::<LineValues>(), 8);
-    }
 
     /// Lines watched, as a file's `gpio_in` states them.
     ///
@@ -1116,9 +895,9 @@ mod tests {
         }
     }
 
-    /// An endpoint on a pair of pipes in place of a chip and a request, for
-    /// what can be tested without one: what is refused, what is asked for,
-    /// and what is passed on.
+    /// An endpoint on a pipe in place of a chip and a request, for what can
+    /// be tested without one: what is refused, what is asked for, and what
+    /// is passed on.
     ///
     /// # Arguments
     ///
@@ -1129,39 +908,19 @@ mod tests {
     ///
     /// # Returns
     ///
-    /// The endpoint, and the write end of the pipe its `lines` reads.
+    /// The endpoint, and the write end of the pipe its lines read, held
+    /// for as long as the test needs the pipe open.
     fn on_a_pipe(
         what: &str,
         offsets: Vec<u32>,
         watched: u64,
         driven: u64,
-    ) -> (GpioEndpoint, RawFd) {
-        let mut fds = [0 as RawFd; 2];
-        // SAFETY: pipe needs room for two descriptors to write, which `fds`
-        // is: a local array of two.
-        assert_eq!(unsafe { libc::pipe(fds.as_mut_ptr()) }, 0, "a pipe");
-
-        // Non-blocking, as the kernel's own descriptor is made in
-        // ask_for_lines: a read gathers everything waiting and must not then
-        // wait for more.
-        // SAFETY: the descriptor is the pipe's read end, just made.
-        unsafe {
-            let flags = libc::fcntl(fds[0], libc::F_GETFL);
-            libc::fcntl(fds[0], libc::F_SETFL, flags | libc::O_NONBLOCK);
-        }
-
-        // SAFETY: dup takes the descriptor by value; the pipe is open.
-        let chip = unsafe { libc::dup(fds[1]) };
-        assert!(chip >= 0, "a copy of the pipe's end");
+    ) -> (GpioEndpoint, std::fs::File) {
+        let (lines, end) =
+            tcsos::linux::gpio::Lines::on_a_pipe().expect("a pipe");
         let endpoint = GpioEndpoint {
             what: what.to_string(),
-            lines: Lines::Chip {
-                // SAFETY: the copy was just made and nothing else owns it.
-                _chip: unsafe { File::from_raw_fd(chip) },
-                // SAFETY: the pipe's read end, just made, owned by the
-                // endpoint from here and not used through `fds[0]` again.
-                request: unsafe { File::from_raw_fd(fds[0]) },
-            },
+            lines: Lines::Chip(lines),
             watched,
             driven,
             path: "/dev/gpiochip0".to_string(),
@@ -1172,61 +931,27 @@ mod tests {
             shared: Arc::new(Shared::default()),
             last: None,
         };
-        (endpoint, fds[1])
+        (endpoint, end)
     }
 
-    /// Closes the write end of a test's pipe.
-    fn close(fd: RawFd) {
-        // SAFETY: close needs a descriptor nothing else owns or will use,
-        // which the write end is: only the test holds it -- the endpoint
-        // owns a dup of it -- and it is not used after this.
-        unsafe {
-            libc::close(fd);
-        }
-    }
-
-    /// A request asks for the lines the file named, as inputs, with the bias
-    /// it asked for and no edge detection.
+    /// Lines watched are asked for as inputs, with the bias the file asked
+    /// for, and the debounce on every watched line.
     #[test]
-    fn a_request_asks_for_what_the_file_said() {
+    fn watched_lines_are_asked_for_as_the_file_said() {
+        use tcsos::linux::gpio::{Bias as Pull, Settings};
+
         let config = GpioConfig {
             bias: Bias::PullUp,
             debounce: Some(Duration::from_micros(5_000)),
             ..watched(vec![3, 7, 11])
         };
-
-        let request = request_for("discretes", &config, &config.lines())
-            .expect("a request");
-
-        assert_eq!(request.num_lines, 3);
-        assert_eq!(&request.offsets[..3], &[3, 7, 11]);
         assert_eq!(
-            request.offsets[3], 0,
-            "the rest of the array is left as the kernel wants it"
+            settings_for(&config, &config.lines()),
+            Settings::Input {
+                bias: Pull::PullUp,
+                debounce: Some((Duration::from_micros(5_000), 0b111)),
+            }
         );
-
-        assert_eq!(
-            request.config.flags,
-            GPIO_V2_LINE_FLAG_INPUT | GPIO_V2_LINE_FLAG_BIAS_PULL_UP
-        );
-
-        // The debounce, applied to every line of the request: a bit per line.
-        assert_eq!(request.config.num_attrs, 1);
-        assert_eq!(
-            request.config.attrs[0].attr.id,
-            GPIO_V2_LINE_ATTR_ID_DEBOUNCE
-        );
-        assert_eq!(request.config.attrs[0].attr.value, 5_000);
-        assert_eq!(request.config.attrs[0].mask, 0b111);
-
-        // And whose lines they are, which is what gpioinfo shows beside them.
-        let consumer: Vec<u8> = request
-            .consumer
-            .iter()
-            .take_while(|byte| **byte != 0)
-            .map(|byte| *byte as u8)
-            .collect();
-        assert_eq!(String::from_utf8_lossy(&consumer), "discretes");
     }
 
     /// A chip that is not there is reported.
@@ -1256,7 +981,7 @@ mod tests {
         assert_eq!(writer.write(b"anything").expect("taken"), 8);
         assert!(reader.due(), "the other half has the report to make");
 
-        close(end);
+        drop(end);
     }
 
     /// A report gives what the lines are as one number, a bit for each by
@@ -1276,7 +1001,7 @@ mod tests {
             Ok(n) => panic!("a pipe gave the lines' values, {n} bytes"),
         };
         assert!(said.contains("discretes"), "{said}");
-        close(end);
+        drop(end);
     }
 
     /// A driven set of lines asks for the output flag and nothing else.
@@ -1298,16 +1023,11 @@ mod tests {
             state_interval: None,
             sim_address: None,
         };
-        let request = request_for("heaters", &config, &config.lines())
-            .expect("a request");
-
         assert_eq!(
-            request.config.flags, GPIO_V2_LINE_FLAG_OUTPUT,
+            settings_for(&config, &config.lines()),
+            tcsos::linux::gpio::Settings::Output,
             "a driven line asks to be driven and nothing more"
         );
-        assert_eq!(request.num_lines, 3);
-        assert_eq!(&request.offsets[..3], &[17, 18, 19]);
-        assert_eq!(request.config.num_attrs, 0);
     }
 
     /// The bits and the mask count lines by their place in the request, and
@@ -1404,7 +1124,7 @@ mod tests {
         assert_eq!(reader.stream(), Some(Stream::Vehicleward));
         assert!(!reader.due(), "passed on once");
         assert_eq!(reader.read(&mut buffer).expect("nothing"), 0);
-        close(end);
+        drop(end);
     }
 
     /// A gpio_inout's lines report what they were last told on the report
@@ -1431,7 +1151,7 @@ mod tests {
         // And not again until the clock comes round.
         assert!(!reader.due());
         assert_eq!(reader.read(&mut buffer).expect("nothing"), 0);
-        close(end);
+        drop(end);
     }
 
     /// A write to a driven set reaches the kernel, which is as far as a test
@@ -1456,7 +1176,7 @@ mod tests {
             "the error should be the kernel's, and name the chip: {said}"
         );
         assert!(!endpoint.due(), "nothing to pass on from a failed drive");
-        close(end);
+        drop(end);
     }
 
     /// tcs-sim's end of simulated lines: a socket on the loopback interface,

@@ -157,8 +157,6 @@ fn the_worlds_ambient_is_printed_in_kelvin() {
 /// down in its tree.
 #[test]
 fn a_checked_configuration_is_kept_under_its_checksum() {
-    use std::os::unix::fs::PermissionsExt;
-
     let dir = tempfile::tempdir().expect("a directory");
     let store = dir.path().join("kept");
     std::fs::create_dir(&store).expect("a store");
@@ -189,7 +187,7 @@ fn a_checked_configuration_is_kept_under_its_checksum() {
             kept.display()
         )]
     );
-    let mode = std::fs::metadata(&kept).expect("kept").permissions().mode();
+    let mode = tcsos::fs::mode(&kept).expect("kept");
     assert_eq!(mode & 0o777, 0o444, "read-only");
     assert!(tree.join("thermostat-common/thermostat.ytcs").is_file());
     let (graph, _) = tcsprotocol::store::Store::at(&store)

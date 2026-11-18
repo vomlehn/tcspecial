@@ -36,9 +36,9 @@
 //! match, which the beacon thread takes only as a match begins and a
 //! receiver only as it is opened and closed.
 
-use std::os::fd::RawFd;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use tcsos::wait::Source;
 
 use tcsprotocol::ConfigDigest;
 
@@ -78,7 +78,7 @@ struct Inner {
     listening: AtomicBool,
     /// The data sockets of every receiver gated by this, which are emptied
     /// as a match begins: see [`Matched::queued_on`].
-    queues: Mutex<Vec<RawFd>>,
+    queues: Mutex<Vec<Source>>,
     /// How many times a match has ended, or a start of tcspecial been heard:
     /// the commanding half rests on a CONNECT answered since the last of
     /// these.
@@ -237,8 +237,8 @@ impl Matched {
     ///
     /// # Arguments
     ///
-    /// * `fd` - The socket's descriptor.
-    pub(crate) fn queued_on(&self, fd: RawFd) {
+    /// * `fd` - The socket's source.
+    pub(crate) fn queued_on(&self, fd: Source) {
         if let Ok(mut queues) = self.0.queues.lock() {
             queues.push(fd);
         }
@@ -248,8 +248,8 @@ impl Matched {
     ///
     /// # Arguments
     ///
-    /// * `fd` - The socket's descriptor.
-    pub(crate) fn no_longer_queued_on(&self, fd: RawFd) {
+    /// * `fd` - The socket's source.
+    pub(crate) fn no_longer_queued_on(&self, fd: Source) {
         if let Ok(mut queues) = self.0.queues.lock() {
             queues.retain(|queued| *queued != fd);
         }
@@ -261,36 +261,14 @@ impl Matched {
         let Ok(queues) = self.0.queues.lock() else {
             return;
         };
-        // One byte of room: with MSG_TRUNC the rest of a datagram is
-        // discarded, which is all that is wanted of it.
-        let mut room = [0u8; 1];
         let mut dropped = 0;
+        // Each source is a receiver's open socket, which it takes off this
+        // list, under this lock, before it closes. Empty, or a socket with
+        // nothing to give, ends its loop: its receiver's next read says
+        // which.
         for &fd in queues.iter() {
-            loop {
-                // SAFETY: recv needs an open socket and a buffer writable for
-                // the length it is given. Each descriptor is a receiver's
-                // open socket, which it takes off this list, under this lock,
-                // before it closes; the buffer is `room`, and its length.
-                let got = unsafe {
-                    libc::recv(
-                        fd,
-                        room.as_mut_ptr().cast(),
-                        room.len(),
-                        libc::MSG_DONTWAIT | libc::MSG_TRUNC,
-                    )
-                };
-                if got >= 0 {
-                    dropped += 1;
-                    continue;
-                }
-                if std::io::Error::last_os_error().kind()
-                    == std::io::ErrorKind::Interrupted
-                {
-                    continue;
-                }
-                // Empty, or a socket with nothing to give: its receiver's
-                // next read says which.
-                break;
+            while let Ok(true) = tcsos::net::discard_one(fd) {
+                dropped += 1;
             }
         }
         self.mismatched(dropped);

@@ -49,22 +49,6 @@ static ENDING: AtomicBool = AtomicBool::new(false);
 /// The thread, until [`before_exec`] joins it.
 static THREAD: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 
-/// The two signals, as a set.
-///
-/// # Returns
-///
-/// SIGINT and SIGTERM.
-fn stop_signals() -> libc::sigset_t {
-    // SAFETY: a set made empty and then given two signals, on the stack.
-    unsafe {
-        let mut set: libc::sigset_t = std::mem::zeroed();
-        libc::sigemptyset(&mut set);
-        libc::sigaddset(&mut set, libc::SIGINT);
-        libc::sigaddset(&mut set, libc::SIGTERM);
-        set
-    }
-}
-
 /// Blocks the two signals in this thread, and so in every thread made after,
 /// and starts the thread that takes them.
 ///
@@ -77,12 +61,7 @@ fn stop_signals() -> libc::sigset_t {
 /// * `stop` - What a signal taken once the loop is listening calls: sets the
 ///            loop's stop flag.
 pub fn start(stop: fn()) {
-    let set = stop_signals();
-    // SAFETY: blocking signals in the calling thread, with a set that lives
-    // across the call.
-    unsafe {
-        libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut())
-    };
+    tcsos::signals::block();
     let thread = crate::runtime::thread::spawn(
         tcsprotocol::ThreadRole::Signals,
         tcsprotocol::NO_NODE,
@@ -106,19 +85,10 @@ pub fn start(stop: fn()) {
 ///
 /// * `stop` - What asks the loop to stop.
 fn take(stop: fn()) {
-    let set = stop_signals();
-    let wait = libc::timespec {
-        tv_sec: 0,
-        tv_nsec: WAIT.as_nanos() as libc::c_long,
-    };
     while !ENDING.load(Ordering::SeqCst) {
-        // SAFETY: waiting on a set and a timeout that live across the call;
-        // no information about the signal is asked for.
-        let taken =
-            unsafe { libc::sigtimedwait(&set, std::ptr::null_mut(), &wait) };
-        if taken <= 0 {
+        let Some(taken) = tcsos::signals::take(WAIT) else {
             continue;
-        }
+        };
         SIGNALLED.store(true, Ordering::SeqCst);
         if !LISTENING.load(Ordering::SeqCst) {
             std::process::exit(128 + taken);
@@ -160,48 +130,20 @@ pub fn before_exec() -> bool {
     if let Some(thread) = thread {
         let _ = thread.join();
     }
-    // SAFETY: asking which signals are pending, into a set on the stack.
-    let pending = unsafe {
-        let mut pending: libc::sigset_t = std::mem::zeroed();
-        libc::sigemptyset(&mut pending);
-        libc::sigpending(&mut pending);
-        libc::sigismember(&pending, libc::SIGINT) == 1
-            || libc::sigismember(&pending, libc::SIGTERM) == 1
-    };
-    let asked = SIGNALLED.load(Ordering::SeqCst) || pending;
+    let asked = SIGNALLED.load(Ordering::SeqCst) || tcsos::signals::pending();
     if asked {
         info!("a stop was asked for as the restart was under way: stopping");
     } else if took {
         // Only where this process took the signals: a test that never did
         // keeps whatever its harness set.
-        unblock_default();
+        tcsos::signals::default_and_unblock();
     }
     asked
-}
-
-/// Gives the two signals their default action, which ends the process, and
-/// unblocks them in this thread, the one that is to exit.
-///
-/// The other threads keep their block, so a stop sent to the process is
-/// handed to this one, and ends it however little of the exit is left. One
-/// that arrived since [`before_exec`] looked is pending, and is handed over
-/// as the block is lifted.
-fn unblock_default() {
-    let set = stop_signals();
-    // SAFETY: setting two signals to their default action, which installs no
-    // handler, and unblocking them in the calling thread, with a set that
-    // lives across the call.
-    unsafe {
-        libc::signal(libc::SIGINT, libc::SIG_DFL);
-        libc::signal(libc::SIGTERM, libc::SIG_DFL);
-        libc::pthread_sigmask(libc::SIG_UNBLOCK, &set, std::ptr::null_mut());
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::os::unix::process::ExitStatusExt;
     use std::process::Command;
 
     /// Set in the environment of the copy of this test that is to be
@@ -228,12 +170,8 @@ mod tests {
         if std::env::var_os(CHILD).is_some() {
             start(nothing);
             assert!(!before_exec(), "no stop has been asked for yet");
-            // SAFETY: a signal sent to this thread, and an exit that runs
-            // nothing more of this process.
-            unsafe {
-                libc::pthread_kill(libc::pthread_self(), libc::SIGTERM);
-                libc::_exit(LOST);
-            }
+            tcsos::signals::terminate_this_thread();
+            std::process::exit(LOST);
         }
         let name =
             concat!(module_path!(), "::a_stop_after_the_look_is_not_lost");
@@ -244,8 +182,8 @@ mod tests {
             .status()
             .expect("the copy runs");
         assert_eq!(
-            status.signal(),
-            Some(libc::SIGTERM),
+            tcsos::process::ended_by(&status),
+            Some(tcsos::signals::TERMINATE),
             "the stop was lost: the copy {status}"
         );
     }

@@ -19,14 +19,12 @@
 //! get wrong. Its own frames are not received back, so a handler never reads
 //! the trigger it just sent.
 //!
-//! The structures and constants are the kernel's; `libc` has them for CAN, so
-//! unlike the GPIO endpoint nothing is declared here.
+//! The socket itself -- the kernel's structures, its options, its frames --
+//! is `tcsos::linux::can`'s, which tcs-sim's CAN device shares.
 
-use std::io;
-use std::mem;
-use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd, RawFd};
+use tcsos::linux::can::{Bus, Refused, Settings};
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{
     node::payload::can::frame_bytes, CanConfig, TcsError, TcsResult,
 };
@@ -42,18 +40,21 @@ pub struct CanEndpoint {
     /// names it, so what the endpoint says of itself says which handler it is
     /// for.
     what: String,
-    socket: OwnedFd,
-    /// The identifier frames are sent with, which is the one they are
-    /// filtered on.
-    can_id: u32,
-    /// Whether frames are CAN FD, which decides both the structure the kernel
-    /// exchanges and how much a frame carries.
+    /// The socket, on its bus.
+    bus: Bus,
+    /// Whether frames are CAN FD, which decides how much a frame carries.
     fd: bool,
 }
 
 impl CanEndpoint {
     /// Opens a socket on the configured interface and filters it to the
     /// configured identifier.
+    ///
+    /// Only this device's frames: a bus carries everybody's. Loopback off is
+    /// the unusual case and the one worth asking for: a bus with real
+    /// hardware on it needs no loopback, where two programs on one host do.
+    /// Non-blocking, as every other endpoint is: a conduit waits and reads
+    /// what is there.
     ///
     /// # Arguments
     ///
@@ -72,63 +73,20 @@ impl CanEndpoint {
     /// not one an interface can have; `TcsError::Endpoint` if the socket
     /// cannot be opened, filtered, flagged, bound or made non-blocking.
     pub fn new(what: &str, config: &CanConfig) -> TcsResult<Self> {
-        let index = interface_index(what, &config.interface)?;
-
-        // SAFETY: a socket call with constant arguments; the result is
-        // checked before it is used.
-        let fd = unsafe {
-            libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW)
+        let interface = &config.interface;
+        let settings = Settings {
+            can_id: config.can_id,
+            extended: tcsprotocol::node::payload::can::is_extended(
+                config.can_id,
+            ),
+            fd: config.fd,
+            loopback: config.loopback,
         };
-        if fd < 0 {
-            return Err(TcsError::Endpoint(format!(
-                "{what}: cannot open a CAN socket: {}. A kernel without CAN \
-                 support has no socket to give",
-                io::Error::last_os_error()
-            )));
-        }
-        // From here the descriptor is owned, so every path below closes it.
-        //
-        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
-        // socket has just made this one and it is checked above; nothing
-        // else has been given it.
-        let socket = unsafe { OwnedFd::from_raw_fd(fd) };
-
-        // Only this device's frames. A bus carries everybody's.
-        set_filter(what, socket.as_raw_fd(), config.can_id)?;
-
-        if config.fd {
-            set_flag(
-                what,
-                socket.as_raw_fd(),
-                libc::CAN_RAW_FD_FRAMES,
-                1,
-                "CAN FD",
-            )?;
-        }
-
-        // Off is the unusual case and the one worth asking for: a bus with
-        // real hardware on it needs no loopback, where two programs on one
-        // host do.
-        if !config.loopback {
-            set_flag(
-                what,
-                socket.as_raw_fd(),
-                libc::CAN_RAW_LOOPBACK,
-                0,
-                "loopback",
-            )?;
-        }
-
-        bind_to(what, socket.as_raw_fd(), &config.interface, index)?;
-
-        // Non-blocking, as every other endpoint is: a conduit waits in poll
-        // and reads what is there.
-        set_nonblocking(what, socket.as_raw_fd())?;
-
+        let bus = Bus::join(interface, &settings)
+            .map_err(|refused| refused_for(what, interface, config, refused))?;
         Ok(Self {
             what: what.to_string(),
-            socket,
-            can_id: config.can_id,
+            bus,
             fd: config.fd,
         })
     }
@@ -149,8 +107,7 @@ impl CanEndpoint {
     pub fn try_clone(&self) -> TcsResult<Self> {
         Ok(Self {
             what: self.what.clone(),
-            socket: self.socket.try_clone()?,
-            can_id: self.can_id,
+            bus: self.bus.try_clone()?,
             fd: self.fd,
         })
     }
@@ -161,263 +118,72 @@ impl CanEndpoint {
     }
 }
 
-/// Finds the kernel's index for a named interface.
+/// What a socket that could not be put on its bus is said to be.
 ///
-/// A socket is bound to an index rather than to a name, and the name is what a
-/// file states. A name the kernel does not know is the common failure -- a bus
-/// that has not been brought up, or a virtual one that was never created -- and
-/// the error says so, with the command that would make one, as the I2C dummy
-/// device does for its module.
+/// A name the kernel does not know is the common failure -- a bus that has
+/// not been brought up, or a virtual one that was never created -- and the
+/// error says so, with the command that would make one.
 ///
 /// # Arguments
 ///
 /// * `what`      - The handler, for what a complaint says.
-/// * `interface` - The interface's name, such as `vcan0`.
+/// * `interface` - The interface's name.
+/// * `config`    - The node's configuration, for the identifier.
+/// * `refused`   - What could not be done.
 ///
 /// # Returns
 ///
-/// The interface's index.
-///
-/// # Errors
-///
-/// `TcsError::Config` if the name holds a NUL or this host has no
-/// interface by that name.
-fn interface_index(what: &str, interface: &str) -> TcsResult<libc::c_uint> {
-    let name = std::ffi::CString::new(interface).map_err(|_| {
-        TcsError::Config(format!(
-            "{what}: \"{interface}\" is not a name an interface can have"
-        ))
-    })?;
-
-    // SAFETY: the name is a valid C string for the length of the call.
-    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-    if index == 0 {
-        return Err(TcsError::Config(format!(
-            "{what}: this host has no interface called \"{interface}\": {}. A \
-             virtual bus is made with \"ip link add dev {interface} type \
-             vcan\" and brought up with \"ip link set dev {interface} up\"",
-            io::Error::last_os_error()
-        )));
-    }
-
-    Ok(index)
-}
-
-/// Accepts this device's frames and nothing else on the bus.
-///
-/// One filter, on the identifier and every bit of it. The extended-format
-/// flag is part of the identifier the kernel compares, so it goes in the mask
-/// as well: without it a base identifier would also match the extended frame
-/// with the same number, which is a different frame.
-///
-/// # Arguments
-///
-/// * `what`   - The handler, for what a complaint says.
-/// * `fd`     - The raw CAN socket to filter.
-/// * `can_id` - The identifier to accept, base or extended.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the kernel refuses the filter.
-fn set_filter(what: &str, fd: RawFd, can_id: u32) -> TcsResult<()> {
-    let id = if tcsprotocol::node::payload::can::is_extended(can_id) {
-        can_id | libc::CAN_EFF_FLAG
-    } else {
-        can_id
-    };
-
-    let filter = libc::can_filter {
-        can_id: id,
-        can_mask: libc::CAN_EFF_MASK | libc::CAN_EFF_FLAG,
-    };
-
-    // SAFETY: the option is a single can_filter, which is what the kernel
-    // reads for CAN_RAW_FILTER, and it lives for the call.
-    let set = unsafe {
-        libc::setsockopt(
-            fd,
-            libc::SOL_CAN_RAW,
-            libc::CAN_RAW_FILTER,
-            &filter as *const libc::can_filter as *const libc::c_void,
-            mem::size_of::<libc::can_filter>() as libc::socklen_t,
-        )
-    };
-
-    if set < 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: cannot filter this socket to can_id {can_id:#x}: {}",
-            io::Error::last_os_error()
-        )));
-    }
-
-    Ok(())
-}
-
-/// Sets one of the raw socket's flags, naming it if the kernel refuses.
-///
-/// # Arguments
-///
-/// * `what`   - The handler, for what a complaint says.
-/// * `fd`     - The raw CAN socket.
-/// * `option` - The `CAN_RAW_*` option to set.
-/// * `to`     - Its value, 1 for on and 0 for off.
-/// * `name`   - What the option is called in a complaint.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the kernel refuses the option.
-fn set_flag(
+/// `TcsError::Config` for an interface that is not there or a name that
+/// cannot be one, `TcsError::Endpoint` for the rest.
+fn refused_for(
     what: &str,
-    fd: RawFd,
-    option: libc::c_int,
-    to: libc::c_int,
-    name: &str,
-) -> TcsResult<()> {
-    // SAFETY: an int option of the size the kernel expects, living for the
-    // call.
-    let set = unsafe {
-        libc::setsockopt(
-            fd,
-            libc::SOL_CAN_RAW,
-            option,
-            &to as *const libc::c_int as *const libc::c_void,
-            mem::size_of::<libc::c_int>() as libc::socklen_t,
-        )
-    };
-
-    if set < 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: this socket will not take {name}: {}",
-            io::Error::last_os_error()
-        )));
-    }
-
-    Ok(())
-}
-
-/// Binds the socket to the interface, which is what puts it on that bus.
-///
-/// # Arguments
-///
-/// * `what`      - The handler, for what a complaint says.
-/// * `fd`        - The raw CAN socket to bind.
-/// * `interface` - The interface's name, for what a complaint says.
-/// * `index`     - The interface's index, which the address carries.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the bind fails.
-fn bind_to(
-    what: &str,
-    fd: RawFd,
     interface: &str,
-    index: libc::c_uint,
-) -> TcsResult<()> {
-    // SAFETY: zeroed and then filled in; sockaddr_can is the address a CAN
-    // socket is bound with, and only its family and interface index are read
-    // for a raw socket.
-    let mut addr: libc::sockaddr_can = unsafe { mem::zeroed() };
-    addr.can_family = libc::AF_CAN as libc::sa_family_t;
-    addr.can_ifindex = index as libc::c_int;
-
-    // SAFETY: the address is of the length given and lives for the call.
-    let bound = unsafe {
-        libc::bind(
-            fd,
-            &addr as *const libc::sockaddr_can as *const libc::sockaddr,
-            mem::size_of::<libc::sockaddr_can>() as libc::socklen_t,
-        )
-    };
-
-    if bound < 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: cannot bind a CAN socket to \"{interface}\": {}",
-            io::Error::last_os_error()
-        )));
-    }
-
-    Ok(())
-}
-
-/// Makes a socket one a conduit can poll and then read without waiting.
-///
-/// # Arguments
-///
-/// * `what` - The handler, for what a complaint says.
-/// * `fd`   - The socket to make non-blocking.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if its flags cannot be read or set.
-fn set_nonblocking(what: &str, fd: RawFd) -> TcsResult<()> {
-    // SAFETY: both calls take the descriptor by value and return a status.
-    let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-    if flags < 0
-        // SAFETY: as for F_GETFL; the descriptor is the caller's socket,
-        // which it holds open across this call.
-        || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) }
-            < 0
-    {
-        return Err(TcsError::Endpoint(format!(
-            "{what}: cannot make this CAN socket non-blocking: {}",
-            io::Error::last_os_error()
-        )));
-    }
-
-    Ok(())
-}
-
-/// Says what a frame carries, as the bytes a conduit moves.
-///
-/// Classic and FD frames differ in their structure and in the length field's
-/// name, and in nothing else that matters here: an identifier, a length, and
-/// that many bytes.
-///
-/// # Arguments
-///
-/// * `frame` - The bytes the kernel delivered.
-/// * `fd`    - Whether they are a `canfd_frame` rather than a `can_frame`.
-///
-/// # Returns
-///
-/// The frame's identifier, flags included, and its data's length; `None`
-/// if `frame` is shorter than the structure.
-fn data_of(frame: &[u8], fd: bool) -> Option<(u32, usize)> {
-    if fd {
-        if frame.len() < mem::size_of::<libc::canfd_frame>() {
-            return None;
-        }
-        // SAFETY: the buffer is at least as long as the structure, which is
-        // what the kernel wrote into it.
-        let got: libc::canfd_frame =
-            unsafe { std::ptr::read_unaligned(frame.as_ptr() as *const _) };
-        Some((got.can_id, got.len as usize))
-    } else {
-        if frame.len() < mem::size_of::<libc::can_frame>() {
-            return None;
-        }
-        // SAFETY: as above.
-        let got: libc::can_frame =
-            unsafe { std::ptr::read_unaligned(frame.as_ptr() as *const _) };
-        Some((got.can_id, got.can_dlc as usize))
+    config: &CanConfig,
+    refused: Refused,
+) -> TcsError {
+    let can_id = config.can_id;
+    match refused {
+        Refused::Name => TcsError::Config(format!(
+            "{what}: \"{interface}\" is not a name an interface can have"
+        )),
+        Refused::NoInterface(e) => TcsError::Config(format!(
+            "{what}: this host has no interface called \"{interface}\": {e}. \
+             A virtual bus is made with \"ip link add dev {interface} type \
+             vcan\" and brought up with \"ip link set dev {interface} up\""
+        )),
+        Refused::Socket(e) => TcsError::Endpoint(format!(
+            "{what}: cannot open a CAN socket: {e}. A kernel without CAN \
+             support has no socket to give"
+        )),
+        Refused::Filter(e) => TcsError::Endpoint(format!(
+            "{what}: cannot filter this socket to can_id {can_id:#x}: {e}"
+        )),
+        Refused::FdFrames(e) => TcsError::Endpoint(format!(
+            "{what}: this socket will not take CAN FD: {e}"
+        )),
+        Refused::Loopback(e) => TcsError::Endpoint(format!(
+            "{what}: this socket will not take loopback: {e}"
+        )),
+        Refused::Bind(e) => TcsError::Endpoint(format!(
+            "{what}: cannot bind a CAN socket to \"{interface}\": {e}"
+        )),
+        Refused::NonBlocking(e) => TcsError::Endpoint(format!(
+            "{what}: cannot make this CAN socket non-blocking: {e}"
+        )),
     }
 }
-
-/// Where a frame's data begins, which is the same offset in both structures:
-/// the identifier, the length, and the padding before the device.
-const DATA_AT: usize = 8;
 
 impl EndpointWaitable for CanEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.bus.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -426,41 +192,12 @@ impl EndpointReadable for CanEndpoint {
     ///
     /// A frame at a time, because that is what the socket delivers: a read
     /// gets one whole frame or none of one, so there is no partial frame to
-    /// keep and no stream rule to say where a read ends.
+    /// keep and no stream rule to say where a read ends. A frame shorter
+    /// than the structure is not a frame, and is counted as nothing read
+    /// rather than reported, since the bus may carry a kind this socket was
+    /// not set up for.
     fn read(&mut self, buffer: &mut [u8]) -> TcsResult<usize> {
-        let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
-        let room = if self.fd {
-            mem::size_of::<libc::canfd_frame>()
-        } else {
-            mem::size_of::<libc::can_frame>()
-        };
-
-        // SAFETY: reading into a buffer of at least `room` bytes.
-        let got = unsafe {
-            libc::read(
-                self.io_fd(),
-                frame.as_mut_ptr() as *mut libc::c_void,
-                room,
-            )
-        };
-        if got < 0 {
-            let e = io::Error::last_os_error();
-            return match e.kind() {
-                io::ErrorKind::WouldBlock => Ok(0),
-                _ => Err(TcsError::Io(e)),
-            };
-        }
-
-        let Some((_, length)) = data_of(&frame[..got as usize], self.fd) else {
-            // A frame shorter than the structure is not a frame. Counted as
-            // nothing read rather than reported, since the bus may carry a
-            // kind this socket was not set up for.
-            return Ok(0);
-        };
-
-        let length = length.min(self.frame_bytes()).min(buffer.len());
-        buffer[..length].copy_from_slice(&frame[DATA_AT..DATA_AT + length]);
-        Ok(length)
+        self.bus.receive(buffer).map_err(TcsError::Io)
     }
 }
 
@@ -483,90 +220,13 @@ impl EndpointWritable for CanEndpoint {
                 if self.fd { "CAN FD" } else { "classic CAN" }
             )));
         }
-
-        let id = if tcsprotocol::node::payload::can::is_extended(self.can_id) {
-            self.can_id | libc::CAN_EFF_FLAG
-        } else {
-            self.can_id
-        };
-
-        let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
-        frame[..4].copy_from_slice(&id.to_ne_bytes());
-        frame[4] = data.len() as u8;
-        frame[DATA_AT..DATA_AT + data.len()].copy_from_slice(data);
-
-        let length = if self.fd {
-            mem::size_of::<libc::canfd_frame>()
-        } else {
-            mem::size_of::<libc::can_frame>()
-        };
-
-        // SAFETY: writing `length` bytes from a buffer at least that long,
-        // laid out as the kernel's frame structure.
-        let sent = unsafe {
-            libc::write(
-                self.io_fd(),
-                frame.as_ptr() as *const libc::c_void,
-                length,
-            )
-        };
-        if sent < 0 {
-            let e = io::Error::last_os_error();
-            return match e.kind() {
-                io::ErrorKind::WouldBlock => Ok(0),
-                _ => Err(TcsError::Io(e)),
-            };
-        }
-
-        // What the device got, not what the frame took: a conduit counts the
-        // bytes it moved, and the padding is the kernel's business.
-        Ok(data.len())
+        self.bus.send(data).map_err(TcsError::Io)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::fs::OpenOptions;
-
-    /// The data of both frames begins where this writes it.
-    ///
-    /// The one piece of the kernel's layout this module relies on: an
-    /// identifier, a length, and the data eight bytes in. A structure that
-    /// moved it would have this reading the length as data and the data as
-    /// nothing.
-    #[test]
-    fn a_frames_data_begins_where_the_kernel_puts_it() {
-        assert_eq!(mem::size_of::<libc::can_frame>(), 16);
-        assert_eq!(mem::size_of::<libc::canfd_frame>(), 72);
-
-        // Built as `write` builds one, and read back as `read` reads one.
-        let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
-        frame[..4].copy_from_slice(&0x123u32.to_ne_bytes());
-        frame[4] = 3;
-        frame[DATA_AT..DATA_AT + 3].copy_from_slice(&[0xDE, 0xAD, 0xBE]);
-
-        let (id, length) = data_of(&frame, false).expect("a classic frame");
-        assert_eq!(id, 0x123);
-        assert_eq!(length, 3);
-        assert_eq!(&frame[DATA_AT..DATA_AT + length], &[0xDE, 0xAD, 0xBE]);
-
-        let (id, length) = data_of(&frame, true).expect("an FD frame");
-        assert_eq!(id, 0x123, "the identifier is in the same place either way");
-        assert_eq!(length, 3, "and so is the length");
-    }
-
-    /// A buffer shorter than a frame is not read as one.
-    #[test]
-    fn a_short_read_is_not_a_frame() {
-        assert_eq!(data_of(&[0u8; 4], false), None);
-        assert_eq!(
-            data_of(&[0u8; 16], true),
-            None,
-            "a classic frame is not an FD one"
-        );
-    }
 
     /// An interface this host has not got is reported, with the command that
     /// would make one.
@@ -577,9 +237,16 @@ mod tests {
     /// tells an operator which it is.
     #[test]
     fn an_interface_that_is_not_there_says_how_to_make_one() {
-        let said = interface_index("device", "vcan-nonesuch")
-            .expect_err("no such interface");
-        let said = format!("{said}");
+        let config = CanConfig {
+            interface: "vcan-nonesuch".to_string(),
+            can_id: 0x100,
+            fd: false,
+            loopback: true,
+        };
+        let said = match CanEndpoint::new("device", &config) {
+            Err(e) => format!("{e}"),
+            Ok(_) => panic!("this host has an interface called vcan-nonesuch"),
+        };
         assert!(
             said.contains("vcan-nonesuch") && said.contains("ip link add"),
             "the error should name the interface and how to make one: {said}"
@@ -682,13 +349,7 @@ mod tests {
             // Writable, because the lengths that are not refused go on to
             // be written: /dev/null takes them and says nothing, which is
             // exactly what is wanted of a descriptor that is not a bus.
-            socket: OwnedFd::from(
-                OpenOptions::new()
-                    .write(true)
-                    .open("/dev/null")
-                    .expect("a descriptor"),
-            ),
-            can_id: 1,
+            bus: Bus::not_on_a_bus(fd).expect("a descriptor"),
             fd,
         }
     }
@@ -733,41 +394,11 @@ mod tests {
         );
     }
 
-    /// Says whether an interface is up, from the flags the kernel keeps for
-    /// it.
-    ///
-    /// An interface that exists is not one a frame can go out on: `ip link
-    /// add` makes a virtual bus and leaves it down, and a socket bound to a
-    /// down bus binds without complaint and then fails the send with
-    /// `ENETDOWN`. The operational state says nothing either -- a virtual bus
-    /// has no carrier and reports "unknown" whether it is up or not -- so
-    /// this reads `IFF_UP` itself.
-    ///
-    /// # Arguments
-    ///
-    /// * `interface` - The interface's name.
-    ///
-    /// # Returns
-    ///
-    /// Whether `IFF_UP` is set; false if the flags cannot be read.
-    fn is_up(interface: &str) -> bool {
-        let Ok(flags) = std::fs::read_to_string(format!(
-            "/sys/class/net/{interface}/flags"
-        )) else {
-            return false;
-        };
-        let Ok(flags) =
-            u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16)
-        else {
-            return false;
-        };
-        flags & libc::IFF_UP as u32 != 0
-    }
-
     /// The first virtual CAN interface this host has up, if it has one.
     fn a_virtual_bus() -> Option<String> {
-        (0..4)
-            .map(|n| format!("vcan{n}"))
-            .find(|name| interface_index("probe", name).is_ok() && is_up(name))
+        (0..4).map(|n| format!("vcan{n}")).find(|name| {
+            tcsos::linux::can::interface_index(name).is_ok()
+                && tcsos::linux::can::is_up(name)
+        })
     }
 }

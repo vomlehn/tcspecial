@@ -48,8 +48,8 @@ struct Running(Child);
 
 impl Drop for Running {
     fn drop(&mut self) {
-        // SAFETY: a signal to a child this test started.
-        unsafe { libc::kill(self.0.id() as libc::pid_t, libc::SIGTERM) };
+        // A child this test started.
+        let _ = tcsos::process::terminate(self.0.id());
         let _ = self.0.wait();
     }
 }
@@ -210,10 +210,8 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
     // A pipe whose write end tcspecial inherits, as a process inherits what
     // its supervisor hands it: made without close-on-exec, which is what
     // makes it inherited.
-    let mut ends = [0 as libc::c_int; 2];
-    // SAFETY: a pipe into an array of two.
-    assert_eq!(unsafe { libc::pipe(ends.as_mut_ptr()) }, 0, "a pipe");
-    let handed = ends[1];
+    let (reader, writer, handed) =
+        tcsos::process::inherited_pipe().expect("a pipe");
 
     let vehicle = Running(
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
@@ -227,11 +225,8 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
             .expect("tcspecial runs"),
     );
     let pid = vehicle.0.id();
-    // SAFETY: this test's own descriptors, no longer needed here.
-    unsafe {
-        libc::close(ends[0]);
-        libc::close(ends[1]);
-    }
+    // This test's own ends, no longer needed here.
+    drop((reader, writer));
 
     // Running, and settled: a second beacon is sent after everything opened.
     beacon(&beacons);
@@ -633,7 +628,7 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
         .stderr(Stdio::null())
         .spawn()
         .expect("tcspecial runs");
-    let pid = vehicle.id() as libc::pid_t;
+    let pid = vehicle.id();
     let first = beacon(&beacons);
     assert_eq!(first.digest, ours);
 
@@ -658,8 +653,8 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
     );
     // At once, as the restart is under way: the answer goes before the
     // vehicle stops to run itself again.
-    // SAFETY: a signal to a child this test started.
-    unsafe { libc::kill(pid, libc::SIGTERM) };
+    // A child this test started.
+    let _ = tcsos::process::terminate(pid);
 
     let by = Instant::now() + Duration::from_secs(10);
     let status = loop {
@@ -749,8 +744,8 @@ fn a_child_that_dies_is_given_up_for_what_is_beneath() {
 
     let pid = vehicle.0.id();
     let child = child_of(pid);
-    // SAFETY: a signal to a process this test's tcspecial started.
-    unsafe { libc::kill(child as libc::pid_t, libc::SIGKILL) };
+    // A process this test's tcspecial started.
+    let _ = tcsos::process::kill(child);
 
     let back = next_start(&beacons, started.sequence);
     assert_eq!(back.digest, ours, "the command line's, beneath it");

@@ -31,9 +31,8 @@
 
 use std::io::{self, Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
-use std::os::unix::io::{AsRawFd, RawFd};
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use socket2::{Domain, Protocol, Socket, Type};
 use tcsprotocol::{NetworkConfig, NetworkProtocol, TcsError, TcsResult};
 
@@ -94,18 +93,16 @@ impl RawEndpoint {
 
         let socket = Socket::new(
             Domain::for_address(to),
-            Type::from(libc::SOCK_RAW),
+            Type::RAW,
             Some(Protocol::from(i32::from(protocol.number()))),
         )
-        .map_err(|e| match e.raw_os_error() {
-            Some(libc::EPERM) | Some(libc::EACCES) => {
-                TcsError::Config(format!(
+        .map_err(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => TcsError::Config(format!(
                 "{what}: a raw socket for IP protocol {protocol} cannot be \
                  opened without CAP_NET_RAW, which this tcspecial has not got: \
                  give it the capability (setcap cap_net_raw+ep on the \
                  executable), or reach the payload over udp"
-            ))
-            }
+            )),
             _ => TcsError::Config(format!(
                 "{what}: a raw socket for IP protocol {protocol} cannot be \
                  opened: {e}"
@@ -192,16 +189,16 @@ fn without_ipv4_header(
 }
 
 impl EndpointWaitable for RawEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.socket.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 

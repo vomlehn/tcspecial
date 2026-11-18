@@ -10,12 +10,11 @@
 
 use std::io::{self, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::thread;
 use std::time::Instant;
+use tcsos::wait::{Ready, Source, Waitable};
 
 use log::info;
-use nix::poll::PollFlags;
 use tcsprotocol::{NetworkConfig, TcsError, TcsResult};
 
 use crate::config::constants::{
@@ -202,22 +201,22 @@ impl TcpEndpoint {
 }
 
 impl EndpointWaitable for TcpEndpoint {
-    fn io_fd(&self) -> RawFd {
+    fn io_source(&self) -> Source {
         if let Some(ref stream) = self.stream {
-            stream.as_raw_fd()
+            stream.source()
         } else if let Some(ref listener) = self.listener {
-            listener.as_raw_fd()
+            listener.source()
         } else {
-            -1
+            Source::NONE
         }
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 

@@ -25,10 +25,9 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::path::Path;
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{
     node::payload::rpmsg::message_bytes, RpmsgConfig, TcsError, TcsResult,
 };
@@ -167,16 +166,16 @@ fn is_that_service(
 }
 
 impl EndpointWaitable for RpmsgEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.file.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.file.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -299,51 +298,22 @@ mod tests {
     /// Messages go both ways, and one too large is refused rather than split.
     #[test]
     fn a_channel_carries_messages_both_ways() {
+        use std::io::{Read, Write};
+
         // A pty, which is what the simulator simulates a channel with: two ends
-        // of one character device.
-        let mut master = 0;
-        let mut slave = 0;
-        // SAFETY: both ends are written by the call and checked below.
-        let made = unsafe {
-            libc::openpty(
-                &mut master,
-                &mut slave,
-                std::ptr::null_mut(),
-                std::ptr::null(),
-                std::ptr::null(),
-            )
-        };
-        assert_eq!(made, 0, "a pty: {}", std::io::Error::last_os_error());
-
-        // Raw, so the line discipline does not edit the messages: a channel
-        // carries bytes, and a pty starts in canonical mode.
-        // SAFETY: the descriptor is an open pty slave; both calls take a
-        // termios this frame owns.
-        unsafe {
-            let mut terms: libc::termios = std::mem::zeroed();
-            libc::tcgetattr(slave, &mut terms);
-            libc::cfmakeraw(&mut terms);
-            libc::tcsetattr(slave, libc::TCSANOW, &terms);
-        }
-
-        let name = {
-            // c_char, which is signed on some targets and unsigned on others.
-            let mut buffer = [0 as libc::c_char; 128];
-            assert_eq!(
-                // SAFETY: a buffer of the length given, filled by the call.
-                unsafe {
-                    libc::ttyname_r(slave, buffer.as_mut_ptr(), buffer.len())
-                },
-                0
-            );
-            // SAFETY: from_ptr needs a NUL-terminated string that outlives
-            // the borrow. ttyname_r returned 0, so it wrote a terminated name
-            // (it fails with ERANGE rather than truncate), and `buffer`
-            // outlives the CStr, which is copied out at once.
-            unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr()) }
-                .to_string_lossy()
-                .into_owned()
-        };
+        // of one character device, the slave raw, so the line discipline does
+        // not edit the messages -- a channel carries bytes, and a pty starts
+        // in canonical mode. The slave is held open for the test, so that the
+        // setting stays.
+        let (mut master, name) =
+            tcsos::linux::pty::open().expect("a pseudo-terminal");
+        let slave = tcsos::linux::fs::open_device(
+            std::path::Path::new(&name),
+            true,
+            true,
+        )
+        .expect("the slave opens");
+        tcsos::linux::pty::make_raw(&slave).expect("the slave is raw");
 
         let mut endpoint = RpmsgEndpoint::new(
             "remote",
@@ -358,19 +328,12 @@ mod tests {
         // The handler's message reaches the remote.
         assert_eq!(endpoint.write(b"READ").expect("a message goes out"), 4);
         let mut got = [0u8; 32];
-        // SAFETY: reading into a buffer of the length given.
-        let read = unsafe {
-            libc::read(master, got.as_mut_ptr() as *mut libc::c_void, got.len())
-        };
+        let read = master.read(&mut got).expect("the remote reads");
         assert!(read >= 4, "the remote got {read} bytes");
         assert_eq!(&got[..4], b"READ");
 
         // And the remote's answer reaches the handler.
-        // SAFETY: writing the slice's own length from the slice.
-        let sent = unsafe {
-            libc::write(master, b"DATA".as_ptr() as *const libc::c_void, 4)
-        };
-        assert_eq!(sent, 4);
+        master.write_all(b"DATA").expect("the remote answers");
         let answered = (0..50)
             .find_map(|_| {
                 std::thread::sleep(std::time::Duration::from_millis(20));
@@ -396,13 +359,6 @@ mod tests {
             "the error should say why it cannot be split: {said}"
         );
 
-        // SAFETY: close needs descriptors that nothing else owns or will use
-        // again. Both came from openpty above as bare numbers; the endpoint
-        // opened the slave by name, so holds a descriptor of its own, and
-        // neither number is used after this.
-        unsafe {
-            libc::close(master);
-            libc::close(slave);
-        }
+        drop(slave);
     }
 }

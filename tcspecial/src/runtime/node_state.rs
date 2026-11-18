@@ -32,104 +32,15 @@
 //! the pipe and a drain cannot block when nothing has poked it.
 
 use std::collections::BTreeMap;
-use std::os::unix::io::RawFd;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
+use tcsos::wait::{Ready, Source, Wakeup, Watch};
 
 use tcsprotocol::consolidation::{ConsolidatorCounts, InputCounts};
 use tcsprotocol::graph::Graph;
 use tcsprotocol::node::vehicle::compute::Triggers;
 use tcsprotocol::{DHSample, NodeCounts, NodeId, Timestamp};
-
-/// A descriptor a wait can be woken through.
-///
-/// Owned: both ends are closed when this is dropped, so a node's descriptors
-/// go when the node's state does.
-#[derive(Debug)]
-pub struct Wakeup {
-    /// The end that goes in a poll set.
-    read_fd: RawFd,
-    /// The end a poke writes to.
-    write_fd: RawFd,
-}
-
-impl Wakeup {
-    /// Makes a new pipe, both ends non-blocking.
-    ///
-    /// # Returns
-    ///
-    /// The wakeup, owning both ends.
-    ///
-    /// # Errors
-    ///
-    /// The error `pipe2` reported, such as running out of descriptors.
-    pub fn new() -> std::io::Result<Wakeup> {
-        let mut fds = [0i32; 2];
-        // SAFETY: `fds` is two ints, which is what pipe2 writes, and the flag
-        // is the one documented for it.
-        let made = unsafe { libc::pipe2(fds.as_mut_ptr(), libc::O_NONBLOCK) };
-        if made != 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-        Ok(Wakeup {
-            read_fd: fds[0],
-            write_fd: fds[1],
-        })
-    }
-
-    /// The descriptor to put in a poll set.
-    pub fn io_fd(&self) -> RawFd {
-        self.read_fd
-    }
-
-    /// Wakes whatever is waiting on this node.
-    ///
-    /// One byte, and a failure is ignored on purpose. The two ways it can fail
-    /// are a full pipe -- which already holds a byte nobody has read, so the
-    /// wait is already woken -- and a descriptor that is gone, which is a node
-    /// whose state is being dropped. Neither is something a disable should
-    /// report: what the ground asked for is a state, and the state is set by
-    /// the store that happens beside this.
-    pub fn poke(&self) {
-        let byte = [0u8; 1];
-        // SAFETY: a one-byte write from a buffer that lives across the call.
-        unsafe {
-            libc::write(self.write_fd, byte.as_ptr() as *const libc::c_void, 1);
-        }
-    }
-
-    /// Takes whatever pokes are waiting in the pipe.
-    ///
-    /// So that a wait woken by one disable does not return at once for ever
-    /// after. Non-blocking, and an empty pipe is the ordinary answer.
-    pub fn drain(&self) {
-        let mut buffer = [0u8; 64];
-        loop {
-            // SAFETY: a read into a buffer that lives across the call.
-            let got = unsafe {
-                libc::read(
-                    self.read_fd,
-                    buffer.as_mut_ptr() as *mut libc::c_void,
-                    buffer.len(),
-                )
-            };
-            if got < buffer.len() as isize {
-                return;
-            }
-        }
-    }
-}
-
-impl Drop for Wakeup {
-    fn drop(&mut self) {
-        // SAFETY: two descriptors this type opened and nothing else holds.
-        unsafe {
-            libc::close(self.read_fd);
-            libc::close(self.write_fd);
-        }
-    }
-}
 
 /// What a port waits on beside its own descriptor, so that a wait inside an
 /// operation can be abandoned.
@@ -142,7 +53,7 @@ impl Drop for Wakeup {
 ///
 /// Carried down into the ports and into a computation's own waiting, which is
 /// the convention [`crate::endpoint`]'s waits take: an endpoint is handed a
-/// `cmd_fd` and polls it beside the device's. The descriptor is readable
+/// `cmd` and polls it beside the device's. The descriptor is readable
 /// exactly while the node is disabled, and nothing but enabling the node drains
 /// it, so a wait that finds it readable has been told to stop and not merely
 /// nudged.
@@ -171,10 +82,10 @@ impl Abandon {
         self.wait(Duration::ZERO)
     }
 
-    /// The descriptor to put in a poll set beside the node's own, where there
-    /// is one.
-    pub fn io_fd(&self) -> Option<RawFd> {
-        self.wakeup.as_ref().map(|wakeup| wakeup.io_fd())
+    /// What to put in a wait's set beside the node's own, where there is
+    /// one.
+    pub fn source(&self) -> Option<Source> {
+        self.wakeup.as_ref().map(|wakeup| wakeup.source())
     }
 
     /// Waits `how_long`, or until the node is disabled, and says which
@@ -201,8 +112,6 @@ impl Abandon {
     /// `true` for "give up": the node has been disabled and the operation
     /// stops where it stands. `false` when the time ran out first.
     pub fn wait(&self, how_long: Duration) -> bool {
-        use nix::poll::{poll, PollFd, PollFlags};
-
         let Some(wakeup) = self.wakeup.as_ref() else {
             if !how_long.is_zero() {
                 std::thread::sleep(how_long);
@@ -210,13 +119,10 @@ impl Abandon {
             return false;
         };
 
-        // SAFETY: the descriptor is owned by the Wakeup this holds an Arc of,
-        // which therefore outlives the poll.
-        let borrowed =
-            unsafe { std::os::fd::BorrowedFd::borrow_raw(wakeup.io_fd()) };
-        let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
-        let waiting = how_long.as_millis().min(i32::MAX as u128) as i32;
-        matches!(poll(&mut set, waiting), Ok(n) if n > 0)
+        // The source is the Wakeup's this holds an Arc of, which therefore
+        // outlives the wait.
+        let mut set = [Watch::new(wakeup.source(), Ready::READ)];
+        matches!(tcsos::wait::wait(&mut set, Some(how_long)), Ok(n) if n > 0)
     }
 }
 
@@ -255,18 +161,13 @@ impl Nudge {
     ///
     /// * `how_long` - The longest to wait; zero only drains the pipe.
     pub fn wait(&self, how_long: Duration) {
-        use nix::poll::{poll, PollFd, PollFlags};
-
         if !how_long.is_zero() {
-            // SAFETY: the descriptor is owned by the Wakeup this holds an Arc
-            // of, which therefore outlives the poll.
-            let borrowed =
-                unsafe { std::os::fd::BorrowedFd::borrow_raw(self.0.io_fd()) };
-            let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
-            let waiting = how_long.as_millis().min(i32::MAX as u128) as i32;
-            // A failed poll is waited out instead. The failure is the poll's
+            // The source is the Wakeup's this holds an Arc of, which
+            // therefore outlives the wait.
+            let mut set = [Watch::new(self.0.source(), Ready::READ)];
+            // A failed wait is waited out instead. The failure is the wait's
             // own and a loop that treated it as a nudge would spin.
-            if poll(&mut set, waiting).is_err() {
+            if tcsos::wait::wait(&mut set, Some(how_long)).is_err() {
                 std::thread::sleep(how_long);
             }
         }
@@ -632,9 +533,9 @@ impl NodeState {
         self.wakeup.poke();
     }
 
-    /// The descriptor to put in this node's poll sets.
-    pub fn io_fd(&self) -> RawFd {
-        self.wakeup.io_fd()
+    /// What to put in this node's waits' sets.
+    pub fn source(&self) -> Source {
+        self.wakeup.source()
     }
 
     /// What this node has moved, as the ground is told it.
@@ -925,50 +826,16 @@ impl crate::runtime::fabric::Watch for NodeStates {
 mod tests {
     use super::*;
 
-    /// A poke wakes a poll on the descriptor, and nothing else does.
-    #[test]
-    fn a_poke_wakes_a_wait_and_silence_does_not() {
-        use nix::poll::{poll, PollFd, PollFlags};
-        use std::os::fd::BorrowedFd;
-
-        let wakeup = Wakeup::new().expect("a pipe");
-        // SAFETY: the descriptor is owned by `wakeup`, which outlives this.
-        let borrowed = unsafe { BorrowedFd::borrow_raw(wakeup.io_fd()) };
-
-        let waited = |flags| {
-            let mut set = [PollFd::new(&borrowed, flags)];
-            poll(&mut set, 0).expect("a poll")
-        };
-
-        // Nothing has poked it: a wait on it finds nothing, which is what lets
-        // it sit in a poll set beside a device's descriptor without waking
-        // every pass.
-        assert_eq!(waited(PollFlags::POLLIN), 0, "nothing has poked it");
-
-        wakeup.poke();
-        assert_eq!(waited(PollFlags::POLLIN), 1, "a poke is readable");
-
-        // And drained, it is quiet again: a wait woken by one disable must not
-        // return at once for ever after.
-        wakeup.drain();
-        assert_eq!(waited(PollFlags::POLLIN), 0, "drained");
-    }
-
     /// Disabling a node wakes it; enabling it leaves nothing behind.
     #[test]
     fn disabling_a_node_wakes_it_and_enabling_it_clears_the_wake() {
-        use nix::poll::{poll, PollFd, PollFlags};
-        use std::os::fd::BorrowedFd;
-
         let state = NodeState::new("sensor", NodeId::of(3)).expect("a state");
         assert!(state.is_enabled(), "a node comes up enabled");
         assert_eq!(state.id(), NodeId::of(3));
 
         let readable = || {
-            // SAFETY: the descriptor is owned by `state`, which outlives this.
-            let borrowed = unsafe { BorrowedFd::borrow_raw(state.io_fd()) };
-            let mut set = [PollFd::new(&borrowed, PollFlags::POLLIN)];
-            poll(&mut set, 0).expect("a poll") == 1
+            let mut set = [Watch::new(state.source(), Ready::READ)];
+            tcsos::wait::wait_ms(&mut set, 0).expect("a wait") == 1
         };
 
         assert!(!readable(), "nothing has disabled it");

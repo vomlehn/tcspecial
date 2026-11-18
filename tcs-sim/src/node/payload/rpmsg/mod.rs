@@ -267,25 +267,8 @@ mod tests {
 
     impl NonBlockingForTest for std::fs::File {
         fn set_nonblocking_for_test(&self) -> std::io::Result<()> {
-            use std::os::unix::io::AsRawFd;
-
-            // SAFETY: both calls take this file's descriptor by value and
-            // return a status.
-            let flags = unsafe { libc::fcntl(self.as_raw_fd(), libc::F_GETFL) };
-            if flags < 0
-                // SAFETY: as for F_GETFL; `self` holds the file open.
-                || unsafe {
-                    libc::fcntl(
-                        self.as_raw_fd(),
-                        libc::F_SETFL,
-                        flags | libc::O_NONBLOCK,
-                    )
-                } < 0
-            {
-                return Err(std::io::Error::last_os_error());
-            }
-
-            Ok(())
+            tcsos::linux::pty::set_nonblocking(self)
+                .map_err(std::io::Error::other)
         }
     }
 }

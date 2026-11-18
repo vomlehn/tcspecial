@@ -1,0 +1,22 @@
+[package]
+name = "tcsos"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+description = """\
+Everything the TCS programs ask of the operating system, in one place: \
+Linux's interfaces, and the browser's substitutes for them"""
+
+# Linux's interfaces are reached through libc, and only here: no other TCS
+# crate names libc, nix or std::os::unix.
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+# The quit signals a program with a window notes: see signals::note_quits.
+signal-hook = "0.4"
+
+# The page's own interfaces, reached from WebAssembly.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+
+[lints]
+workspace = true

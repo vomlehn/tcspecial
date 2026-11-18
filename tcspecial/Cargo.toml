@@ -11,6 +11,7 @@ handler manager, being integrated with NASA's cFS and JPL's F Prime"""
 
 [dependencies]
 tcsprotocol = { path = "../tcsprotocol" }
+tcsos = { path = "../tcsos" }
 # The file interfaces an app node's program is run with, and the starting of
 # one: see tcsapp. The same crate an app itself is written against, so that the
 # protocol is stated once.
@@ -19,12 +20,10 @@ tcsapp = { path = "../tcsapp" }
 # opened, so that what this refuses to start on is what tcs-verify reports.
 tcsverify = { path = "../tcsverify" }
 serde = { version = "1.0", features = ["derive"] }
-libc = "0.2"
 thiserror = "1.0"
 log = "0.4"
 env_logger = "0.10"
-nix = { version = "0.27", features = ["poll", "fs"] }
-socket2 = "0.6.2"
+socket2 = { version = "0.6.2", features = ["all"] }
 tcslog = "0.3.1"
 # For the visual window only: see the `visual` feature.
 slint = { version = "1.18", optional = true }

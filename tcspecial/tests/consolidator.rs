@@ -385,7 +385,7 @@ fn ran_within(command: &mut Command, most: Duration) -> std::process::Output {
         .stderr(Stdio::piped())
         .spawn()
         .expect("it starts");
-    let pid = child.id() as libc::pid_t;
+    let pid = child.id();
     let ended = Arc::new(AtomicBool::new(false));
     let watch = {
         let ended = ended.clone();
@@ -397,9 +397,9 @@ fn ran_within(command: &mut Command, most: Duration) -> std::process::Output {
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
-            // SAFETY: a signal sent to the child this test started, which
-            // has not been waited for, so its id is still its own.
-            unsafe { libc::kill(pid, libc::SIGKILL) };
+            // The child this test started, which has not been waited for,
+            // so its id is still its own.
+            let _ = tcsos::process::kill(pid);
         })
     };
     let output = child.wait_with_output().expect("it is waited for");

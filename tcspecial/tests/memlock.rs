@@ -6,7 +6,6 @@
 //! running the tests has. A lock that succeeds is not tested here: it takes
 //! a limit larger than this desk's.
 
-use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
 
@@ -14,7 +13,7 @@ mod common;
 use common::{bound, free, port};
 
 /// The limit on locked memory each run is given, in bytes.
-const LIMIT: libc::rlim_t = 1024 * 1024;
+const LIMIT: u64 = 1024 * 1024;
 
 /// Writes a configuration with no nodes into `dir`.
 ///
@@ -90,20 +89,7 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
         .env_remove("RUST_LOG")
         .stdout(Stdio::null())
         .stderr(std::fs::File::create(&log).expect("a log"));
-    // SAFETY: setrlimit lowers a limit of the child's, between fork and
-    // exec, and allocates nothing.
-    unsafe {
-        command.pre_exec(|| {
-            let limit = libc::rlimit {
-                rlim_cur: LIMIT,
-                rlim_max: LIMIT,
-            };
-            if libc::setrlimit(libc::RLIMIT_MEMLOCK, &limit) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
-    }
+    tcsos::process::limit_locked_memory(&mut command, LIMIT);
     let mut child = command.spawn().expect("tcspecial starts");
     let deadline = Instant::now() + Duration::from_secs(seconds);
     let mut ended = None;
@@ -118,8 +104,8 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
     let status = match ended {
         Some(status) => status.code(),
         None => {
-            // SAFETY: a signal to a child this test started.
-            unsafe { libc::kill(child.id() as libc::pid_t, libc::SIGTERM) };
+            // A child this test started.
+            let _ = tcsos::process::terminate(child.id());
             child.wait().expect("it ends").code()
         }
     };

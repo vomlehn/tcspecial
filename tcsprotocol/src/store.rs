@@ -680,7 +680,6 @@ impl Store {
 /// What the system said, where it cannot be written.
 fn write_read_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
-    use std::os::unix::fs::PermissionsExt;
 
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -688,7 +687,8 @@ fn write_read_only(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
         .open(path)?;
     file.write_all(bytes)?;
     file.sync_all()?;
-    file.set_permissions(std::fs::Permissions::from_mode(0o444))
+    drop(file);
+    tcsos::fs::set_mode(path, 0o444)
 }
 
 /// Flushes a directory, so that the names made and changed in it last.
@@ -744,8 +744,6 @@ mod tests {
     /// it; keeping it again writes nothing.
     #[test]
     fn a_configuration_is_kept_under_its_checksum_and_loads_by_it() {
-        use std::os::unix::fs::PermissionsExt;
-
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
@@ -761,7 +759,7 @@ mod tests {
             .join(format!("{digest}.ytcs"));
         assert_eq!(kept, Kept::Written(at.clone()));
         assert!(store.holds(digest));
-        let mode = std::fs::metadata(&at).unwrap().permissions().mode();
+        let mode = tcsos::fs::mode(&at).unwrap();
         assert_eq!(mode & 0o777, 0o444, "read-only");
         assert_eq!(store.held().unwrap(), vec![digest]);
 
@@ -839,8 +837,6 @@ mod tests {
     /// name it is included by. It loads by its checksum.
     #[test]
     fn a_configuration_of_several_files_is_kept_as_a_tree() {
-        use std::os::unix::fs::PermissionsExt;
-
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
@@ -856,10 +852,7 @@ mod tests {
             .collect();
         names.sort();
         assert_eq!(names, vec![top_name, "zone.ytcs".to_string()]);
-        let mode = std::fs::metadata(at.join("zone.ytcs"))
-            .unwrap()
-            .permissions()
-            .mode();
+        let mode = tcsos::fs::mode(&at.join("zone.ytcs")).unwrap();
         assert_eq!(mode & 0o777, 0o444, "read-only");
         assert_eq!(store.held().unwrap(), vec![digest]);
 
@@ -954,8 +947,6 @@ mod tests {
     /// by its checksum, which is the example's own, in both spellings.
     #[test]
     fn the_ping_and_thermostat_examples_are_kept_and_load() {
-        use std::os::unix::fs::PermissionsExt;
-
         let from = tempfile::tempdir().expect("a directory");
         let store_dir = tempfile::tempdir().expect("a store");
         let store = Store::at(store_dir.path());
@@ -985,10 +976,7 @@ mod tests {
             );
             let common_file =
                 at.join(format!("{example}-common/{common}.ytcs"));
-            let mode = std::fs::metadata(&common_file)
-                .unwrap()
-                .permissions()
-                .mode();
+            let mode = tcsos::fs::mode(&common_file).unwrap();
             assert_eq!(mode & 0o777, 0o444, "read-only");
             assert_eq!(
                 crate::config_digest::digest_of_file(kept.path()).unwrap(),

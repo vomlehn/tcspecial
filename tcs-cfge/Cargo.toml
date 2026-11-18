@@ -26,7 +26,7 @@ serde = { version = "1.0", features = ["derive"] }
 # deprecated; serde_norway is the maintained fork of it, writing the same YAML,
 # so a history written before the change still reads.
 serde_norway = "0.9.42"
-libc = "0.2"
+tcsos = { path = "../tcsos" }
 # The line diffs a save is merged from, so that a file is written back with
 # only the lines an edit changed: see `faithful`.
 similar = "3.2"

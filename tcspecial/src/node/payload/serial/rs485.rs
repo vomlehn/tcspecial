@@ -23,36 +23,18 @@
 //! leaves these terms unapplied there: see `apply_line_terms` in the serial
 //! module.
 //!
-//! The structure and the two ioctls are declared here rather than taken from
-//! `libc`, which has the ioctl numbers and not the structure.
+//! The kernel's structure and its two ioctls are
+//! `tcsos::linux::serial::rs485`'s.
 
-use std::os::unix::io::RawFd;
+use std::fs::File;
+
+use tcsos::linux::serial::rs485::{
+    Mode as SerialRs485, ENABLED as SER_RS485_ENABLED,
+    RTS_AFTER_SEND as SER_RS485_RTS_AFTER_SEND,
+    RTS_ON_SEND as SER_RS485_RTS_ON_SEND,
+};
 
 use tcsprotocol::{Rs485Params, TcsError, TcsResult};
-
-/// The kernel's `struct serial_rs485`, from `linux/serial.h`.
-///
-/// Laid out exactly as the kernel reads it: two words of flags and delays,
-/// then a union of five words that the flags decide the meaning of. Nothing
-/// here sets any flag that uses them, so they are the padding the kernel
-/// asks to be zero.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct SerialRs485 {
-    flags: u32,
-    delay_rts_before_send: u32,
-    delay_rts_after_send: u32,
-    padding: [u32; 5],
-}
-
-/// RS-485 is on.
-const SER_RS485_ENABLED: u32 = 1 << 0;
-/// RTS is high while sending.
-const SER_RS485_RTS_ON_SEND: u32 = 1 << 1;
-/// RTS is high once sending has finished. The two are a pair: a driver reads
-/// them as the level during and the level after, so the one that is not
-/// `RTS_ON_SEND` is the other.
-const SER_RS485_RTS_AFTER_SEND: u32 = 1 << 2;
 
 /// Says what this asks a port for, as the kernel's flags.
 ///
@@ -116,7 +98,7 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
         && got.delay_rts_after_send == asked.delay_rts_after_send
 }
 
-/// Puts the line open on `fd` into RS-485 mode, as `terms` asks.
+/// Puts the line `line` into RS-485 mode, as `terms` asks.
 ///
 /// `what` is the handler's name, so a failure says which device's line it
 /// was; see the endpoint factories, which pass it down for exactly this.
@@ -130,7 +112,7 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
 ///
 /// # Arguments
 ///
-/// * `fd`    - The open serial port, which this neither owns nor closes.
+/// * `line`  - The open serial port.
 /// * `what`  - The handler's name, for the errors.
 /// * `terms` - The RS-485 terms the configuration gave.
 ///
@@ -139,36 +121,23 @@ fn took_it(asked: &SerialRs485, got: &SerialRs485) -> bool {
 /// `TcsError::Config` if the port refuses the mode, will not say what mode
 /// it is in, or holds something other than what it was told.
 pub(crate) fn apply(
-    fd: RawFd,
+    line: &File,
     what: &str,
     terms: &Rs485Params,
 ) -> TcsResult<()> {
     let asked = asked_for(terms);
 
-    // SAFETY: the fd is an open serial port, and the structure is laid out as
-    // the kernel's own and lives for the call.
-    let set = unsafe {
-        libc::ioctl(fd, libc::TIOCSRS485, &asked as *const SerialRs485)
-    };
-    if set < 0 {
-        return Err(TcsError::Config(format!(
-            "{what}: this line will not go into RS-485 mode: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
-
-    let mut got = SerialRs485::default();
-    // SAFETY: as above, and the kernel writes through the pointer.
-    let read_back = unsafe {
-        libc::ioctl(fd, libc::TIOCGRS485, &mut got as *mut SerialRs485)
-    };
-    if read_back < 0 {
-        return Err(TcsError::Config(format!(
+    tcsos::linux::serial::rs485::set(line, &asked).map_err(|e| {
+        TcsError::Config(format!(
+            "{what}: this line will not go into RS-485 mode: {e}"
+        ))
+    })?;
+    let got = tcsos::linux::serial::rs485::get(line).map_err(|e| {
+        TcsError::Config(format!(
             "{what}: this line took RS-485 mode and will not say what it is \
-             in: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
+             in: {e}"
+        ))
+    })?;
 
     if !took_it(&asked, &got) {
         return Err(TcsError::Config(format!(
@@ -191,17 +160,6 @@ pub(crate) fn apply(
 mod tests {
     use super::*;
     use std::time::Duration;
-
-    /// The structure is the size the kernel's own is.
-    ///
-    /// Eight words: flags, two delays, and the five-word union. A structure
-    /// of the wrong size is an ioctl that reads or writes past what was
-    /// handed to it, and nothing else in a test would notice.
-    #[test]
-    fn the_structure_is_what_the_kernel_reads() {
-        assert_eq!(std::mem::size_of::<SerialRs485>(), 8 * 4);
-        assert_eq!(std::mem::align_of::<SerialRs485>(), 4);
-    }
 
     /// Which way RTS goes is one flag or the other, never both and never
     /// neither.
@@ -304,22 +262,17 @@ mod tests {
     /// be refused rather than started on a bus it would hold down.
     #[test]
     fn a_pty_refuses_the_mode_and_is_reported() {
-        let mut master = 0;
-        let mut slave = 0;
-        // SAFETY: both ends are written by the call and checked below.
-        let made = unsafe {
-            libc::openpty(
-                &mut master,
-                &mut slave,
-                std::ptr::null_mut(),
-                std::ptr::null(),
-                std::ptr::null(),
-            )
-        };
-        assert_eq!(made, 0, "a pty: {}", std::io::Error::last_os_error());
+        let (_master, name) =
+            tcsos::linux::pty::open().expect("a pseudo-terminal");
+        let slave = tcsos::linux::fs::open_device(
+            std::path::Path::new(&name),
+            true,
+            true,
+        )
+        .expect("the slave opens");
 
         let said = apply(
-            slave,
+            &slave,
             "line",
             &Rs485Params {
                 rts_on_send: true,
@@ -333,13 +286,5 @@ mod tests {
             said.contains("line") && said.contains("RS-485"),
             "the error should name the device and the mode: {said}"
         );
-
-        // SAFETY: close needs descriptors that nothing else owns or will use
-        // again. Both came from openpty above as bare numbers, were never
-        // given to an owner, and are not used after this.
-        unsafe {
-            libc::close(master);
-            libc::close(slave);
-        }
     }
 }

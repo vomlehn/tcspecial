@@ -12,10 +12,9 @@
 
 use std::io;
 use std::net::{SocketAddr, UdpSocket};
-use std::os::unix::io::{AsRawFd, RawFd};
 use std::sync::{Arc, Mutex};
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{NetworkConfig, SendsFrom, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
@@ -271,6 +270,15 @@ impl UdpEndpoint {
         })
     }
 
+    /// Where this end is bound.
+    ///
+    /// # Returns
+    ///
+    /// The address, or `None` where the system cannot say.
+    pub fn local_addr(&self) -> Option<SocketAddr> {
+        self.socket.local_addr().ok()
+    }
+
     /// Where the far end last spoke from, if it has.
     pub fn peer(&self) -> Option<SocketAddr> {
         self.peer.lock().ok().and_then(|guard| *guard)
@@ -278,16 +286,16 @@ impl UdpEndpoint {
 }
 
 impl EndpointWaitable for UdpEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.socket.source()
     }
 
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 

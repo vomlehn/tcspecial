@@ -72,12 +72,10 @@ pub fn lock(asked: bool, mode: Mode) -> Result<Locked, String> {
     if !asked {
         return Ok(Locked::NotAsked);
     }
-    // SAFETY: mlockall takes flags and changes only how the kernel keeps
-    // this process's pages.
-    if unsafe { libc::mlockall(libc::MCL_CURRENT | libc::MCL_FUTURE) } == 0 {
+    let Err(error) = tcsos::memory::lock_all() else {
         return Ok(Locked::Locked);
-    }
-    let why = refusal(std::io::Error::last_os_error());
+    };
+    let why = refusal(error);
     if mode.is_flight() {
         Ok(Locked::Unlocked(why))
     } else {
@@ -95,8 +93,8 @@ pub fn lock(asked: bool, mode: Mode) -> Result<Locked, String> {
 ///
 /// A sentence naming the limit, how much is mapped and what to change.
 fn refusal(error: std::io::Error) -> String {
-    let limit = limit();
-    let mapped = mapped();
+    let limit = tcsos::memory::lock_limit();
+    let mapped = Some(tcsos::memory::figures().mapped).filter(|&m| m > 0);
     let sizes = match (limit, mapped) {
         (Some(limit), Some(mapped)) => format!(
             ": the limit on what it may lock is {} and it has {} mapped",
@@ -109,10 +107,9 @@ fn refusal(error: std::io::Error) -> String {
         _ => String::new(),
     };
     format!(
-        "its memory cannot be locked into RAM ({error}){sizes}. Raise the \
-         limit -- LimitMEMLOCK=infinity in its systemd unit, ulimit -l \
-         unlimited in the shell that starts it -- or give --no-memlock to \
-         run without the lock"
+        "its memory cannot be locked into RAM ({error}){sizes}. {} -- or \
+         give --no-memlock to run without the lock",
+        tcsos::memory::RAISE_THE_LIMIT
     )
 }
 
@@ -125,125 +122,22 @@ fn kib(bytes: u64) -> String {
     }
 }
 
-/// The limit on what this process may lock, in bytes, `u64::MAX` where
-/// there is none.
-///
-/// # Returns
-///
-/// The soft limit, or `None` where it cannot be read.
-fn limit() -> Option<u64> {
-    let mut limit = libc::rlimit {
-        rlim_cur: 0,
-        rlim_max: 0,
-    };
-    // SAFETY: getrlimit writes the limit it is asked for into `limit`.
-    if unsafe { libc::getrlimit(libc::RLIMIT_MEMLOCK, &mut limit) } != 0 {
-        return None;
-    }
-    Some(if limit.rlim_cur == libc::RLIM_INFINITY {
-        u64::MAX
-    } else {
-        limit.rlim_cur
-    })
-}
-
-/// How much this process has mapped, in bytes, which is what a lock of
-/// everything it has is held to the limit by.
-///
-/// # Returns
-///
-/// `VmSize` from `/proc/self/status`, or `None` where it cannot be read.
-fn mapped() -> Option<u64> {
-    let status = std::fs::read_to_string("/proc/self/status").ok()?;
-    let line = status.lines().find(|line| line.starts_with("VmSize:"))?;
-    let kib: u64 = line.split_whitespace().nth(1)?.parse().ok()?;
-    Some(kib * 1024)
-}
-
 /// How much memory the whole process has, as QUERY_THREADS tells the ground.
 ///
-/// Allocates nothing, since it is asked from the loop: `/proc/self/status`
-/// is read into a buffer on the stack. A figure that cannot be read is
-/// nought.
+/// Allocates nothing, since it is asked from the loop: see
+/// `tcsos::memory::figures`. A figure that cannot be read is nought.
 ///
 /// # Returns
 ///
 /// What is mapped, resident and locked, and the limit on what may be.
 pub fn now() -> ProcessMemory {
-    let mut buffer = [0u8; 4096];
-    let read = status_into(&mut buffer);
-    let status = &buffer[..read];
+    let figures = tcsos::memory::figures();
     ProcessMemory {
-        mapped: field_of(status, b"VmSize:"),
-        resident: field_of(status, b"VmRSS:"),
-        locked: field_of(status, b"VmLck:"),
-        lock_limit: limit().unwrap_or(0),
+        mapped: figures.mapped,
+        resident: figures.resident,
+        locked: figures.locked,
+        lock_limit: tcsos::memory::lock_limit().unwrap_or(0),
     }
-}
-
-/// Reads `/proc/self/status` into `buffer`, without allocating.
-///
-/// # Arguments
-///
-/// * `buffer` - Where it goes; what does not fit is left out.
-///
-/// # Returns
-///
-/// How many bytes were read: nought where it cannot be.
-fn status_into(buffer: &mut [u8]) -> usize {
-    // SAFETY: a path that is a nul-terminated literal, a descriptor that is
-    // closed before the function returns, and reads into the buffer's own
-    // bytes, no more than it holds.
-    unsafe {
-        let fd = libc::open(
-            c"/proc/self/status".as_ptr(),
-            libc::O_RDONLY | libc::O_CLOEXEC,
-        );
-        if fd < 0 {
-            return 0;
-        }
-        let mut filled = 0;
-        while filled < buffer.len() {
-            let got = libc::read(
-                fd,
-                buffer[filled..].as_mut_ptr().cast(),
-                buffer.len() - filled,
-            );
-            if got <= 0 {
-                break;
-            }
-            filled += got as usize;
-        }
-        libc::close(fd);
-        filled
-    }
-}
-
-/// One of `/proc/self/status`'s sizes, in bytes.
-///
-/// # Arguments
-///
-/// * `status` - The file's text.
-/// * `label`  - The field's label, its colon included: `VmSize:`.
-///
-/// # Returns
-///
-/// The size, which the file gives in KiB; nought where there is none.
-fn field_of(status: &[u8], label: &[u8]) -> u64 {
-    for line in status.split(|&byte| byte == b'\n') {
-        if let Some(rest) = line.strip_prefix(label) {
-            let kib = rest
-                .iter()
-                .skip_while(|byte| byte.is_ascii_whitespace())
-                .take_while(|byte| byte.is_ascii_digit())
-                .fold(0u64, |sum, digit| {
-                    sum.saturating_mul(10)
-                        .saturating_add(u64::from(digit - b'0'))
-                });
-            return kib.saturating_mul(1024);
-        }
-    }
-    0
 }
 
 /// tcspecial's allocator: the system's, ending the process when it fails.
@@ -316,12 +210,10 @@ pub fn ran_out(bytes: usize) -> ! {
         b" bytes could not be had, so this configuration cannot run here \
           as it is\n",
     );
-    // SAFETY: writes bytes from a buffer on the stack to the error output,
-    // and ends the process.
-    unsafe {
-        libc::write(libc::STDERR_FILENO, said.as_ptr().cast(), at);
-        libc::_exit(SHORT_STATUS.load(Ordering::Relaxed));
-    }
+    tcsos::memory::say_and_end(
+        &said[..at],
+        SHORT_STATUS.load(Ordering::Relaxed),
+    )
 }
 
 /// A number in decimal, without allocating.
@@ -374,17 +266,14 @@ impl Digits {
 mod tests {
     use super::*;
 
-    /// The process's figures are read from its status, the mapped at least
-    /// as large as the resident, and a field the status lacks is nought.
+    /// The process's figures are what tcsos reads, with the limit beside
+    /// them.
     #[test]
     fn the_process_memory_is_read() {
         let memory = now();
         assert!(memory.mapped > 0, "{memory:?}");
-        assert!(memory.resident > 0, "{memory:?}");
         assert!(memory.mapped >= memory.resident, "{memory:?}");
         assert!(memory.lock_limit > 0, "{memory:?}");
-        assert_eq!(field_of(b"VmSize:\t  1234 kB\n", b"VmSize:"), 1234 * 1024);
-        assert_eq!(field_of(b"VmRSS:\t5 kB\n", b"VmSize:"), 0);
     }
 
     /// A number is written in decimal, from nought to the largest.
@@ -409,7 +298,8 @@ mod tests {
     /// A lock refused says what limit it was held to and what to change.
     #[test]
     fn a_refused_lock_says_what_to_change() {
-        let said = refusal(std::io::Error::from_raw_os_error(libc::ENOMEM));
+        let said =
+            refusal(std::io::Error::from(std::io::ErrorKind::OutOfMemory));
         assert!(said.contains("LimitMEMLOCK"), "{said}");
         assert!(said.contains("ulimit -l"), "{said}");
         assert!(said.contains("--no-memlock"), "{said}");

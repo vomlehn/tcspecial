@@ -209,12 +209,8 @@ fn tests_state_dir() -> &'static PathBuf {
     DIRECTORY.get_or_init(|| {
         let temp = std::env::temp_dir();
         remove_abandoned(&temp, Path::new("/proc"));
-        // SAFETY: atexit is given a function that takes nothing, returns
-        // nothing and never unwinds, which is all it asks; it is called once,
-        // here, under the OnceLock.
-        unsafe {
-            libc::atexit(remove_at_exit);
-        }
+        // Once, here, under the OnceLock.
+        tcsos::process::at_exit(remove_at_exit);
         temp.join(format!("tcs-cfge-tests-{}", std::process::id()))
     })
 }

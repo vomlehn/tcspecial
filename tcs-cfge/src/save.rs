@@ -36,8 +36,6 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
-use std::os::unix::ffi::OsStrExt;
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 
 /// What went wrong, and whether the file on disk is still the old one.
@@ -278,9 +276,9 @@ fn write_all_and_sync(file: &mut File, contents: &[u8]) -> Result<(), Attempt> {
 
 /// Forces a directory's own contents -- its list of names -- to the device.
 ///
-/// There is no portable way to do this through `std`: a directory cannot be
-/// opened for writing, and `File::sync_all` on a read-only handle is what is
-/// left. It works, and it is what every database does for the same reason.
+/// A directory cannot be opened for writing, so `File::sync_all` on a
+/// read-only handle is what is left. It works, and it is what every database
+/// does for the same reason.
 ///
 /// # Arguments
 ///
@@ -290,14 +288,7 @@ fn write_all_and_sync(file: &mut File, contents: &[u8]) -> Result<(), Attempt> {
 ///
 /// The error from opening the directory or from `fsync`.
 fn sync_directory(directory: &Path) -> std::io::Result<()> {
-    let handle = File::open(directory)?;
-    // SAFETY: a valid descriptor from a handle that outlives the call.
-    let result = unsafe { libc::fsync(handle.as_raw_fd()) };
-    if result == 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
+    File::open(directory)?.sync_all()
 }
 
 /// A name for the temporary file, beside the target and unmistakably ours.
@@ -315,19 +306,12 @@ fn sync_directory(directory: &Path) -> std::io::Result<()> {
 ///
 /// `.<name>.tcs-cfge-<pid>` in the same directory as `path`.
 fn temporary_beside(path: &Path) -> PathBuf {
-    let name = path
-        .file_name()
-        .map(|n| n.as_bytes().to_vec())
-        .unwrap_or_default();
-    let mut temporary = Vec::with_capacity(name.len() + 24);
-    temporary.extend_from_slice(b".");
-    temporary.extend_from_slice(&name);
-    temporary.extend_from_slice(
-        format!(".tcs-cfge-{}", std::process::id()).as_bytes(),
-    );
+    let mut temporary = std::ffi::OsString::from(".");
+    temporary.push(path.file_name().unwrap_or_default());
+    temporary.push(format!(".tcs-cfge-{}", std::process::id()));
 
     let mut full = path.to_path_buf();
-    full.set_file_name(std::ffi::OsStr::from_bytes(&temporary));
+    full.set_file_name(temporary);
     full
 }
 
@@ -347,7 +331,7 @@ mod tests {
         let shared = common.join("shared-sim.yaml");
         fs::write(&shared, b"old\n").expect("written");
         let link = example.join("example-sim.yaml");
-        std::os::unix::fs::symlink("../common/shared-sim.yaml", &link)
+        tcsos::linux::fs::symlink("../common/shared-sim.yaml", &link)
             .expect("linked");
 
         write_atomically(&link, b"new\n").expect("written through");
@@ -360,7 +344,7 @@ mod tests {
 
         // Links in a circle are refused, and nothing is written.
         let circle = where_.path().join("circle");
-        std::os::unix::fs::symlink("circle", &circle).expect("linked");
+        tcsos::linux::fs::symlink("circle", &circle).expect("linked");
         let why = write_atomically(&circle, b"x").expect_err("a circle");
         assert!(matches!(why, SaveError::Link { .. }), "{why}");
     }
@@ -468,12 +452,7 @@ mod tests {
         fs::create_dir(&locked).unwrap();
         let target = locked.join("graph.ytcs");
         write_atomically(&target, b"first\n").expect("a file to overwrite");
-        let mut permissions = fs::metadata(&locked).unwrap().permissions();
-        {
-            use std::os::unix::fs::PermissionsExt;
-            permissions.set_mode(0o500);
-        }
-        fs::set_permissions(&locked, permissions).unwrap();
+        tcsos::fs::set_mode(&locked, 0o500).unwrap();
 
         let said = match write_atomically(&target, b"second\n") {
             Err(e) => format!("{e}"),
@@ -491,10 +470,7 @@ mod tests {
 
         // Put it back so the directory can be cleaned up.
         {
-            use std::os::unix::fs::PermissionsExt;
-            let mut permissions = fs::metadata(&locked).unwrap().permissions();
-            permissions.set_mode(0o700);
-            fs::set_permissions(&locked, permissions).unwrap();
+            tcsos::fs::set_mode(&locked, 0o700).unwrap();
         }
     }
 

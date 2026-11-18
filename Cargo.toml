@@ -2,6 +2,9 @@
 resolver = "2"
 
 members = [
+    # Everything the programs ask of the operating system: Linux's
+    # interfaces, and the browser's substitutes for them. See tcsos.
+    "tcsos",
     "tcsprotocol",
     "tcsmoc",
     "tcspecial",

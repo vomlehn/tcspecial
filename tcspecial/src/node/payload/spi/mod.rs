@@ -13,13 +13,13 @@
 //!
 //! See [`crate::endpoint`] for the traits.
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
+use std::io::IsTerminal;
 use std::io::{Read, Write};
-use std::os::unix::fs::OpenOptionsExt;
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::path::Path;
+use tcsos::wait::{Ready, Source, Waitable};
 
 use log::info;
-use nix::poll::PollFlags;
 use tcsprotocol::{
     BitOrder, CsActive, SpiConfig, SpiMode, TcsError, TcsResult,
 };
@@ -30,22 +30,7 @@ use crate::endpoint::{
     WaitResult,
 };
 
-/// Requests of an open spidev node, from `linux/spi/spidev.h`.
-///
-/// Each is an `_IOW('k', n, T)`: the direction and the size of the argument
-/// are encoded in the number, which is why the mode requests differ by the
-/// width of what they take rather than only by their index.
-const SPI_IOC_WR_MODE: libc::c_ulong = 0x4001_6B01;
-const SPI_IOC_WR_LSB_FIRST: libc::c_ulong = 0x4001_6B02;
-const SPI_IOC_WR_BITS_PER_WORD: libc::c_ulong = 0x4001_6B03;
-const SPI_IOC_WR_MAX_SPEED_HZ: libc::c_ulong = 0x4004_6B04;
-
-/// Mode bits, from the same header. The two low bits are the mode proper --
-/// clock polarity and clock phase -- and the chip select polarity is a bit
-/// beside them.
-const SPI_CPHA: u8 = 0x01;
-const SPI_CPOL: u8 = 0x02;
-const SPI_CS_HIGH: u8 = 0x04;
+use tcsos::linux::spi::{CPHA, CPOL, CS_HIGH};
 
 /// Whether the node at the end of the path is a peripheral or a simulated
 /// device.
@@ -67,61 +52,6 @@ enum Clocking {
     Peripheral,
     /// A terminal simulating one: the bytes without the clock.
     Simulated,
-}
-
-/// Takes a terminal's line discipline out of the way, so that what it
-/// carries is bytes: no editing, no echo, no translation of what looks like
-/// a line.
-///
-/// The same thing the serial endpoint does to a port, and for the same reason,
-/// but not for the same purpose: there it is part of setting the line to the
-/// terms the configuration gives, and here there are no terms -- it is only
-/// the discipline that would otherwise sit between the two ends of a link
-/// carrying device data.
-///
-/// # Arguments
-///
-/// * `fd` - The open terminal.
-/// * `on` - The handler's name and the terminal's path, for what a
-///          complaint says.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the terminal's terms cannot be read or set.
-fn make_raw(fd: RawFd, on: &str) -> TcsResult<()> {
-    // SAFETY: termios is a C struct of integers and arrays of integers, for
-    // which all zeroes is a valid value; tcgetattr overwrites it anyway.
-    let mut terms: libc::termios = unsafe { std::mem::zeroed() };
-    // SAFETY: tcgetattr needs an open descriptor and a termios it can write.
-    // The one caller passes the descriptor of the `device` it has just
-    // opened and still holds; `terms` is local and mutably borrowed.
-    if unsafe { libc::tcgetattr(fd, &mut terms) } != 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{on} is a terminal whose terms cannot be read: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
-
-    // SAFETY: cfmakeraw needs a termios it can write, which `terms` is,
-    // filled in by tcgetattr above.
-    unsafe { libc::cfmakeraw(&mut terms) };
-
-    // SAFETY: tcsetattr needs an open descriptor and a termios it can read:
-    // `fd` is open as for tcgetattr, and `terms` is local.
-    if unsafe { libc::tcsetattr(fd, libc::TCSANOW, &terms) } != 0 {
-        return Err(TcsError::Endpoint(format!(
-            "{on} is a terminal that cannot be set raw: {}",
-            std::io::Error::last_os_error()
-        )));
-    }
-    Ok(())
-}
-
-/// Whether this descriptor is a terminal, which is what a simulated peripheral
-/// is.
-fn is_a_terminal(fd: RawFd) -> bool {
-    // SAFETY: isatty reads the descriptor's kind and nothing else.
-    unsafe { libc::isatty(fd) == 1 }
 }
 
 /// One SPI peripheral, on the terms its configuration gives.
@@ -160,37 +90,38 @@ impl SpiEndpoint {
         // name cannot be left off one message and put on the next.
         let on = format!("{what}: {}", config.path);
 
-        let device = OpenOptions::new()
-            .read(true)
-            .write(true)
-            // Not this process's terminal. A device that is a tty -- a real
-            // serial port, or a pty tcs-sim made to simulate one -- becomes the
-            // controlling terminal of a process that opens it without this, and
-            // then a read from a background process group raises SIGTTIN and a
-            // hangup raises SIGHUP: a handler stopped or killed for reasons
-            // that have nothing to do with its device.
-            .custom_flags(libc::O_NOCTTY)
-            .open(&config.path)
-            .map_err(|e| {
-                TcsError::Endpoint(format!("{on} cannot be opened: {e}"))
-            })?;
+        // Not this process's terminal: see tcsos::linux::fs::open_device.
+        let device =
+            tcsos::linux::fs::open_device(Path::new(&config.path), true, true)
+                .map_err(|e| {
+                    TcsError::Endpoint(format!("{on} cannot be opened: {e}"))
+                })?;
         crate::exclusive::device(what, &config.path, &device)?;
 
-        let fd = device.as_raw_fd();
+        // A node that is not a spidev answers `ENOTTY`, which says nothing on
+        // its own about what was attempted, so each refusal says what was
+        // being set.
+        let refused = |wanted: &str, why: std::io::Error| {
+            TcsError::Endpoint(format!("{on} would not take {wanted}: {why}"))
+        };
 
         // The mode first, and what happens to it decides the rest. A node that
         // refuses it is not a spidev: a terminal is a simulated device to carry
         // bytes on, and anything else is a configuration naming the wrong path.
-        match set_u8(fd, SPI_IOC_WR_MODE, mode_bits(config), &on, "its mode") {
+        match tcsos::linux::spi::set_mode(&device, mode_bits(config)) {
             Ok(()) => {}
-            Err(_) if is_a_terminal(fd) => {
+            Err(_) if device.is_terminal() => {
                 // The one term that means anything on a terminal: take the
                 // line discipline out of the way. Left canonical, the
                 // discipline holds bytes back until a newline arrives, and
                 // device data has no lines in it -- so a handler would sit on
                 // a read that never returned while the bytes it wanted were
                 // being edited on its behalf.
-                make_raw(fd, &on)?;
+                tcsos::linux::pty::make_raw(&device).map_err(|e| {
+                    TcsError::Endpoint(format!(
+                        "{on} is a terminal that cannot be set raw: {e}"
+                    ))
+                })?;
 
                 info!(
                     "{} is a terminal simulating a SPI peripheral: it \
@@ -204,29 +135,19 @@ impl SpiEndpoint {
                     _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
                 });
             }
-            Err(e) => return Err(e),
+            Err(e) => return Err(refused("its mode", e)),
         }
-        set_u8(
-            fd,
-            SPI_IOC_WR_BITS_PER_WORD,
-            config.bits_per_word,
-            &on,
-            &format!("{} bits per word", config.bits_per_word),
-        )?;
-        set_u8(
-            fd,
-            SPI_IOC_WR_LSB_FIRST,
-            u8::from(matches!(config.bit_order, BitOrder::LsbFirst)),
-            &on,
-            "its bit order",
-        )?;
-        set_u32(
-            fd,
-            SPI_IOC_WR_MAX_SPEED_HZ,
-            config.max_speed,
-            &on,
-            &format!("{} Hz", config.max_speed),
-        )?;
+        tcsos::linux::spi::set_bits_per_word(&device, config.bits_per_word)
+            .map_err(|e| {
+                refused(&format!("{} bits per word", config.bits_per_word), e)
+            })?;
+        tcsos::linux::spi::set_lsb_first(
+            &device,
+            matches!(config.bit_order, BitOrder::LsbFirst),
+        )
+        .map_err(|e| refused("its bit order", e))?;
+        tcsos::linux::spi::set_max_speed(&device, config.max_speed)
+            .map_err(|e| refused(&format!("{} Hz", config.max_speed), e))?;
 
         Ok(Self {
             device,
@@ -265,129 +186,23 @@ impl SpiEndpoint {
 ///
 /// # Returns
 ///
-/// The byte `SPI_IOC_WR_MODE` takes.
+/// The byte `tcsos::linux::spi::set_mode` takes.
 fn mode_bits(config: &SpiConfig) -> u8 {
     let mut bits = match config.mode {
         SpiMode::Mode0 => 0,
-        SpiMode::Mode1 => SPI_CPHA,
-        SpiMode::Mode2 => SPI_CPOL,
-        SpiMode::Mode3 => SPI_CPOL | SPI_CPHA,
+        SpiMode::Mode1 => CPHA,
+        SpiMode::Mode2 => CPOL,
+        SpiMode::Mode3 => CPOL | CPHA,
     };
     if let CsActive::High = config.cs_active {
-        bits |= SPI_CS_HIGH;
+        bits |= CS_HIGH;
     }
     bits
 }
 
-/// Makes a request of the open device that takes a byte.
-///
-/// # Arguments
-///
-/// * `fd`      - The open spidev node.
-/// * `request` - The `SPI_IOC_WR_*` request, one whose argument is a `u8`.
-/// * `value`   - What to set.
-/// * `on`      - The handler's name and the node's path, for what a
-///               complaint says.
-/// * `wanted`  - What was being set, for what a complaint says.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the node refuses the request.
-fn set_u8(
-    fd: RawFd,
-    request: libc::c_ulong,
-    value: u8,
-    on: &str,
-    wanted: &str,
-) -> TcsResult<()> {
-    set(fd, request, &value, on, wanted)
-}
-
-/// Makes a request of the open device that takes a 32-bit word.
-///
-/// # Arguments
-///
-/// * `fd`      - The open spidev node.
-/// * `request` - The `SPI_IOC_WR_*` request, one whose argument is a `u32`.
-/// * `value`   - What to set.
-/// * `on`      - The handler's name and the node's path, for what a
-///               complaint says.
-/// * `wanted`  - What was being set, for what a complaint says.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the node refuses the request.
-fn set_u32(
-    fd: RawFd,
-    request: libc::c_ulong,
-    value: u32,
-    on: &str,
-    wanted: &str,
-) -> TcsResult<()> {
-    set(fd, request, &value, on, wanted)
-}
-
-/// How many bytes an ioctl request says its argument is.
-///
-/// The size field of the request number, as `_IOC_SIZE` reads it: 13 bits
-/// from bit 16 hold it on every architecture Linux has, 14 on most.
-fn argument_bytes(request: libc::c_ulong) -> usize {
-    ((request >> 16) & 0x1fff) as usize
-}
-
-/// Makes one request of the open device, saying what was being set if it
-/// fails.
-///
-/// A node that is not a spidev answers `ENOTTY`, which says nothing on its
-/// own about what was attempted.
-///
-/// The value is checked against the size the request's number gives before
-/// it is passed, so a request and a value that disagree are refused rather
-/// than letting the kernel read past the value.
-///
-/// # Arguments
-///
-/// * `fd`      - The open spidev node.
-/// * `request` - The `SPI_IOC_WR_*` request.
-/// * `value`   - The value to set, as wide as the request encodes.
-/// * `on`      - The handler's name and the node's path, for what a
-///               complaint says.
-/// * `wanted`  - What was being set, for what a complaint says.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint` if the value is not as wide as the request says, or
-/// the node refuses the request.
-fn set<T>(
-    fd: RawFd,
-    request: libc::c_ulong,
-    value: &T,
-    on: &str,
-    wanted: &str,
-) -> TcsResult<()> {
-    if argument_bytes(request) != std::mem::size_of::<T>() {
-        return Err(TcsError::Endpoint(format!(
-            "{on}: setting {wanted} takes {} bytes, not the {} given",
-            argument_bytes(request),
-            std::mem::size_of::<T>()
-        )));
-    }
-    // SAFETY: the pointer is to `value`, alive and as wide as the request
-    // says, which was checked above; the kernel only reads it, for a write
-    // request, and an fd that is not open is refused with EBADF.
-    let value = value as *const T as *const libc::c_void;
-    if unsafe { libc::ioctl(fd, request, value) } < 0 {
-        let why = std::io::Error::last_os_error();
-        return Err(TcsError::Endpoint(format!(
-            "{on} would not take {wanted}: {why}"
-        )));
-    }
-    Ok(())
-}
-
 impl EndpointWaitable for SpiEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.device.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.device.source()
     }
 
     /// As for an I2C bus: a transfer is one the controller starts, so there is
@@ -395,10 +210,10 @@ impl EndpointWaitable for SpiEndpoint {
     /// command pipe.
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -418,30 +233,6 @@ impl EndpointWritable for SpiEndpoint {
 mod tests {
     use super::*;
 
-    /// Each request is made with a value as wide as its number says: one
-    /// byte for the mode, the bit order and the word size, four for the
-    /// speed.
-    #[test]
-    fn each_request_is_as_wide_as_its_value() {
-        for request in [
-            SPI_IOC_WR_MODE,
-            SPI_IOC_WR_LSB_FIRST,
-            SPI_IOC_WR_BITS_PER_WORD,
-        ] {
-            assert_eq!(argument_bytes(request), 1, "{request:#x}");
-        }
-        assert_eq!(argument_bytes(SPI_IOC_WR_MAX_SPEED_HZ), 4);
-    }
-
-    /// A value of another width is refused before the kernel is asked, which
-    /// would otherwise read past it.
-    #[test]
-    fn a_value_of_the_wrong_width_is_refused() {
-        let why = set_u8(-1, SPI_IOC_WR_MAX_SPEED_HZ, 1, "spi", "its speed")
-            .expect_err("one byte where four are read");
-        assert!(format!("{why}").contains("takes 4 bytes"), "{why}");
-    }
-
     /// The four modes are the two clock bits, and the chip select polarity is
     /// a bit beside them rather than part of the mode.
     #[test]
@@ -458,12 +249,12 @@ mod tests {
         };
 
         assert_eq!(of(SpiMode::Mode0, CsActive::Low), 0);
-        assert_eq!(of(SpiMode::Mode1, CsActive::Low), SPI_CPHA);
-        assert_eq!(of(SpiMode::Mode2, CsActive::Low), SPI_CPOL);
-        assert_eq!(of(SpiMode::Mode3, CsActive::Low), SPI_CPOL | SPI_CPHA);
+        assert_eq!(of(SpiMode::Mode1, CsActive::Low), CPHA);
+        assert_eq!(of(SpiMode::Mode2, CsActive::Low), CPOL);
+        assert_eq!(of(SpiMode::Mode3, CsActive::Low), CPOL | CPHA);
         assert_eq!(
             of(SpiMode::Mode0, CsActive::High),
-            SPI_CS_HIGH,
+            CS_HIGH,
             "an active-high chip select is not a mode of its own"
         );
     }
@@ -477,45 +268,9 @@ mod tests {
     #[test]
     fn a_terminal_is_taken_as_simulated_and_carries_bytes() {
         use std::io::Write;
-        use std::os::unix::io::FromRawFd;
 
-        // SAFETY: posix_openpt takes only flags and has no preconditions;
-        // its result is checked before it is used.
-        let master_fd =
-            unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY) };
-        assert!(
-            master_fd >= 0,
-            "no pty: {}",
-            std::io::Error::last_os_error()
-        );
-        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
-        // `master_fd` was just opened, is checked above, and nothing else
-        // takes ownership of it; the uses below only borrow it while the File
-        // is alive.
-        let mut master = unsafe { File::from_raw_fd(master_fd) };
-        // SAFETY: grantpt needs an open pty master, which `master_fd` is,
-        // owned by the File above for the rest of the test.
-        assert_eq!(unsafe { libc::grantpt(master_fd) }, 0);
-        // SAFETY: as for grantpt.
-        assert_eq!(unsafe { libc::unlockpt(master_fd) }, 0);
-
-        let mut name = [0 as libc::c_char; 128];
-        assert_eq!(
-            // SAFETY: ptsname_r needs an open pty master and a buffer it can
-            // write of the length it is given: `name` is a local array, and
-            // its own length is what is passed.
-            unsafe {
-                libc::ptsname_r(master_fd, name.as_mut_ptr(), name.len())
-            },
-            0
-        );
-        // SAFETY: from_ptr needs a NUL-terminated string that outlives the
-        // borrow. ptsname_r returned 0, so it wrote a terminated name into
-        // `name` (it fails with ERANGE rather than truncate), and `name`
-        // outlives the CStr, which is copied out at once.
-        let slave = unsafe { std::ffi::CStr::from_ptr(name.as_ptr()) }
-            .to_string_lossy()
-            .into_owned();
+        let (mut master, slave) =
+            tcsos::linux::pty::open().expect("a pseudo-terminal");
 
         let config = SpiConfig {
             path: slave.clone(),

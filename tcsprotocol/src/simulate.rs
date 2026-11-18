@@ -475,20 +475,9 @@ pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
             return Err(unseen(format!("{path} cannot be looked at ({e})")))
         }
     };
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{FileTypeExt, MetadataExt};
-        if !found.file_type().is_char_device() {
-            return Err(unseen(format!("{path} is {}", kind_of_file(&found))));
-        }
-        Ok(split_device(found.rdev()))
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = found;
-        Err(unseen(format!(
-            "{path} cannot be looked at on this platform"
-        )))
+    match tcsos::fs::device_number(&found) {
+        Some(number) => Ok(split_device(number)),
+        None => Err(unseen(format!("{path} is {}", kind_of_file(&found)))),
     }
 }
 
@@ -501,22 +490,16 @@ pub(crate) fn character_device(path: &str) -> Result<(u64, u64), Unseen> {
 /// # Returns
 ///
 /// What it is, such as "a directory".
-#[cfg(unix)]
 fn kind_of_file(found: &std::fs::Metadata) -> &'static str {
-    use std::os::unix::fs::FileTypeExt;
-    let kind = found.file_type();
-    if kind.is_dir() {
-        "a directory"
-    } else if kind.is_file() {
-        "an ordinary file"
-    } else if kind.is_fifo() {
-        "a pipe"
-    } else if kind.is_socket() {
-        "a socket"
-    } else if kind.is_block_device() {
-        "a block device"
-    } else {
-        "not a character device"
+    use tcsos::fs::Kind;
+
+    match tcsos::fs::kind_of(found) {
+        Kind::Directory => "a directory",
+        Kind::File => "an ordinary file",
+        Kind::Pipe => "a pipe",
+        Kind::Socket => "a socket",
+        Kind::BlockDevice => "a block device",
+        Kind::CharDevice | Kind::Other => "not a character device",
     }
 }
 

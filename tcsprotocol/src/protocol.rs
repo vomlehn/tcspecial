@@ -1,7 +1,8 @@
 //! Protocol definitions for TCSpecial
 //!
 //! Provides canonical values for operating system dependent values like
-//! address families, socket types, and protocols.
+//! address families, socket types, and protocols, and, on Linux, their
+//! conversion to the system's own numbers.
 
 use serde::{Deserialize, Serialize};
 
@@ -43,30 +44,33 @@ impl AddressFamily {
     /// # Returns
     ///
     /// The address family, or `None` for a number this does not know.
+    #[cfg(target_os = "linux")]
     pub fn from_os(value: i32) -> Option<Self> {
+        use tcsos::linux::net::numbers as n;
+
         match value {
-            libc::AF_UNIX => Some(AddressFamily::Unix),
-            libc::AF_INET => Some(AddressFamily::Inet),
-            libc::AF_INET6 => Some(AddressFamily::Inet6),
-            libc::AF_AX25 => Some(AddressFamily::Ax25),
-            libc::AF_IPX => Some(AddressFamily::Ipx),
-            libc::AF_APPLETALK => Some(AddressFamily::Appletalk),
-            libc::AF_X25 => Some(AddressFamily::X25),
-            libc::AF_DECnet => Some(AddressFamily::Decnet),
-            libc::AF_KEY => Some(AddressFamily::Key),
-            libc::AF_NETLINK => Some(AddressFamily::Netlink),
-            libc::AF_PACKET => Some(AddressFamily::Packet),
-            libc::AF_RDS => Some(AddressFamily::Rds),
-            libc::AF_PPPOX => Some(AddressFamily::Pppox),
-            libc::AF_LLC => Some(AddressFamily::Llc),
-            libc::AF_IB => Some(AddressFamily::Ib),
-            libc::AF_MPLS => Some(AddressFamily::Mpls),
-            libc::AF_CAN => Some(AddressFamily::Can),
-            libc::AF_TIPC => Some(AddressFamily::Tipc),
-            libc::AF_BLUETOOTH => Some(AddressFamily::Bluetooth),
-            libc::AF_ALG => Some(AddressFamily::Alg),
-            libc::AF_VSOCK => Some(AddressFamily::Vsock),
-            libc::AF_XDP => Some(AddressFamily::Xdp),
+            n::AF_UNIX => Some(AddressFamily::Unix),
+            n::AF_INET => Some(AddressFamily::Inet),
+            n::AF_INET6 => Some(AddressFamily::Inet6),
+            n::AF_AX25 => Some(AddressFamily::Ax25),
+            n::AF_IPX => Some(AddressFamily::Ipx),
+            n::AF_APPLETALK => Some(AddressFamily::Appletalk),
+            n::AF_X25 => Some(AddressFamily::X25),
+            n::AF_DECnet => Some(AddressFamily::Decnet),
+            n::AF_KEY => Some(AddressFamily::Key),
+            n::AF_NETLINK => Some(AddressFamily::Netlink),
+            n::AF_PACKET => Some(AddressFamily::Packet),
+            n::AF_RDS => Some(AddressFamily::Rds),
+            n::AF_PPPOX => Some(AddressFamily::Pppox),
+            n::AF_LLC => Some(AddressFamily::Llc),
+            n::AF_IB => Some(AddressFamily::Ib),
+            n::AF_MPLS => Some(AddressFamily::Mpls),
+            n::AF_CAN => Some(AddressFamily::Can),
+            n::AF_TIPC => Some(AddressFamily::Tipc),
+            n::AF_BLUETOOTH => Some(AddressFamily::Bluetooth),
+            n::AF_ALG => Some(AddressFamily::Alg),
+            n::AF_VSOCK => Some(AddressFamily::Vsock),
+            n::AF_XDP => Some(AddressFamily::Xdp),
             _ => None,
         }
     }
@@ -76,30 +80,33 @@ impl AddressFamily {
     /// # Returns
     ///
     /// The OS's `AF_*` number.
+    #[cfg(target_os = "linux")]
     pub fn to_os(&self) -> i32 {
+        use tcsos::linux::net::numbers as n;
+
         match self {
-            AddressFamily::Unix => libc::AF_UNIX,
-            AddressFamily::Inet => libc::AF_INET,
-            AddressFamily::Inet6 => libc::AF_INET6,
-            AddressFamily::Ax25 => libc::AF_AX25,
-            AddressFamily::Ipx => libc::AF_IPX,
-            AddressFamily::Appletalk => libc::AF_APPLETALK,
-            AddressFamily::X25 => libc::AF_X25,
-            AddressFamily::Decnet => libc::AF_DECnet,
-            AddressFamily::Key => libc::AF_KEY,
-            AddressFamily::Netlink => libc::AF_NETLINK,
-            AddressFamily::Packet => libc::AF_PACKET,
-            AddressFamily::Rds => libc::AF_RDS,
-            AddressFamily::Pppox => libc::AF_PPPOX,
-            AddressFamily::Llc => libc::AF_LLC,
-            AddressFamily::Ib => libc::AF_IB,
-            AddressFamily::Mpls => libc::AF_MPLS,
-            AddressFamily::Can => libc::AF_CAN,
-            AddressFamily::Tipc => libc::AF_TIPC,
-            AddressFamily::Bluetooth => libc::AF_BLUETOOTH,
-            AddressFamily::Alg => libc::AF_ALG,
-            AddressFamily::Vsock => libc::AF_VSOCK,
-            AddressFamily::Xdp => libc::AF_XDP,
+            AddressFamily::Unix => n::AF_UNIX,
+            AddressFamily::Inet => n::AF_INET,
+            AddressFamily::Inet6 => n::AF_INET6,
+            AddressFamily::Ax25 => n::AF_AX25,
+            AddressFamily::Ipx => n::AF_IPX,
+            AddressFamily::Appletalk => n::AF_APPLETALK,
+            AddressFamily::X25 => n::AF_X25,
+            AddressFamily::Decnet => n::AF_DECnet,
+            AddressFamily::Key => n::AF_KEY,
+            AddressFamily::Netlink => n::AF_NETLINK,
+            AddressFamily::Packet => n::AF_PACKET,
+            AddressFamily::Rds => n::AF_RDS,
+            AddressFamily::Pppox => n::AF_PPPOX,
+            AddressFamily::Llc => n::AF_LLC,
+            AddressFamily::Ib => n::AF_IB,
+            AddressFamily::Mpls => n::AF_MPLS,
+            AddressFamily::Can => n::AF_CAN,
+            AddressFamily::Tipc => n::AF_TIPC,
+            AddressFamily::Bluetooth => n::AF_BLUETOOTH,
+            AddressFamily::Alg => n::AF_ALG,
+            AddressFamily::Vsock => n::AF_VSOCK,
+            AddressFamily::Xdp => n::AF_XDP,
         }
     }
 }
@@ -124,12 +131,15 @@ impl SocketType {
     /// # Returns
     ///
     /// The socket type, or `None` for a number this does not know.
+    #[cfg(target_os = "linux")]
     pub fn from_os(value: i32) -> Option<Self> {
+        use tcsos::linux::net::numbers as n;
+
         match value {
-            libc::SOCK_STREAM => Some(SocketType::Stream),
-            libc::SOCK_DGRAM => Some(SocketType::Dgram),
-            libc::SOCK_RAW => Some(SocketType::Raw),
-            libc::SOCK_SEQPACKET => Some(SocketType::Seqpacket),
+            n::SOCK_STREAM => Some(SocketType::Stream),
+            n::SOCK_DGRAM => Some(SocketType::Dgram),
+            n::SOCK_RAW => Some(SocketType::Raw),
+            n::SOCK_SEQPACKET => Some(SocketType::Seqpacket),
             _ => None,
         }
     }
@@ -139,12 +149,15 @@ impl SocketType {
     /// # Returns
     ///
     /// The OS's `SOCK_*` number.
+    #[cfg(target_os = "linux")]
     pub fn to_os(&self) -> i32 {
+        use tcsos::linux::net::numbers as n;
+
         match self {
-            SocketType::Stream => libc::SOCK_STREAM,
-            SocketType::Dgram => libc::SOCK_DGRAM,
-            SocketType::Raw => libc::SOCK_RAW,
-            SocketType::Seqpacket => libc::SOCK_SEQPACKET,
+            SocketType::Stream => n::SOCK_STREAM,
+            SocketType::Dgram => n::SOCK_DGRAM,
+            SocketType::Raw => n::SOCK_RAW,
+            SocketType::Seqpacket => n::SOCK_SEQPACKET,
         }
     }
 
@@ -314,21 +327,25 @@ impl MessageFrame {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "linux")]
+    use tcsos::linux::net::numbers as n;
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_address_family_conversion() {
         let af = AddressFamily::Inet;
-        assert_eq!(af.to_os(), libc::AF_INET);
+        assert_eq!(af.to_os(), n::AF_INET);
         assert_eq!(
-            AddressFamily::from_os(libc::AF_INET),
+            AddressFamily::from_os(n::AF_INET),
             Some(AddressFamily::Inet)
         );
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn test_socket_type_conversion() {
         let st = SocketType::Stream;
-        assert_eq!(st.to_os(), libc::SOCK_STREAM);
+        assert_eq!(st.to_os(), n::SOCK_STREAM);
         assert!(st.is_stream());
         assert!(!st.is_datagram());
     }

@@ -213,7 +213,7 @@ impl Watch {
     /// The watch, which measures nothing where the thread's stack could not
     /// be found, so that a thread is never kept from starting by this.
     fn start(role: ThreadRole, node: NodeId, given: usize) -> Watch {
-        let Some((bottom, top, limit)) = bounds() else {
+        let Some((bottom, top, limit)) = tcsos::thread::stack_bounds() else {
             return Watch { key: None };
         };
         let low = if role == ThreadRole::Main {
@@ -243,32 +243,6 @@ impl Drop for Watch {
         if let (Some(key), Ok(mut watched)) = (self.key, WATCHED.lock()) {
             watched.retain(|thread| thread.key != key);
         }
-    }
-}
-
-/// The calling thread's stack, as glibc has it.
-///
-/// # Returns
-///
-/// The lowest address it may use, one past its highest, and its size in
-/// bytes; `None` where glibc cannot say. A thread's stack excludes the
-/// guard below it, which filling must not touch. The main thread's lowest
-/// is as far down as `ulimit -s` lets it grow.
-fn bounds() -> Option<(usize, usize, usize)> {
-    // SAFETY: an attribute object that is initialised by the call that
-    // fills it, read only once that call has said it succeeded, and
-    // destroyed once read.
-    unsafe {
-        let mut attr: libc::pthread_attr_t = std::mem::zeroed();
-        if libc::pthread_getattr_np(libc::pthread_self(), &mut attr) != 0 {
-            return None;
-        }
-        let mut addr: *mut libc::c_void = std::ptr::null_mut();
-        let mut size: libc::size_t = 0;
-        let got = libc::pthread_attr_getstack(&attr, &mut addr, &mut size);
-        libc::pthread_attr_destroy(&mut attr);
-        (got == 0 && !addr.is_null())
-            .then(|| (addr as usize, addr as usize + size, size))
     }
 }
 
@@ -384,10 +358,7 @@ pub fn stacks(first: usize, into: &mut [ThreadStack]) -> (usize, usize) {
 /// If glibc refuses the setting, which it does only for a parameter it
 /// does not know.
 pub fn one_arena() {
-    // SAFETY: mallopt takes two integers and changes only malloc's own
-    // settings; called while the process has one thread.
-    let set = unsafe { libc::mallopt(libc::M_ARENA_MAX, 1) };
-    assert_eq!(set, 1, "glibc takes M_ARENA_MAX");
+    assert!(tcsos::memory::one_arena(), "glibc takes M_ARENA_MAX");
 }
 
 #[cfg(test)]

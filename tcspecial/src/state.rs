@@ -309,15 +309,11 @@ fn short_lock(path: &Path) -> Result<File, String> {
         .truncate(false)
         .open(&lock)
         .map_err(cannot)?;
-    use std::os::fd::AsRawFd;
     loop {
-        // SAFETY: flock on a descriptor `file` holds open, with no pointer.
-        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX) } == 0 {
-            return Ok(file);
-        }
-        let e = std::io::Error::last_os_error();
-        if e.kind() != std::io::ErrorKind::Interrupted {
-            return Err(cannot(e));
+        match file.lock() {
+            Ok(()) => return Ok(file),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(e) => return Err(cannot(e)),
         }
     }
 }

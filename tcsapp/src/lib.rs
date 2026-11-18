@@ -118,8 +118,6 @@ pub mod app;
 pub mod packet;
 pub mod parent;
 
-use std::os::fd::RawFd;
-
 /// One of the three file interfaces an app is run with.
 ///
 /// Named by what it carries rather than by its number, because the number is
@@ -137,12 +135,13 @@ pub enum Interface {
 }
 
 impl Interface {
-    /// Gives the descriptor this interface is, on a UNIX-like system.
+    /// Gives the standard slot this interface is handed over in: its
+    /// descriptor, on Linux.
     ///
     /// # Returns
     ///
     /// 0 for the payload interface, 1 for the gateway one, 2 for the errors.
-    pub fn fd(self) -> RawFd {
+    pub fn fd(self) -> i32 {
         match self {
             Interface::Payload => 0,
             Interface::Gateway => 1,
@@ -182,14 +181,8 @@ impl Interface {
 }
 
 /// Whether a descriptor is open at all.
-pub fn is_open(fd: RawFd) -> bool {
-    // F_GETFD asks for the descriptor's flags, which is the cheapest question
-    // that has to be answered by the descriptor existing.
-    //
-    // SAFETY: F_GETFD only reads the descriptor table, so any number may be
-    // asked about: one that is not open is answered with -1 and EBADF, and
-    // nothing is changed or read through a pointer.
-    unsafe { libc::fcntl(fd, libc::F_GETFD) != -1 }
+pub fn is_open(fd: i32) -> bool {
+    tcsos::interfaces::is_open(fd)
 }
 
 /// Tells whether what is at this descriptor is an interface that was handed
@@ -214,16 +207,6 @@ pub fn is_open(fd: RawFd) -> bool {
 /// # Returns
 ///
 /// `true` if it is open and a socket, `false` otherwise.
-pub fn is_handed_over(fd: RawFd) -> bool {
-    let mut about = std::mem::MaybeUninit::<libc::stat>::uninit();
-    // SAFETY: fstat needs a stat it can write, which `about` is, alive for
-    // the call; any descriptor may be asked about, and one that is not open
-    // fails with EBADF. assume_init needs the stat written, which it is once
-    // fstat has not failed -- and a failure returns before it is reached.
-    unsafe {
-        if libc::fstat(fd, about.as_mut_ptr()) == -1 {
-            return false;
-        }
-        (about.assume_init().st_mode & libc::S_IFMT) == libc::S_IFSOCK
-    }
+pub fn is_handed_over(fd: i32) -> bool {
+    tcsos::interfaces::is_handed_over(fd)
 }

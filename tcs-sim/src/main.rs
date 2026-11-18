@@ -40,12 +40,9 @@ use std::env;
 use std::path::Path;
 use std::process;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-use signal_hook::consts::{SIGHUP, SIGINT, SIGTERM};
-use signal_hook::flag;
 
 use tcsprotocol::config::{
     payload_path_from_args, SIM_PAYLOAD_CONFIG_PATH_VAR,
@@ -1663,19 +1660,17 @@ fn main() {
     }
 }
 
-/// The signals that stop tcs-sim as its Quit button does.
-const QUIT_SIGNALS: [i32; 3] = [SIGHUP, SIGINT, SIGTERM];
-
-/// How often the event loop looks for one of `QUIT_SIGNALS`.
+/// How often the event loop looks for a quit signal.
 const SIGNAL_POLL: Duration = Duration::from_millis(100);
 
-/// The status tcs-sim exits with on a second of `QUIT_SIGNALS`, which does
-/// not wait for the payloads to stop.
+/// The status tcs-sim exits with on a second quit signal, which does not
+/// wait for the payloads to stop.
 const SECOND_SIGNAL_STATUS: i32 = 1;
 
-/// Has each of `QUIT_SIGNALS` be noted rather than end tcs-sim, so that the
-/// event loop can stop the payloads and clear what they made first. A
-/// second, should that take too long, ends tcs-sim at once.
+/// Has each quit signal -- SIGHUP, SIGINT and SIGTERM -- be noted rather
+/// than end tcs-sim, so that the event loop can stop the payloads and clear
+/// what they made first. A second, should that take too long, ends tcs-sim
+/// at once.
 ///
 /// # Returns
 ///
@@ -1685,23 +1680,8 @@ const SECOND_SIGNAL_STATUS: i32 = 1;
 ///
 /// Why a signal could not be handled, naming it.
 fn note_quit_signals() -> Result<Arc<AtomicUsize>, String> {
-    let came = Arc::new(AtomicBool::new(false));
-    let signalled = Arc::new(AtomicUsize::new(0));
-    for signal in QUIT_SIGNALS {
-        // The exit first: it looks at whether a signal had already come,
-        // and the first one is to find that none had.
-        flag::register_conditional_shutdown(
-            signal,
-            SECOND_SIGNAL_STATUS,
-            came.clone(),
-        )
-        .and_then(|_| flag::register(signal, came.clone()))
-        .and_then(|_| {
-            flag::register_usize(signal, signalled.clone(), signal as usize)
-        })
-        .map_err(|e| format!("tcs-sim: cannot handle signal {signal}: {e}"))?;
-    }
-    Ok(signalled)
+    tcsos::signals::note_quits(SECOND_SIGNAL_STATUS)
+        .map_err(|e| format!("tcs-sim: {e}"))
 }
 
 /// Runs `quit` from the event loop once a signal has come, and only once.

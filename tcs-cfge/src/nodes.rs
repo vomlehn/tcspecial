@@ -1401,7 +1401,7 @@ mod tests {
 
         // Two ways down to one directory: not a loop, and said as two
         // descriptions of one name.
-        std::os::unix::fs::symlink("compute", root.join("again"))
+        tcsos::linux::fs::symlink("compute", root.join("again"))
             .expect("a link");
         let (_, trouble) = read_tree(root).expect("two ways down is no loop");
         assert!(
@@ -1410,7 +1410,7 @@ mod tests {
         );
 
         // A way back up: a loop.
-        std::os::unix::fs::symlink("..", root.join("compute/up"))
+        tcsos::linux::fs::symlink("..", root.join("compute/up"))
             .expect("a link");
         let refused = read_tree(root).expect_err("a loop is refused");
         assert!(refused.contains("/up:"), "{refused}");

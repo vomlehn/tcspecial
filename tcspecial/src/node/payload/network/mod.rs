@@ -15,7 +15,12 @@ pub mod tcp;
 pub mod udp;
 pub mod unix;
 
-use libc::{IPPROTO_SCTP, IPPROTO_TCP, IPPROTO_UDP, IPPROTO_UDPLITE};
+/// IP protocol numbers, as IANA assigns them: the same on every system, so
+/// stated here rather than taken from one system's headers.
+const IPPROTO_TCP: i32 = 6;
+const IPPROTO_UDP: i32 = 17;
+const IPPROTO_SCTP: i32 = 132;
+const IPPROTO_UDPLITE: i32 = 136;
 use socket2::{Domain, Type};
 use std::collections::BTreeMap;
 use std::sync::LazyLock;

@@ -15,9 +15,8 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::os::unix::io::{AsRawFd, RawFd};
+use tcsos::wait::{Ready, Source, Waitable};
 
-use nix::poll::PollFlags;
 use tcsprotocol::{I2cConfig, TcsError, TcsResult};
 
 use crate::config::constants::ENDPOINT_BUFFER_SIZE;
@@ -26,37 +25,10 @@ use crate::endpoint::{
     WaitResult,
 };
 
-/// Requests of an open I2C bus, from `linux/i2c-dev.h`.
-///
-/// The addressing ones are set once, when the bus is opened for a particular
-/// device, and hold for every transfer on that description afterwards -- which
-/// is why each handler opens the bus for itself rather than sharing one
-/// description between devices.
-const I2C_SLAVE: libc::c_ulong = 0x0703;
-const I2C_TENBIT: libc::c_ulong = 0x0704;
-const I2C_PEC: libc::c_ulong = 0x0708;
-/// What the adapter behind this bus can actually do, as a bitfield.
-const I2C_FUNCS: libc::c_ulong = 0x0705;
-/// One SMBus transfer, described by `SmbusTransfer` below.
-const I2C_SMBUS: libc::c_ulong = 0x0720;
+use tcsos::linux::i2c::{
+    FUNC_I2C, FUNC_SMBUS_READ_I2C_BLOCK, FUNC_SMBUS_WRITE_I2C_BLOCK,
+};
 
-/// Functionality bits, from the same header. Only the three that decide how a
-/// transfer is made are named.
-const I2C_FUNC_I2C: libc::c_ulong = 0x0000_0001;
-const I2C_FUNC_SMBUS_READ_I2C_BLOCK: libc::c_ulong = 0x0400_0000;
-const I2C_FUNC_SMBUS_WRITE_I2C_BLOCK: libc::c_ulong = 0x0800_0000;
-
-/// SMBus transfer directions and the one transfer size that carries a block.
-const I2C_SMBUS_WRITE: u8 = 0;
-const I2C_SMBUS_READ: u8 = 1;
-const I2C_SMBUS_I2C_BLOCK_DATA: u32 = 8;
-
-/// The most bytes one SMBus block transfer carries. A packet longer than this
-/// takes several, which is what the simulator's segment size is for.
-const I2C_SMBUS_BLOCK_MAX: usize = 32;
-
-/// The register a device's data is read from and written to.
-///
 /// SMBus transfers are addressed to a register within the device, and nothing
 /// in a device configuration says which: a device link is a stream of
 /// bytes rather than a set of named values, so one register serves as the
@@ -78,7 +50,7 @@ enum Transfers {
     /// Raw I2C: a read is a read, and the device decides what it sends.
     Raw,
     /// SMBus block transfers to [`DATA_REGISTER`], at most
-    /// [`I2C_SMBUS_BLOCK_MAX`] bytes at a time.
+    /// `tcsos::linux::i2c::BLOCK_MAX` bytes at a time.
     BlockRegister,
 }
 
@@ -103,13 +75,12 @@ impl Transfers {
     ///
     /// `TcsError::Endpoint` if the adapter can do neither raw I2C nor SMBus
     /// block transfers.
-    fn of(funcs: libc::c_ulong, on: &str) -> TcsResult<Self> {
-        if funcs & I2C_FUNC_I2C != 0 {
+    fn of(funcs: u64, on: &str) -> TcsResult<Self> {
+        if funcs & FUNC_I2C != 0 {
             return Ok(Transfers::Raw);
         }
 
-        let block =
-            I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK;
+        let block = FUNC_SMBUS_READ_I2C_BLOCK | FUNC_SMBUS_WRITE_I2C_BLOCK;
         if funcs & block == block {
             return Ok(Transfers::BlockRegister);
         }
@@ -120,22 +91,6 @@ impl Transfers {
              device data over it"
         )))
     }
-}
-
-/// One SMBus transfer, as `linux/i2c-dev.h` describes it.
-#[repr(C)]
-struct SmbusTransfer {
-    read_write: u8,
-    command: u8,
-    size: u32,
-    data: *mut SmbusData,
-}
-
-/// The device of one SMBus transfer. A block carries its length in the first
-/// byte, which is why this is one longer than the block maximum plus that.
-#[repr(C)]
-struct SmbusData {
-    block: [u8; I2C_SMBUS_BLOCK_MAX + 2],
 }
 
 /// One device on an I2C bus.
@@ -190,35 +145,30 @@ impl I2cEndpoint {
             })?;
         crate::exclusive::on_bus(what, &config.bus, config.address, &bus)?;
 
-        let fd = bus.as_raw_fd();
-
+        // A file that is not an I2C bus answers `ENOTTY`, which on its own
+        // says nothing about what was attempted; a handler that opened the
+        // wrong node is better told that it is not a bus than left talking
+        // to it, so each refusal says what was being asked for.
+        let refused = |wanted: &str, why: std::io::Error| {
+            TcsError::Endpoint(format!("{on} would not take {wanted}: {why}"))
+        };
         if config.ten_bit {
-            request(fd, I2C_TENBIT, 1, &on, "ten-bit addressing")?;
+            tcsos::linux::i2c::set_ten_bit(&bus)
+                .map_err(|e| refused("ten-bit addressing", e))?;
         }
-        request(
-            fd,
-            I2C_SLAVE,
-            config.address as libc::c_int,
-            &on,
-            &format!("the address {:#04X}", config.address),
-        )?;
+        tcsos::linux::i2c::set_address(&bus, config.address).map_err(|e| {
+            refused(&format!("the address {:#04X}", config.address), e)
+        })?;
         if config.pec {
-            request(fd, I2C_PEC, 1, &on, "the packet error check")?;
+            tcsos::linux::i2c::set_pec(&bus)
+                .map_err(|e| refused("the packet error check", e))?;
         }
 
         // What this adapter can do decides how every transfer below is
         // made, so it is asked once, here, rather than guessed at each one.
-        let mut funcs: libc::c_ulong = 0;
-        // SAFETY: I2C_FUNCS needs an open i2c-dev descriptor and a pointer
-        // to an unsigned long it can write, which is what i2c-dev puts. `fd`
-        // is `bus`'s, held open above; `funcs` is a local c_ulong.
-        if unsafe { libc::ioctl(fd, I2C_FUNCS, &mut funcs) } < 0 {
-            return Err(TcsError::Endpoint(format!(
-                "{} will not say what it can do: {}",
-                on,
-                std::io::Error::last_os_error()
-            )));
-        }
+        let funcs = tcsos::linux::i2c::functions(&bus).map_err(|e| {
+            TcsError::Endpoint(format!("{on} will not say what it can do: {e}"))
+        })?;
         let transfers = Transfers::of(funcs, &on)?;
 
         Ok(Self {
@@ -227,48 +177,6 @@ impl I2cEndpoint {
             at: format!("{on} at {:#04X}", config.address),
             _buffer: vec![0u8; ENDPOINT_BUFFER_SIZE],
         })
-    }
-
-    /// Makes one SMBus block transfer to or from [`DATA_REGISTER`].
-    ///
-    /// A block carries its own length, so a read says how much there was
-    /// and a write says how much to take.
-    ///
-    /// # Arguments
-    ///
-    /// * `read_write` - `I2C_SMBUS_READ` or `I2C_SMBUS_WRITE`.
-    /// * `bytes`      - The block: its first byte is the length, the data
-    ///                  follow. Filled by a read, taken from by a write.
-    ///
-    /// # Returns
-    ///
-    /// The bytes moved, which is the block's first byte after the transfer.
-    ///
-    /// # Errors
-    ///
-    /// `TcsError::Io` if the transfer fails.
-    fn block(
-        &mut self,
-        read_write: u8,
-        bytes: &mut SmbusData,
-    ) -> TcsResult<usize> {
-        let mut transfer = SmbusTransfer {
-            read_write,
-            command: DATA_REGISTER,
-            size: I2C_SMBUS_I2C_BLOCK_DATA,
-            data: bytes as *mut SmbusData,
-        };
-
-        // SAFETY: the bus is open, and the transfer points at a live block for
-        // the duration of the call.
-        if unsafe {
-            libc::ioctl(self.bus.as_raw_fd(), I2C_SMBUS, &mut transfer)
-        } < 0
-        {
-            return Err(TcsError::Io(std::io::Error::last_os_error()));
-        }
-
-        Ok(bytes.block[0] as usize)
     }
 
     /// Makes a second endpoint on the same open bus.
@@ -295,50 +203,9 @@ impl I2cEndpoint {
     }
 }
 
-/// Makes one request of the open bus, saying what was being asked for if it
-/// fails.
-///
-/// A file that is not an I2C bus answers `ENOTTY`, which on its own says
-/// nothing about what was attempted; a handler that opened the wrong node is
-/// better told that it is not a bus than left talking to it.
-///
-/// # Arguments
-///
-/// * `fd`      - The open bus.
-/// * `request` - The `ioctl` request, such as `I2C_SLAVE`.
-/// * `value`   - The integer it takes.
-/// * `on`      - The handler and its bus, for the complaint.
-/// * `wanted`  - What was being asked for, for the complaint.
-///
-/// # Returns
-///
-/// Nothing, once the bus has taken the request.
-///
-/// # Errors
-///
-/// `TcsError::Endpoint`, saying what was wanted and why, if the bus
-/// refuses it.
-fn request(
-    fd: RawFd,
-    request: libc::c_ulong,
-    value: libc::c_int,
-    on: &str,
-    wanted: &str,
-) -> TcsResult<()> {
-    // SAFETY: fd is open for the lifetime of the borrow, and every request
-    // here takes an integer by value.
-    if unsafe { libc::ioctl(fd, request, value) } < 0 {
-        let why = std::io::Error::last_os_error();
-        return Err(TcsError::Endpoint(format!(
-            "{on} would not take {wanted}: {why}"
-        )));
-    }
-    Ok(())
-}
-
 impl EndpointWaitable for I2cEndpoint {
-    fn io_fd(&self) -> RawFd {
-        self.bus.as_raw_fd()
+    fn io_source(&self) -> Source {
+        self.bus.source()
     }
 
     /// A bus is not pollable the way a socket is -- a read of one is a
@@ -347,10 +214,10 @@ impl EndpointWaitable for I2cEndpoint {
     /// simply makes every wait return at once.
     fn wait_for_event(
         &self,
-        cmd_fd: RawFd,
+        cmd: Source,
         timeout_ms: i32,
     ) -> TcsResult<WaitResult> {
-        wait_for_fds(self.io_fd(), cmd_fd, PollFlags::POLLIN, timeout_ms)
+        wait_for_fds(self.io_source(), cmd, Ready::READ, timeout_ms)
     }
 }
 
@@ -359,20 +226,8 @@ impl EndpointReadable for I2cEndpoint {
         match self.transfers {
             Transfers::Raw => self.bus.read(buffer).map_err(TcsError::Io),
             Transfers::BlockRegister => {
-                let want = buffer.len().min(I2C_SMBUS_BLOCK_MAX);
-                if want == 0 {
-                    return Ok(0);
-                }
-
-                let mut bytes = SmbusData {
-                    block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
-                };
-                bytes.block[0] = want as u8;
-
-                let got = self.block(I2C_SMBUS_READ, &mut bytes)?;
-                let got = got.min(want);
-                buffer[..got].copy_from_slice(&bytes.block[1..=got]);
-                Ok(got)
+                tcsos::linux::i2c::read_block(&self.bus, DATA_REGISTER, buffer)
+                    .map_err(TcsError::Io)
             }
         }
     }
@@ -382,23 +237,12 @@ impl EndpointWritable for I2cEndpoint {
     fn write(&mut self, data: &[u8]) -> TcsResult<usize> {
         match self.transfers {
             Transfers::Raw => self.bus.write(data).map_err(TcsError::Io),
+            // As much as one block carries. The caller is a conduit, which
+            // writes what it was given and counts what went, so a short write
+            // is a count rather than a failure.
             Transfers::BlockRegister => {
-                // As much as one block carries. The caller is a conduit, which
-                // writes what it was given and counts what went, so a short
-                // write is a count rather than a failure.
-                let going = data.len().min(I2C_SMBUS_BLOCK_MAX);
-                if going == 0 {
-                    return Ok(0);
-                }
-
-                let mut bytes = SmbusData {
-                    block: [0u8; I2C_SMBUS_BLOCK_MAX + 2],
-                };
-                bytes.block[0] = going as u8;
-                bytes.block[1..=going].copy_from_slice(&data[..going]);
-
-                self.block(I2C_SMBUS_WRITE, &mut bytes)?;
-                Ok(going)
+                tcsos::linux::i2c::write_block(&self.bus, DATA_REGISTER, data)
+                    .map_err(TcsError::Io)
             }
         }
     }
@@ -419,9 +263,8 @@ mod tests {
     /// explains it.
     #[test]
     fn how_a_bus_is_talked_to_follows_from_what_it_can_do() {
-        let raw = I2C_FUNC_I2C;
-        let block =
-            I2C_FUNC_SMBUS_READ_I2C_BLOCK | I2C_FUNC_SMBUS_WRITE_I2C_BLOCK;
+        let raw = FUNC_I2C;
+        let block = FUNC_SMBUS_READ_I2C_BLOCK | FUNC_SMBUS_WRITE_I2C_BLOCK;
 
         assert_eq!(Transfers::of(raw, "/dev/i2c-1").unwrap(), Transfers::Raw);
         assert_eq!(
@@ -438,10 +281,7 @@ mod tests {
         // Half of block is not block: a bus that can be read and not written
         // carries device data in one direction only, which a conduit pair
         // cannot use.
-        for half in [
-            I2C_FUNC_SMBUS_READ_I2C_BLOCK,
-            I2C_FUNC_SMBUS_WRITE_I2C_BLOCK,
-        ] {
+        for half in [FUNC_SMBUS_READ_I2C_BLOCK, FUNC_SMBUS_WRITE_I2C_BLOCK] {
             let e = match Transfers::of(half, "/dev/i2c-1") {
                 Ok(t) => panic!("half a block transfer became {t:?}"),
                 Err(e) => format!("{e}"),

@@ -23,12 +23,12 @@
 //! * [`crate::node::payload::network::unix`] -- a Unix-domain socket of either
 //!   flavour, which the simulator simply is
 
-use std::os::unix::fs::{symlink, FileTypeExt};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
+use tcsos::linux::fs::symlink;
 
 use rand::Rng;
 use tcsprotocol::DHSample;
@@ -521,7 +521,9 @@ pub(crate) fn make_the_path_lead_to(
                 )
             })?;
         }
-        Ok(found) if found.file_type().is_char_device() => {
+        Ok(found)
+            if tcsos::fs::kind_of(&found) == tcsos::fs::Kind::CharDevice =>
+        {
             return Err(format!(
                 "{} is a real serial device, so the simulator will not stand \
                  in for it: point the tcspecial configuration at a path it may \

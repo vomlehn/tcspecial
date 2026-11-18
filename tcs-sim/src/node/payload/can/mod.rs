@@ -28,8 +28,6 @@
 //! See [`crate::payload`] for the pacing, which is common to every kind.
 
 use std::io;
-use std::mem;
-use std::os::unix::io::{AsRawFd, FromRawFd, OwnedFd};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -39,20 +37,9 @@ use crate::payload::{
     wait_while_running, Pacing, PayloadConfig, PayloadStats, Produce,
 };
 
-/// Where a frame's data begins in both of the kernel's frame structures: the
-/// identifier, the length, and the padding before the device.
-const DATA_AT: usize = 8;
-
-/// A socket on the bus, as this end of the link.
-struct BusMember {
-    socket: OwnedFd,
-    /// The identifier this device's frames carry, which is also the one the
-    /// handler sends its triggers with.
-    can_id: u32,
-    /// Whether frames are CAN FD, which decides the structure the kernel
-    /// exchanges and how much a frame carries.
-    fd: bool,
-}
+/// A socket on the bus, as this end of the link: the kernel's part is
+/// `tcsos::linux::can`'s, which tcspecial's CAN node shares.
+struct BusMember(tcsos::linux::can::Bus);
 
 impl BusMember {
     /// Joins the bus the handler is on, filtered to this device's identifier.
@@ -76,263 +63,82 @@ impl BusMember {
     /// commands that make one), or the socket cannot be opened, filtered, set
     /// for CAN FD, bound or made non-blocking.
     fn join(config: &PayloadConfig) -> Result<Self, String> {
-        let interface = config.address.clone();
-        let index = index_of(&interface).ok_or_else(|| {
-            format!(
-                "{}: this host has no interface called \"{interface}\". Make a \
-                 virtual bus with \"ip link add dev {interface} type vcan\" \
-                 and bring it up with \"ip link set dev {interface} up\"",
-                config.name
-            )
-        })?;
+        use tcsos::linux::can::{Bus, Refused, Settings};
 
-        // SAFETY: a socket call with constant arguments, checked before use.
-        let fd = unsafe {
-            libc::socket(libc::PF_CAN, libc::SOCK_RAW, libc::CAN_RAW)
-        };
-        if fd < 0 {
-            return Err(format!(
-                "{}: cannot open a CAN socket: {}",
-                config.name,
-                io::Error::last_os_error()
-            ));
-        }
-        // Owned from here, so every path below closes it.
-        //
-        // SAFETY: from_raw_fd needs sole ownership of an open descriptor.
-        // socket has just made this one and it is checked above; nothing
-        // else has been given it.
-        let socket = unsafe { OwnedFd::from_raw_fd(fd) };
-
+        let interface = &config.address;
+        let name = &config.name;
         let can_id = config.can_id;
-        let extended = can_id > 0x7FF;
-        let filter = libc::can_filter {
-            can_id: if extended {
-                can_id | libc::CAN_EFF_FLAG
-            } else {
-                can_id
-            },
-            can_mask: libc::CAN_EFF_MASK | libc::CAN_EFF_FLAG,
-        };
-        // SAFETY: one can_filter, which is what CAN_RAW_FILTER reads, living
-        // for the call.
-        let filtered = unsafe {
-            libc::setsockopt(
-                socket.as_raw_fd(),
-                libc::SOL_CAN_RAW,
-                libc::CAN_RAW_FILTER,
-                &filter as *const libc::can_filter as *const libc::c_void,
-                mem::size_of::<libc::can_filter>() as libc::socklen_t,
-            )
-        };
-        if filtered < 0 {
-            return Err(format!(
-                "{}: cannot filter this socket to can_id {can_id:#x}: {}",
-                config.name,
-                io::Error::last_os_error()
-            ));
-        }
-
-        if config.can_fd {
-            let on: libc::c_int = 1;
-            // SAFETY: an int option of the size the kernel expects.
-            let set = unsafe {
-                libc::setsockopt(
-                    socket.as_raw_fd(),
-                    libc::SOL_CAN_RAW,
-                    libc::CAN_RAW_FD_FRAMES,
-                    &on as *const libc::c_int as *const libc::c_void,
-                    mem::size_of::<libc::c_int>() as libc::socklen_t,
-                )
-            };
-            if set < 0 {
-                return Err(format!(
-                    "{}: this socket will not take CAN FD: {}",
-                    config.name,
-                    io::Error::last_os_error()
-                ));
-            }
-        }
-
-        // SAFETY: zeroed and filled in; only the family and the interface
-        // index are read for a raw CAN socket.
-        let mut addr: libc::sockaddr_can = unsafe { mem::zeroed() };
-        addr.can_family = libc::AF_CAN as libc::sa_family_t;
-        addr.can_ifindex = index as libc::c_int;
-        // SAFETY: the address is of the length given and lives for the call.
-        let bound = unsafe {
-            libc::bind(
-                socket.as_raw_fd(),
-                &addr as *const libc::sockaddr_can as *const libc::sockaddr,
-                mem::size_of::<libc::sockaddr_can>() as libc::socklen_t,
-            )
-        };
-        if bound < 0 {
-            return Err(format!(
-                "{}: cannot bind a CAN socket to \"{interface}\": {}",
-                config.name,
-                io::Error::last_os_error()
-            ));
-        }
-
-        // Read without waiting: the loop looks for a trigger every pass and
-        // sends on its own clock, as every other kind's does.
-        // SAFETY: both calls take the descriptor by value.
-        let flags = unsafe { libc::fcntl(socket.as_raw_fd(), libc::F_GETFL) };
-        if flags < 0
-            // SAFETY: as for F_GETFL: `socket` is owned here and open.
-            || unsafe {
-                libc::fcntl(
-                    socket.as_raw_fd(),
-                    libc::F_SETFL,
-                    flags | libc::O_NONBLOCK,
-                )
-            } < 0
-        {
-            return Err(format!(
-                "{}: cannot make this CAN socket non-blocking: {}",
-                config.name,
-                io::Error::last_os_error()
-            ));
-        }
-
-        Ok(Self {
-            socket,
+        let settings = Settings {
             can_id,
+            extended: can_id > 0x7FF,
             fd: config.can_fd,
-        })
+            loopback: true,
+        };
+        Bus::join(interface, &settings)
+            .map(BusMember)
+            .map_err(|refused| match refused {
+                Refused::Name | Refused::NoInterface(_) => format!(
+                    "{name}: this host has no interface called \"{interface}\". \
+                     Make a virtual bus with \"ip link add dev {interface} type \
+                     vcan\" and bring it up with \"ip link set dev {interface} \
+                     up\""
+                ),
+                Refused::Socket(e) => {
+                    format!("{name}: cannot open a CAN socket: {e}")
+                }
+                Refused::Filter(e) => format!(
+                    "{name}: cannot filter this socket to can_id {can_id:#x}: {e}"
+                ),
+                Refused::FdFrames(e) => {
+                    format!("{name}: this socket will not take CAN FD: {e}")
+                }
+                Refused::Loopback(e) => {
+                    format!("{name}: this socket will not take loopback: {e}")
+                }
+                Refused::Bind(e) => format!(
+                    "{name}: cannot bind a CAN socket to \"{interface}\": {e}"
+                ),
+                Refused::NonBlocking(e) => format!(
+                    "{name}: cannot make this CAN socket non-blocking: {e}"
+                ),
+            })
     }
 
-    /// Says how many bytes one frame carries.
-    ///
-    /// # Returns
-    ///
-    /// 64 for CAN FD, 8 otherwise.
+    /// How many bytes one of this member's frames carries.
     fn frame_bytes(&self) -> usize {
-        if self.fd {
-            64
-        } else {
-            8
-        }
+        self.0.frame_bytes()
     }
 
-    /// Puts one segment on the bus as one frame.
+    /// Sends one frame carrying `data`.
     ///
     /// # Arguments
     ///
-    /// * `data` - The segment, no longer than a frame carries.
+    /// * `data` - The device's bytes, no more than a frame carries.
     ///
     /// # Returns
     ///
-    /// The segment's length: the device's bytes, not the frame's.
+    /// The device's bytes sent, not the frame's: what a simulated device
+    /// counts is what it sent, and the padding is the kernel's.
     ///
     /// # Errors
     ///
-    /// `InvalidInput` if the segment will not fit in a frame, or the
-    /// system's error if the write fails.
+    /// `InvalidInput` for more than a frame carries, and what the kernel
+    /// said where the write failed.
     fn send(&self, data: &[u8]) -> io::Result<usize> {
-        if data.len() > self.frame_bytes() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "{} bytes will not fit in a frame carrying {}",
-                    data.len(),
-                    self.frame_bytes()
-                ),
-            ));
-        }
-
-        let extended = self.can_id > 0x7FF;
-        let id = if extended {
-            self.can_id | libc::CAN_EFF_FLAG
-        } else {
-            self.can_id
-        };
-
-        let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
-        frame[..4].copy_from_slice(&id.to_ne_bytes());
-        frame[4] = data.len() as u8;
-        frame[DATA_AT..DATA_AT + data.len()].copy_from_slice(data);
-
-        let length = if self.fd {
-            mem::size_of::<libc::canfd_frame>()
-        } else {
-            mem::size_of::<libc::can_frame>()
-        };
-
-        // SAFETY: writing `length` bytes of a buffer at least that long, laid
-        // out as the kernel's frame.
-        let sent = unsafe {
-            libc::write(
-                self.socket.as_raw_fd(),
-                frame.as_ptr() as *const libc::c_void,
-                length,
-            )
-        };
-        if sent < 0 {
-            return Err(io::Error::last_os_error());
-        }
-
-        // The device's bytes, not the frame's: what a simulated device
-        // counts is what it sent, and the padding is the kernel's.
-        Ok(data.len())
+        self.0.send(data)
     }
 
-    /// Reads one frame's data, or nothing where no frame is waiting.
+    /// Reads one frame's data, if one has arrived.
     ///
     /// # Arguments
     ///
-    /// * `into` - Where the data goes; a longer frame is cut to fit.
+    /// * `into` - Where the data goes.
     ///
     /// # Returns
     ///
-    /// The bytes put in `into`; 0 if no whole frame was waiting.
+    /// How many bytes it carried, nought where none had arrived.
     fn receive(&self, into: &mut [u8]) -> usize {
-        let mut frame = [0u8; mem::size_of::<libc::canfd_frame>()];
-        let room = if self.fd {
-            mem::size_of::<libc::canfd_frame>()
-        } else {
-            mem::size_of::<libc::can_frame>()
-        };
-
-        // SAFETY: reading into a buffer of at least `room` bytes.
-        let got = unsafe {
-            libc::read(
-                self.socket.as_raw_fd(),
-                frame.as_mut_ptr() as *mut libc::c_void,
-                room,
-            )
-        };
-        if got < 0 || (got as usize) < room {
-            return 0;
-        }
-
-        // The length field, which is in the same place in both structures.
-        let length =
-            (frame[4] as usize).min(self.frame_bytes()).min(into.len());
-        into[..length].copy_from_slice(&frame[DATA_AT..DATA_AT + length]);
-        length
-    }
-}
-
-/// Looks up the kernel's index for an interface name.
-///
-/// # Arguments
-///
-/// * `interface` - The interface's name, such as `vcan0`.
-///
-/// # Returns
-///
-/// The index, or `None` if there is no such interface or the name holds a
-/// NUL.
-fn index_of(interface: &str) -> Option<libc::c_uint> {
-    let name = std::ffi::CString::new(interface).ok()?;
-    // SAFETY: a valid C string for the length of the call.
-    let index = unsafe { libc::if_nametoindex(name.as_ptr()) };
-    if index == 0 {
-        None
-    } else {
-        Some(index)
+        self.0.receive(into).unwrap_or(0)
     }
 }
 
@@ -423,42 +229,12 @@ mod tests {
     use std::time::Duration;
     use tcsprotocol::Faults;
 
-    /// Says whether an interface is up, from the flags the kernel keeps for
-    /// it.
-    ///
-    /// An interface that exists is not one a frame can go out on: `ip link
-    /// add` makes a virtual bus and leaves it down, and a socket bound to a
-    /// down bus binds without complaint and then fails the send with
-    /// `ENETDOWN`. The operational state says nothing either -- a virtual bus
-    /// has no carrier and reports "unknown" whether it is up or not -- so
-    /// this reads `IFF_UP` itself.
-    ///
-    /// # Arguments
-    ///
-    /// * `interface` - The interface's name.
-    ///
-    /// # Returns
-    ///
-    /// Whether `IFF_UP` is set; false if its flags cannot be read.
-    fn is_up(interface: &str) -> bool {
-        let Ok(flags) = std::fs::read_to_string(format!(
-            "/sys/class/net/{interface}/flags"
-        )) else {
-            return false;
-        };
-        let Ok(flags) =
-            u32::from_str_radix(flags.trim().trim_start_matches("0x"), 16)
-        else {
-            return false;
-        };
-        flags & libc::IFF_UP as u32 != 0
-    }
-
     /// The first virtual CAN interface this host has up, if it has one.
     fn a_virtual_bus() -> Option<String> {
-        (0..4)
-            .map(|n| format!("vcan{n}"))
-            .find(|name| index_of(name).is_some() && is_up(name))
+        (0..4).map(|n| format!("vcan{n}")).find(|name| {
+            tcsos::linux::can::interface_index(name).is_ok()
+                && tcsos::linux::can::is_up(name)
+        })
     }
 
     /// Configures a device on the given bus, under the given identifier,
@@ -592,18 +368,11 @@ mod tests {
     ///
     /// If `/dev/null` cannot be opened.
     fn not_on_a_bus(fd: bool) -> BusMember {
-        BusMember {
-            // Writable, because the lengths that are not refused go on to be
-            // written: /dev/null takes them and says nothing.
-            socket: std::os::unix::io::OwnedFd::from(
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .open("/dev/null")
-                    .expect("a descriptor"),
-            ),
-            can_id: 1,
-            fd,
-        }
+        // Writable, because the lengths that are not refused go on to be
+        // written: /dev/null takes them and says nothing.
+        BusMember(
+            tcsos::linux::can::Bus::not_on_a_bus(fd).expect("a descriptor"),
+        )
     }
 
     /// A packet larger than a frame is refused rather than split, and how

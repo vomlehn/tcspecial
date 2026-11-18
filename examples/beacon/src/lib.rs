@@ -239,32 +239,18 @@ impl Vehicle {
     ///
     /// A message saying the program cannot be started, and why.
     pub fn start(&mut self) -> Result<(), String> {
-        use std::os::unix::process::CommandExt;
-
         if self.is_running() {
             return Ok(());
         }
         let mut command = std::process::Command::new(&self.program);
         command.args(&self.args);
-        // This program, as the child will see it as its parent: if the two
-        // differ once the death signal is set, this program died between the
-        // fork and the prctl, and the child would never be told.
-        let parent = std::process::id() as libc::pid_t;
-        // SAFETY: prctl and getppid are async-signal-safe, and touch nothing
-        // of this process's but the child's own death signal.
-        unsafe {
-            command.pre_exec(move || {
-                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                if libc::getppid() != parent {
-                    return Err(std::io::Error::other(
-                        "the window that started it has already gone",
-                    ));
-                }
-                Ok(())
-            });
-        }
+        // Killed when this window goes, so that a vehicle is never left
+        // beaconing with no button to stop it.
+        tcsos::child::dies_with_parent(
+            &mut command,
+            tcsos::child::Ending::Kill,
+            "the window that started it has already gone",
+        );
         let child = command.spawn().map_err(|e| {
             format!("{} cannot be started: {e}", self.program.display())
         })?;

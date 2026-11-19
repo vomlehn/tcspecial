@@ -823,9 +823,10 @@ fewer stars until a later pass. Its Restart button sends a
 command up to lander-b, whose gateway passes it to the payload that starts
 the lander again: it arrives 1.3 s later, and is seen 1.3 s after that.
 Disable Autorestart and Enable Autorestart send one up to lander-a, whose
-gateway passes it to the payload that sets the lander's autorestart. It is
-off until enabled: after a crash the lander stays down until Restart, or,
-enabled, starts again by itself after its pause. Closing
+gateway passes it to the payload that sets the lander's autorestart. The
+station enables it as soon as the vehicles are connected, so after a crash
+the lander starts again by itself after its pause; disabled, it stays down
+until Restart. Closing
 tcs-sim's window,
 or the MOC's, stops everything. Yamcs's web interface is at
 <http://localhost:19090>.

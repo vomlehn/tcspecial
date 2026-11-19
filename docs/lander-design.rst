@@ -242,10 +242,11 @@ second and shows:
   time after the press;
 * Disable Autorestart and Enable Autorestart, which send a command up
   through lander-a's gateway to a simulated payload, ``autorestart``,
-  joined to the lander's ``autorestart`` input. Until it is enabled, a
-  lander that has crashed stays down until it is restarted; enabled, it
-  starts again by itself after its pause. A landed lander is still
-  flying, so autorestart does nothing to it.
+  joined to the lander's ``autorestart`` input. Both ground stations
+  enable it as soon as the vehicles are connected: enabled, a lander that
+  has crashed starts again by itself after its pause; disabled, it stays
+  down until it is restarted. A landed lander is still flying, so
+  autorestart does nothing to it.
 
 The sky, sent down
 ------------------

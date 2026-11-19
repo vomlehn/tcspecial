@@ -24,7 +24,9 @@ This program puts the pieces together:
 * it starts Yamcs, tcs-sim with both configurations, and both tcspecials,
   each killed when this program exits, however it exits;
 * it has Yamcs send each vehicle a CONNECT carrying its configuration's
-  checksum until the vehicle answers with it, through the delay;
+  checksum until the vehicle answers with it, through the delay, and then
+  turns the lander's autorestart on, so that a lander nobody flies starts
+  again by itself after each crash;
 * it shows what arrives in a window -- the landscape and the lander where it
   was said to be, the values, the fuel, where the joystick was held, and
   whether it has landed or crashed -- or, with ``--seconds``, prints it for
@@ -1178,8 +1180,10 @@ class Autorestart:
     """Has Yamcs tell the lander whether to start again by itself after a
     crash, up through the vehicle whose gateway passes it to the payload
     that sets the lander's autorestart. Until it is told, it does not: it
-    stays down until it is restarted. A landing does not end a flight, so
-    this says nothing to a landed lander.
+    stays down until it is restarted. The program enables it as soon as the
+    vehicles are connected, so that a lander nobody flies starts again by
+    itself after each crash. A landing does not end a flight, so this says
+    nothing to a landed lander.
 
     Args:
         uplink: The :class:`Uplink` to the autorestart payload's vehicle.
@@ -1720,6 +1724,10 @@ def main(argv):
                      else None)
         autorestart = (Autorestart(uplinks["autorestart"])
                        if "autorestart" in uplinks else None)
+        # On from the start, so that a lander nobody flies starts again by
+        # itself after each crash; the window's buttons change it after.
+        if autorestart is not None:
+            autorestart.enable()
         if options.seconds is None:
             return run_the_window(readings, lander, seed, options.delay,
                                   stopped, restarter, autorestart,

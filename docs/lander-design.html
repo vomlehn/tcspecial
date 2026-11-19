@@ -606,10 +606,11 @@ input: each press a new count, the lander starting again at each, a light
 time after the press;</li>
 <li>Disable Autorestart and Enable Autorestart, which send a command up
 through lander-a's gateway to a simulated payload, <tt class="docutils literal">autorestart</tt>,
-joined to the lander's <tt class="docutils literal">autorestart</tt> input. Until it is enabled, a
-lander that has crashed stays down until it is restarted; enabled, it
-starts again by itself after its pause. A landed lander is still
-flying, so autorestart does nothing to it.</li>
+joined to the lander's <tt class="docutils literal">autorestart</tt> input. Both ground stations
+enable it as soon as the vehicles are connected: enabled, a lander that
+has crashed starts again by itself after its pause; disabled, it stays
+down until it is restarted. A landed lander is still flying, so
+autorestart does nothing to it.</li>
 </ul>
 </div>
 <div class="section" id="the-sky-sent-down">

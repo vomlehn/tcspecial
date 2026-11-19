@@ -15,8 +15,10 @@ slint::include_modules!();
 /// Every shape a beacon's message takes at its widest: tcspecial at version
 /// 255.255.255, each part being a byte, and an MD5 digest written in one hex
 /// digit throughout, once for each digit -- which digit is widest is the
-/// font's to say, so the window measures them all -- and what the panel says
-/// before any beacon has arrived. The panel's message line is as wide as the
+/// font's to say, so the window measures them all -- followed by what a
+/// beacon from a tcspecial not yet connected to says it is, as the first
+/// beacons of every run do; and what the panel says before any beacon has
+/// arrived. The panel's message line is as wide as the
 /// widest of these, so that the window opens at the width a beacon will want
 /// and keeps it.
 ///
@@ -25,8 +27,8 @@ slint::include_modules!();
 ///
 /// # Returns
 ///
-/// The sixteen widest beacon messages, one for each hex digit, and the
-/// message shown before any beacon.
+/// The sixteen widest beacon messages, one for each hex digit, each with the
+/// restart flag's words, and the message shown before any beacon.
 ///
 /// # Panics
 ///
@@ -41,7 +43,7 @@ pub fn widest_messages() -> Vec<String> {
             tcsmoc::beacon::what_it_read(
                 version,
                 ConfigDigest([digit * 0x11; 16]),
-            )
+            ) + tcsmoc::beacon::RESTART_FLAG_SAID
         })
         .collect();
     messages.push(tcsmoc::beacon::NO_BEACON_MESSAGE.to_string());

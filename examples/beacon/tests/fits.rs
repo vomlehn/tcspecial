@@ -93,18 +93,20 @@ fn the_window_is_just_large_enough_for_what_it_holds() {
 }
 
 /// The widest messages are the widest a beacon can say: the largest version,
-/// every hex digit, and what the panel says before any beacon.
+/// every hex digit, the restart flag's words that every run's first beacons
+/// carry, and what the panel says before any beacon.
 #[test]
 fn the_widest_messages_are_the_widest_a_beacon_says() {
     use beacon_example::widest_messages;
-    use tcsmoc::beacon::NO_BEACON_MESSAGE;
+    use tcsmoc::beacon::{NO_BEACON_MESSAGE, RESTART_FLAG_SAID};
 
     let messages = widest_messages();
     assert_eq!(messages.len(), 17);
     assert!(messages.contains(&NO_BEACON_MESSAGE.to_string()));
     for digit in "0123456789abcdef".chars() {
         let digest: String = std::iter::repeat_n(digit, 32).collect();
-        let message = format!("tcspecial v255.255.255 md5 {digest}");
+        let message =
+            format!("tcspecial v255.255.255 md5 {digest}{RESTART_FLAG_SAID}");
         assert!(messages.contains(&message), "no {message:?}");
     }
 }

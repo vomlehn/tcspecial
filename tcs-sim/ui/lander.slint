@@ -509,7 +509,9 @@ export component LanderPane inherits Rectangle {
     // Where the pane and its joystick are in the window, said to
     // LanderScene as they change.
     property <length> right: root.absolute-position.x + root.width;
-    property <length> bottom: root.absolute-position.y + root.height;
+    // Where its controls end, rather than the pane: the pane is as tall as
+    // the panels beside it, and what is below its buttons is empty.
+    property <length> bottom: controls.absolute-position.y + controls.height;
     property <length> stick-left: stick.absolute-position.x;
     property <length> stick-top: stick.absolute-position.y;
     property <length> stick-width: stick.width;
@@ -532,16 +534,22 @@ export component LanderPane inherits Rectangle {
     VerticalLayout {
         padding: 2px;
         spacing: 2px;
+        // What the rows leave over goes below the buttons, not between the
+        // landscape and the rows under it.
+        alignment: start;
 
         // The landscape, drawn to scale.
         // The room the landscape has: all of the pane that the rows below
         // leave it, which grows with the window, the landscape in it as
-        // large as fits at its own proportions.
+        // large as fits at its own proportions -- and no taller than the
+        // landscape is at the pane's width, which would only leave a band
+        // of nothing under it.
         scene-room := Rectangle {
             min-width: 300px;
             min-height: 300px * root.ratio;
             preferred-width: 600px;
             preferred-height: 600px * root.ratio;
+            max-height: self.width * root.ratio;
             horizontal-stretch: 1;
             vertical-stretch: 1;
             scene := LanderPicture {
@@ -626,7 +634,7 @@ export component LanderPane inherits Rectangle {
 
         // The world paused and resumed, and the autopilot started and
         // stopped, each button saying what a press of it does.
-        HorizontalLayout {
+        controls := HorizontalLayout {
             spacing: 4px;
             alignment: start;
             Button {

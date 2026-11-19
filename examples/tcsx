@@ -4,7 +4,7 @@
 #   tcsx [--no-memlock] [--simulate=MODE] [NAME [ARGUMENT...]]
 #
 # With no NAME it lists the examples, saying what each needs beyond what is
-# installed, Yamcs only while YAMCS_HOME does not name it. With one it runs
+# installed. With one it runs
 # it as its make run target in the examples' Makefile does in a checkout:
 # most by tcs-moc, which starts tcs-sim and tcspecial on its configuration,
 # and the rest by their own ground station, which starts tcspecial itself.
@@ -25,8 +25,9 @@
 # runs at their paths from there. /tmp/telemetry, where the examples' logs go, is made afresh
 # first, so that what is in it afterwards is that run's alone.
 #
-# The examples through Yamcs need a Yamcs release unpacked: YAMCS_HOME
-# says where. can, gpio and iio need the kernel's dummy devices, which
+# The examples through Yamcs use the Yamcs release YAMCS_HOME names, or,
+# where it names none, the one their ground station fetches the first time
+# and keeps in ~/.cache/tcspecial. can, gpio and iio need the kernel's dummy devices, which
 # tcspecial's bin/mk-kernel-dummies makes as root.
 
 set -eu
@@ -81,18 +82,13 @@ among() {
 	esac
 }
 
-# Lists the examples, one a line, with what each needs that is not there:
-# Yamcs only while YAMCS_HOME does not say where it is.
+# Lists the examples, one a line, with what each needs that is not there.
 list() {
-	yamcs=
-	[ -x "${YAMCS_HOME:-}/bin/yamcsd" ] || yamcs=$YAMCS
 	for dir in "$examples"/*/; do
 		name=$(basename "$dir")
 		! among "$name" "$PARTS" || continue
 		[ -f "$dir/$name.ytcs" ] || among "$name" "$SEVERAL" || continue
-		if among "$name" "$yamcs"; then
-			echo "$name (needs Yamcs: YAMCS_HOME)"
-		elif among "$name" "$KERNEL_DUMMIES"; then
+		if among "$name" "$KERNEL_DUMMIES"; then
 			echo "$name (needs the kernel's dummy devices)"
 		else
 			echo "$name"
@@ -138,10 +134,12 @@ shift
 [ -f "$examples/$name/$name.ytcs" ] \
 	|| { among "$name" "$SEVERAL" && [ -d "$examples/$name" ]; } \
 	|| die "no example $name: tcsx lists them"
-if among "$name" "$YAMCS"; then
-	[ -x "${YAMCS_HOME:-}/bin/yamcsd" ] \
-		|| die "$name needs Yamcs: set YAMCS_HOME to the directory" \
-			"holding bin/yamcsd"
+# Yamcs where YAMCS_HOME names it, and where it names none, fetched by
+# the ground station; one named that is not there is said here.
+if among "$name" "$YAMCS" && [ -n "${YAMCS_HOME:-}" ]; then
+	[ -x "$YAMCS_HOME/bin/yamcsd" ] \
+		|| die "$name: YAMCS_HOME, $YAMCS_HOME, holds no bin/yamcsd:" \
+			"unset it to have Yamcs fetched"
 fi
 if ! among "$name" "$OWN_GROUND"; then
 	[ $# -eq 0 ] || die "$name is run by tcs-moc, which takes no ARGUMENTs"

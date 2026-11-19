@@ -489,15 +489,14 @@ drag along an arm. Land on the pad at no more than 3.05 m/s down and
 you like. Autoland flies it for you.</p>
 <p>It needs Yamcs, which runs on Java. Install a Java runtime --
 <tt class="docutils literal"><span class="pre">default-jre-headless</span></tt> on Ubuntu, <tt class="docutils literal"><span class="pre">java-25-openjdk-headless</span></tt> on
-Fedora -- unpack a Yamcs release, and say where:</p>
+Fedora -- and run it:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span><span class="name variable">yamcs</span><span class="operator">=</span>https://github.com/yamcs/yamcs/releases/download/yamcs-5.14.0<span class="whitespace">
-</span><span class="generic prompt">$ </span>curl<span class="whitespace"> </span>-fLO<span class="whitespace"> </span><span class="literal string double">&quot;</span><span class="name variable">$yamcs</span><span class="literal string double">/yamcs-5.14.0-linux-x86_64.tar.gz&quot;</span><span class="whitespace">
-</span><span class="generic prompt">$ </span>mkdir<span class="whitespace"> </span>yamcs<span class="whitespace"> </span><span class="operator">&amp;&amp;</span><span class="whitespace"> </span>tar<span class="whitespace"> </span>xzf<span class="whitespace"> </span>yamcs-5.14.0-linux-x86_64.tar.gz<span class="whitespace"> </span>-C<span class="whitespace"> </span>yamcs<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="generic prompt">&gt; </span><span class="whitespace">    </span>--strip-components<span class="operator">=</span><span class="literal number">1</span><span class="whitespace">
-</span><span class="generic prompt">$ </span><span class="name builtin">export</span><span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span><span class="name variable">$PWD</span>/yamcs<span class="whitespace">
-</span><span class="generic prompt">$ </span>tcsx<span class="whitespace"> </span>--no-memlock<span class="whitespace"> </span>lander
+<span class="generic prompt">$ </span>tcsx<span class="whitespace"> </span>--no-memlock<span class="whitespace"> </span>lander
 </pre>
+<p>The first run fetches Yamcs 5.14.0, checks it against the release's
+checksum, and keeps it in <tt class="docutils literal"><span class="pre">~/.cache/tcspecial</span></tt> for every run after. To
+use a Yamcs of your own instead, set <tt class="docutils literal">YAMCS_HOME</tt> to where it is
+unpacked, the directory holding <tt class="docutils literal">bin/yamcsd</tt>.</p>
 <p><tt class="docutils literal">tcsx</tt> lists the other examples through Yamcs too: <tt class="docutils literal"><span class="pre">ping-yamcs</span></tt>,
 <tt class="docutils literal"><span class="pre">thermostat-yamcs</span></tt> and <tt class="docutils literal">memusage</tt>.</p>
 </div>

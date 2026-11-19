@@ -55,17 +55,17 @@ help:
 		"that pings the vehicle"
 	@echo "  make run-ping-yamcs  - Run the ping-yamcs example: a Python" \
 		"window that pings the vehicle through Yamcs, over CCSDS" \
-		"packets (YAMCS_HOME=<yamcs>)"
+		"packets"
 	@echo "  make run-memusage    - Run the memusage example: tcspecial's" \
 		"memory and every thread's stack, watched through Yamcs" \
-		"(YAMCS_HOME=<yamcs>; MEMUSAGE=<configurations> for more" \
+		"(MEMUSAGE=<configurations> for more" \
 		"than one tcspecial)"
 	@echo "  make run-thermostat-yamcs - Run the thermostat-yamcs" \
 		"example: the thermostat, watched through Yamcs, over CCSDS" \
-		"packets (YAMCS_HOME=<yamcs>)"
+		"packets"
 	@echo "  make run-lander      - Run the lander example: two" \
 		"tcspecials flying a lunar lander from tcs-sim's joystick," \
-		"watched through Yamcs 1.3 s away (YAMCS_HOME=<yamcs>)"
+		"watched through Yamcs 1.3 s away"
 	@echo "  make run-lander-station - The same, watched by" \
 		"lander-station, its ground station in Rust: no Yamcs (SEED=N)"
 	@echo "  make run-tees        - Run tcs-moc on the tees example: tees" \
@@ -97,7 +97,9 @@ help:
 # tcsx gives its ground station. tcspecial gives each filled log segment to
 # the segsend built beside it, and refuses to start without one, so
 # segsend is built with the rest. YAMCS_HOME, where a Yamcs release is
-# unpacked, is for the examples through Yamcs.
+# unpacked, is for the examples through Yamcs; where it is unset, their
+# ground station fetches Yamcs the first time and keeps it in
+# ~/.cache/tcspecial.
 define tcsx
 	cd $(ROOT) && cargo build -q $(addprefix --bin ,$(2))
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) YAMCS_HOME="$(YAMCS_HOME)" \
@@ -252,10 +254,11 @@ run-ping: check-tkinter
 	$(call tcsx,ping,tcspecial tcs-verify segsend)
 
 # The ping example with Yamcs between the ground station and the vehicle.
-# YAMCS_HOME is where a Yamcs release is unpacked; ping_yamcs.py starts Yamcs
+# YAMCS_HOME is where a Yamcs release is unpacked, fetched where it is unset;
+# ping_yamcs.py starts Yamcs
 # and tcspecial, and opens the ping example's window, which pings through
 # Yamcs. Closing the window stops them both. With no window,
-#   python3 examples/ping-yamcs/ping_yamcs.py --yamcs <yamcs> --pings 3
+#   python3 examples/ping-yamcs/ping_yamcs.py --pings 3
 # pings three times, prints each answer and its times, and stops them.
 .PHONY: run-ping-yamcs
 run-ping-yamcs: check-tkinter
@@ -263,7 +266,7 @@ run-ping-yamcs: check-tkinter
 
 # The memusage example: tcspecial's memory, and each of its threads'
 # stacks, watched through Yamcs. YAMCS_HOME is where a Yamcs release is
-# unpacked; memusage.py starts Yamcs, with an instance for each tcspecial,
+# unpacked, fetched where it is unset; memusage.py starts Yamcs, with an instance for each tcspecial,
 # and a tcspecial on each configuration MEMUSAGE names, memusage's own where
 # it names none, and prints what each answers QUERY_THREADS with every five
 # seconds until it is stopped. Yamcs's web interface, at
@@ -278,13 +281,13 @@ run-memusage:
 	$(call tcsx,memusage,tcspecial tcs-verify segsend,$(MEMUSAGE))
 
 # The thermostat example with Yamcs between the ground station and the
-# vehicle. YAMCS_HOME is where a Yamcs release is unpacked;
-# thermostat_yamcs.py starts Yamcs, tcs-sim and tcspecial, and opens a window
+# vehicle. YAMCS_HOME is where a Yamcs release is unpacked, fetched where it
+# is unset; thermostat_yamcs.py starts Yamcs, tcs-sim and tcspecial, and opens a window
 # of the zone's temperature, the three readings, the thermostat's decision
 # and the heaters it drives, each read from Yamcs. Closing the window stops
 # them all. tcs-sim draws a window of its own, so this wants a display. With
 # no window of the program's own,
-#   python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs <yamcs> \
+#   python3 examples/thermostat-yamcs/thermostat_yamcs.py \
 #       --seconds 120
 # prints what arrives for two minutes, and a line each time the heaters are
 # switched, and stops them.
@@ -295,12 +298,12 @@ run-thermostat-yamcs: check-tkinter
 
 # The lander example: two tcspecials, lander-a flying the X axis and
 # lander-b the Y, and one tcs-sim simulating both, the lander flown from its
-# window's joystick. YAMCS_HOME is where a Yamcs release is unpacked;
-# lander_yamcs.py makes a landscape from a seed, starts Yamcs with a relay
+# window's joystick. YAMCS_HOME is where a Yamcs release is unpacked, fetched
+# where it is unset; lander_yamcs.py makes a landscape from a seed, starts Yamcs with a relay
 # holding everything 1.3 s each way, tcs-sim and both tcspecials, and opens
 # the MOC's window, read from Yamcs. Closing tcs-sim's window, or the
 # MOC's, stops them all. With no window of the program's own,
-#   python3 examples/lander/lander_yamcs.py --yamcs <yamcs> --seconds 60
+#   python3 examples/lander/lander_yamcs.py --seconds 60
 # prints what arrives for a minute; --seed N has a landscape again.
 .PHONY: run-lander
 run-lander: check-tkinter

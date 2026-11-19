@@ -37,14 +37,16 @@ Yamcs's web interface, at http://localhost:16090 by default, shows every
 packet and parameter meanwhile: the beacon, the answers, and the pings, a
 ping's command and its answer's parameters as the text they are.
 
-Usage, from the repository's root, with Yamcs unpacked somewhere::
+Usage, from the repository's root::
 
-    python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0
+    python3 examples/ping-yamcs/ping_yamcs.py
     python3 examples/ping-yamcs/ping_yamcs.py --pings 3   # no window
     python3 examples/ping-yamcs/ping_yamcs.py --describe  # what it read
 
 ``--yamcs`` is the directory a Yamcs release unpacks to, holding
-``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not. With
+``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not, and
+where neither does, the Yamcs release the examples are written for is
+fetched the first time and kept in ``~/.cache/tcspecial``. With
 neither ``--pings`` nor ``--describe`` it opens the window, and pings each
 time ``Send ping`` is pressed. ``--no-vehicle`` leaves tcspecial to somebody
 else, and ``--no-yamcs`` uses a Yamcs already running on the run directory's
@@ -115,7 +117,9 @@ def arguments(argv):
         "configuration", nargs="?", default=str(HERE / "ping-yamcs.xtcs"),
         help="the tcspecial configuration (default: ping-yamcs.xtcs)")
     parser.add_argument("--yamcs", default=os.environ.get("YAMCS_HOME"),
-                        help="where Yamcs is unpacked (default: $YAMCS_HOME)")
+                        help="where Yamcs is unpacked (default: "
+                             "$YAMCS_HOME, or else Yamcs fetched the first "
+                             "time and kept)")
     parser.add_argument("--run-dir", default="/tmp/ping-yamcs",
                         help="where Yamcs's configuration and data are written "
                              "(default: /tmp/ping-yamcs)")

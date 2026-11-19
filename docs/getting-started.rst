@@ -139,16 +139,16 @@ you like. Autoland flies it for you.
 
 It needs Yamcs, which runs on Java. Install a Java runtime --
 ``default-jre-headless`` on Ubuntu, ``java-25-openjdk-headless`` on
-Fedora -- unpack a Yamcs release, and say where:
+Fedora -- and run it:
 
 .. code-block:: console
 
-   $ yamcs=https://github.com/yamcs/yamcs/releases/download/yamcs-5.14.0
-   $ curl -fLO "$yamcs/yamcs-5.14.0-linux-x86_64.tar.gz"
-   $ mkdir yamcs && tar xzf yamcs-5.14.0-linux-x86_64.tar.gz -C yamcs \
-   >     --strip-components=1
-   $ export YAMCS_HOME=$PWD/yamcs
    $ tcsx --no-memlock lander
+
+The first run fetches Yamcs 5.14.0, checks it against the release's
+checksum, and keeps it in ``~/.cache/tcspecial`` for every run after. To
+use a Yamcs of your own instead, set ``YAMCS_HOME`` to where it is
+unpacked, the directory holding ``bin/yamcsd``.
 
 ``tcsx`` lists the other examples through Yamcs too: ``ping-yamcs``,
 ``thermostat-yamcs`` and ``memusage``.

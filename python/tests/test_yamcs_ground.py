@@ -67,14 +67,72 @@ class WriteYamcsTest(unittest.TestCase):
             yamcs_ground.write_yamcs(config, self.run, 1, self.home, "ping",
                                      "a_test.py")
 
-    def test_where_yamcs_is_must_be_said(self):
-        with self.assertRaisesRegex(ValueError, "bin/yamcsd"):
-            yamcs_ground.yamcs_home(None)
+    def test_where_yamcs_is_said_or_it_is_fetched(self):
+        fetched = Path("/fetched/yamcs")
+        self.assertEqual(
+            yamcs_ground.yamcs_home(None, fetch=lambda: fetched), fetched)
         with self.assertRaisesRegex(ValueError, "bin/yamcsd"):
             yamcs_ground.yamcs_home(str(self.home))
         (self.home / "bin").mkdir()
         (self.home / "bin" / "yamcsd").touch()
         self.assertEqual(yamcs_ground.yamcs_home(str(self.home)), self.home)
+
+    def _release(self, digest_ok=True):
+        """A release archive, as fetched, and an opener that serves it.
+
+        Args:
+            digest_ok: Whether the archive is pinned as the release's.
+
+        Returns:
+            ``(opener, urls)``: the opener, and the URLs it was asked for.
+        """
+        import hashlib
+        import io
+        import tarfile
+        out = io.BytesIO()
+        with tarfile.open(fileobj=out, mode="w:gz") as tar:
+            data = b"#!/bin/sh\n"
+            info = tarfile.TarInfo(
+                f"yamcs-{yamcs_ground.YAMCS_VERSION}/bin/yamcsd")
+            info.size = len(data)
+            info.mode = 0o755
+            tar.addfile(info, io.BytesIO(data))
+        archive = out.getvalue()
+        machine = __import__("platform").machine()
+        kind = yamcs_ground.YAMCS_ARCHIVES.get(machine, ("linux-x", ""))[0]
+        digest = (hashlib.sha256(archive).hexdigest() if digest_ok
+                  else "0" * 64)
+        self._pinned = dict(yamcs_ground.YAMCS_ARCHIVES)
+        yamcs_ground.YAMCS_ARCHIVES[machine] = (kind, digest)
+        self.addCleanup(lambda: (yamcs_ground.YAMCS_ARCHIVES.clear(),
+                                 yamcs_ground.YAMCS_ARCHIVES.update(
+                                     self._pinned)))
+        urls = []
+
+        def opener(url):
+            """Serves the archive."""
+            urls.append(url)
+            return io.BytesIO(archive)
+        return opener, urls
+
+    def test_yamcs_is_fetched_once_and_checked(self):
+        opener, urls = self._release()
+        cache = self.home / "cache"
+        home = yamcs_ground.fetch_yamcs(cache, opener, say=lambda _: None)
+        self.assertTrue((home / "bin" / "yamcsd").exists())
+        self.assertEqual(len(urls), 1)
+        self.assertIn(yamcs_ground.YAMCS_VERSION, urls[0])
+        again = yamcs_ground.fetch_yamcs(cache, opener, say=lambda _: None)
+        self.assertEqual(again, home)
+        self.assertEqual(len(urls), 1, "fetched once, and kept")
+
+    def test_an_archive_not_the_releases_is_refused(self):
+        opener, _ = self._release(digest_ok=False)
+        cache = self.home / "cache"
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            yamcs_ground.fetch_yamcs(cache, opener, say=lambda _: None)
+        self.assertFalse(
+            (cache / f"yamcs-{yamcs_ground.YAMCS_VERSION}").exists())
 
 
 class ConnectYamcs:

@@ -27,13 +27,17 @@ instance's configuration is written.
 
 import base64
 import datetime
+import hashlib
 import json
 import os
+import platform
 import shutil
 import signal
 import string
 import subprocess
 import sys
+import tarfile
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -100,22 +104,131 @@ def command_settings(config):
             "cmd_apid": str(config.command_apid())}
 
 
-def yamcs_home(said):
-    """Where Yamcs is unpacked, checked.
+#: The Yamcs release fetched where none is named, the one the examples are
+#: written for and docs/getting-started.rst installs.
+YAMCS_VERSION = "5.14.0"
+
+#: Each release archive by the machine it runs on, and its SHA-256, as the
+#: release states it: an archive that does not match is refused.
+YAMCS_ARCHIVES = {
+    "x86_64": ("linux-x86_64",
+               "35004954a65021a06182928bbc344adf"
+               "b09b11599dd009863745010e98527356"),
+    "aarch64": ("linux-aarch64",
+                "45164e10ba4d67b63af261f842a5f67a"
+                "83807b88ab2bcf03d81d91de22c9c4a8"),
+}
+
+#: Where the releases are.
+YAMCS_RELEASES = "https://github.com/yamcs/yamcs/releases/download"
+
+
+def yamcs_cache():
+    """Where a fetched Yamcs is kept: tcspecial's directory in the user's
+    cache, as ``$XDG_CACHE_HOME`` or ``~/.cache`` says.
+
+    Returns:
+        The directory, which may not exist yet.
+    """
+    cache = os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache"
+    return Path(cache) / "tcspecial"
+
+
+def fetch_yamcs(cache=None, opener=urllib.request.urlopen, say=None):
+    """Yamcs, fetched and unpacked into the cache the first time it is
+    asked for, and the same unpacked release every time after.
+
+    The release is :data:`YAMCS_VERSION`, for this machine; its archive is
+    checked against the SHA-256 the release states before anything in it
+    is unpacked, and unpacked beside where it is kept and then moved there,
+    so that a fetch cut short leaves nothing that looks whole.
 
     Args:
-        said: The directory a Yamcs release unpacks to, as ``--yamcs`` or
-              ``$YAMCS_HOME`` gives it, or ``None``.
+        cache:  Where releases are kept; :func:`yamcs_cache` where ``None``.
+        opener: What fetches a URL: ``urllib.request.urlopen``, or a
+                test's.
+        say:    Told what is being done, a line at a time; stderr where
+                ``None``.
+
+    Returns:
+        The directory holding ``bin/yamcsd``.
+
+    Raises:
+        ValueError: This machine has no Yamcs release, or the archive
+                    fetched is not the release's.
+        OSError: It cannot be fetched or unpacked.
+    """
+    if say is None:
+        def say(line):
+            """Says a line on stderr.
+
+            Args:
+                line: The line.
+            """
+            print(line, file=sys.stderr, flush=True)
+    cache = Path(cache) if cache is not None else yamcs_cache()
+    home = cache / f"yamcs-{YAMCS_VERSION}"
+    if (home / "bin" / "yamcsd").exists():
+        return home
+    machine = platform.machine()
+    if machine not in YAMCS_ARCHIVES:
+        raise ValueError(f"there is no Yamcs {YAMCS_VERSION} release for "
+                         f"{machine}: install one, and say where with "
+                         "--yamcs or $YAMCS_HOME")
+    kind, digest = YAMCS_ARCHIVES[machine]
+    name = f"yamcs-{YAMCS_VERSION}-{kind}.tar.gz"
+    url = f"{YAMCS_RELEASES}/yamcs-{YAMCS_VERSION}/{name}"
+    cache.mkdir(parents=True, exist_ok=True)
+    say(f"fetching Yamcs {YAMCS_VERSION} into {home}, once: {url}")
+    with tempfile.TemporaryDirectory(dir=cache) as work:
+        archive = Path(work) / name
+        sha = hashlib.sha256()
+        with opener(url) as response, open(archive, "wb") as out:
+            while chunk := response.read(1 << 20):
+                sha.update(chunk)
+                out.write(chunk)
+        if sha.hexdigest() != digest:
+            raise ValueError(f"{url} is not the Yamcs {YAMCS_VERSION} "
+                             f"release: its SHA-256 is {sha.hexdigest()}, "
+                             f"and the release's is {digest}")
+        with tarfile.open(archive) as tar:
+            tar.extractall(work, filter="data")
+        unpacked = Path(work) / f"yamcs-{YAMCS_VERSION}"
+        if not (unpacked / "bin" / "yamcsd").exists():
+            raise ValueError(
+                f"{url} holds no yamcs-{YAMCS_VERSION}/bin/yamcsd")
+        try:
+            unpacked.rename(home)
+        except OSError:
+            # Another program fetched it meanwhile: theirs is as good.
+            if not (home / "bin" / "yamcsd").exists():
+                raise
+    return home
+
+
+def yamcs_home(said, fetch=fetch_yamcs):
+    """Where Yamcs is unpacked, checked; or, where nothing says, the Yamcs
+    fetched for the examples, fetched now if it has not been.
+
+    Args:
+        said:  The directory a Yamcs release unpacks to, as ``--yamcs`` or
+               ``$YAMCS_HOME`` gives it, or ``None`` for the one fetched.
+        fetch: What fetches it: :func:`fetch_yamcs`, or a test's.
 
     Returns:
         Its path.
 
     Raises:
-        ValueError: None is given, or it holds no ``bin/yamcsd``.
+        ValueError: The directory said holds no ``bin/yamcsd``, or what
+                    :func:`fetch_yamcs` raises.
+        OSError: What :func:`fetch_yamcs` raises.
     """
-    if not said or not (Path(said) / "bin" / "yamcsd").exists():
-        raise ValueError("say where Yamcs is, with --yamcs or $YAMCS_HOME: "
-                         "the directory holding bin/yamcsd")
+    if not said:
+        return fetch()
+    if not (Path(said) / "bin" / "yamcsd").exists():
+        raise ValueError(f"{said} holds no bin/yamcsd: say where Yamcs is "
+                         "unpacked with --yamcs or $YAMCS_HOME, or say "
+                         "neither to have it fetched")
     return Path(said)
 
 
@@ -276,7 +389,12 @@ class Yamcs:
         Raises:
             RuntimeError: It stops, or its instance does not run within a
                           minute.
+            ValueError: What :func:`yamcs_home` raises.
+            OSError: What :func:`yamcs_home` raises.
         """
+        # Where nothing said where Yamcs is, the one fetched for the
+        # examples: fetched now if it has not been.
+        self.home = yamcs_home(self.home)
         program = self.home / "bin" / "yamcsd"
         log = open(self.run_dir / "yamcs.log", "w")
         parent = os.getpid()

@@ -37,14 +37,16 @@ This program puts the pieces together:
 Yamcs's web interface, at http://localhost:17090 by default, shows every
 packet and parameter meanwhile, each temperature with its unit.
 
-Usage, from the repository's root, with Yamcs unpacked somewhere::
+Usage, from the repository's root::
 
-    python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs ~/yamcs
+    python3 examples/thermostat-yamcs/thermostat_yamcs.py
     python3 examples/thermostat-yamcs/thermostat_yamcs.py --seconds 120
     python3 examples/thermostat-yamcs/thermostat_yamcs.py --describe
 
 ``--yamcs`` is the directory a Yamcs release unpacks to, holding
-``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not.
+``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not, and
+where neither does, the Yamcs release the examples are written for is
+fetched the first time and kept in ``~/.cache/tcspecial``.
 ``--no-vehicle``, ``--no-simulator`` and ``--no-yamcs`` leave tcspecial,
 tcs-sim and Yamcs to somebody else. tcs-sim draws a window of its own, so it
 wants a display; every payload of it sends from the start, as though its
@@ -120,7 +122,9 @@ def arguments(argv):
         default=str(HERE / "thermostat-yamcs.xtcs"),
         help="the tcspecial configuration (default: thermostat-yamcs.xtcs)")
     parser.add_argument("--yamcs", default=os.environ.get("YAMCS_HOME"),
-                        help="where Yamcs is unpacked (default: $YAMCS_HOME)")
+                        help="where Yamcs is unpacked (default: "
+                             "$YAMCS_HOME, or else Yamcs fetched the first "
+                             "time and kept)")
     parser.add_argument("--run-dir", default="/tmp/thermostat-yamcs",
                         help="where Yamcs's configuration and data are "
                              "written (default: /tmp/thermostat-yamcs)")

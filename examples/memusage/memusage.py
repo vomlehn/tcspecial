@@ -31,10 +31,10 @@ This program:
 * then, every ``--interval`` seconds, has Yamcs send each one QUERY_THREADS,
   as often as it takes to have every thread, and prints what it answered.
 
-Usage, from the repository's root, with Yamcs unpacked somewhere::
+Usage, from the repository's root::
 
-    python3 examples/memusage/memusage.py --yamcs ~/yamcs-5.14.0
-    python3 examples/memusage/memusage.py --yamcs ~/yamcs-5.14.0 \\
+    python3 examples/memusage/memusage.py
+    python3 examples/memusage/memusage.py \\
         examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs
     python3 examples/memusage/memusage.py --polls 1   # one round, and stop
     python3 examples/memusage/memusage.py --describe  # what it read
@@ -46,7 +46,9 @@ Two configurations are two tcspecials, which must be able to run at once:
 port the system chooses.
 
 ``--yamcs`` is the directory a Yamcs release unpacks to, holding
-``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not.
+``bin/yamcsd``; ``$YAMCS_HOME`` says it when ``--yamcs`` does not, and
+where neither does, the Yamcs release the examples are written for is
+fetched the first time and kept in ``~/.cache/tcspecial``.
 ``--no-vehicle`` leaves the tcspecials to somebody else, ``--no-yamcs`` uses
 a Yamcs already running on the run directory's configuration, and
 ``--no-memlock`` runs each tcspecial without locking its memory, for a desk
@@ -107,7 +109,9 @@ def arguments(argv):
         help="the tcspecial configurations, one for each tcspecial "
              "(default: memusage.xtcs)")
     parser.add_argument("--yamcs", default=os.environ.get("YAMCS_HOME"),
-                        help="where Yamcs is unpacked (default: $YAMCS_HOME)")
+                        help="where Yamcs is unpacked (default: "
+                             "$YAMCS_HOME, or else Yamcs fetched the first "
+                             "time and kept)")
     parser.add_argument("--run-dir", default="/tmp/memusage",
                         help="where Yamcs's configuration and data are "
                              "written (default: /tmp/memusage)")

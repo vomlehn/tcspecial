@@ -1032,6 +1032,11 @@ both. From the top:
   let go the plus comes back and both axes read nought. The joystick's X, from
   minus one to one, and Y, from nought to one, are what its ``x`` and ``y`` give
   out, for the vehicle to read through the simulated payloads joined to them.
+  When the window opens, and each time the lander starts again after a crash
+  with the autopilot not flying it, the joystick beckons: its square flashes
+  orange inside a flashing ring, and "Click or tap, and drag, to control" is
+  written above and to its right, with an arrow pointing down to the square.
+  Taking hold of the square, or pressing Pause or Autoland, ends it.
 
 At the foot of the pane are two buttons:
 
@@ -1049,9 +1054,11 @@ At the foot of the pane are two buttons:
   pad, and down onto it, slowing to a metre a second at touchdown. A
   landing is not certain: the fuel can run out. The joystick's lines show
   where it holds the stick; taking hold of the joystick hands it back to
-  you, and a landing or a crash stops it; once landed, the lander can be
-  flown off the pad again by hand. Greyed out where the world has no
-  joystick.
+  you, and a landing stops it; once landed, the lander can be flown off
+  the pad again by hand. A crash does not: it lets go while the lander lies
+  crashed, and flies the next flight once the lander starts again, by
+  Restart or by itself under autorestart. Greyed out where the world has
+  no joystick.
 
 Each of the lander's engines shows a plume while it fires -- the bottom
 engine's below its nozzle, a side thruster's out of the body's side, away

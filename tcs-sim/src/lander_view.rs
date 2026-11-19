@@ -18,7 +18,7 @@
 //! until then, and the joystick drives it the same way: see
 //! `World::glance_component` and `World::drive_by_hand`.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use tcsos::sync::Arc;
 use tcsos::time::{Duration, Instant};
@@ -1227,11 +1227,17 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     let scene = Rc::new(scene);
     // The autopilot, while it flies the lander: see `Autopilot`.
     let pilot: Rc<RefCell<Option<Autopilot>>> = Rc::default();
+    // Whether the joystick beckons: at first, and again each time the
+    // lander starts again after a crash with nobody flying it, until the
+    // joystick is taken hold of or a button pressed. See `Joystick34`.
+    let beckoning = Rc::new(Cell::new(scene.joystick_3_4.is_some()));
     pane.set_has_joystick_3_4(scene.joystick_3_4.is_some());
     {
         let held = Rc::clone(&scene);
         let weak = ui.as_weak();
+        let beckon = Rc::clone(&beckoning);
         pane.on_pause_clicked(move || {
+            beckon.set(false);
             let now = Instant::now();
             if held.world.paused() {
                 held.world.resume(now);
@@ -1247,7 +1253,9 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let held = Rc::clone(&scene);
         let flying = Rc::clone(&pilot);
         let weak = ui.as_weak();
+        let beckon = Rc::clone(&beckoning);
         pane.on_autoland_clicked(move || {
+            beckon.set(false);
             let Some(ui) = weak.upgrade() else { return };
             let mut flying = flying.borrow_mut();
             if flying.take().is_some() {
@@ -1263,12 +1271,14 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let held = Rc::clone(&scene);
         let flying = Rc::clone(&pilot);
         let weak = ui.as_weak();
+        let beckon = Rc::clone(&beckoning);
         pane.on_stick_moved(move |dx, dy| {
             // Paused, the joystick takes nothing: the window does not take
             // hold of it either.
             if held.world.paused() {
                 return;
             }
+            beckon.set(false);
             // The pilot takes over from the autopilot.
             if flying.borrow_mut().take().is_some() {
                 if let Some(ui) = weak.upgrade() {
@@ -1323,18 +1333,49 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     {
         let weak = ui.as_weak();
         let scene = Rc::clone(&scene);
+        // Whether the lander lay crashed when last looked at, which a
+        // restart ends.
+        let was_crashed = Cell::new(false);
         timer.start(slint::TimerMode::Repeated, REFRESH, move || {
             let Some(ui) = weak.upgrade() else { return };
-            show(
-                &ui.global::<LanderScene>(),
-                &scene,
-                opened.elapsed().as_secs_f64(),
-            );
+            let seconds = opened.elapsed().as_secs_f64();
+            show(&ui.global::<LanderScene>(), &scene, seconds);
             fly(&ui, &scene, &pilot);
+            let out =
+                scene.world.glance_component(scene.lander, Instant::now());
+            let crashed = out[CRASHED] > 0.5;
+            if was_crashed.replace(crashed)
+                && !crashed
+                && pilot.borrow().is_none()
+                && scene.joystick_3_4.is_some()
+            {
+                beckoning.set(true);
+            }
+            let pane = ui.global::<LanderScene>();
+            pane.set_beckon(beckoning.get());
+            pane.set_beckon_lit(beckoning.get() && beckon_lit(seconds));
             regions(&ui);
         });
     }
     timer
+}
+
+/// How often the beckoning joystick's square flashes, in seconds, and for
+/// how much of each it is lit.
+const BECKON_EVERY: f64 = 1.0;
+const BECKON_FOR: f64 = 0.5;
+
+/// Whether the beckoning joystick's square is lit at a moment.
+///
+/// # Arguments
+///
+/// * `seconds` - The time since the window opened, in seconds.
+///
+/// # Returns
+///
+/// Whether it is lit.
+pub fn beckon_lit(seconds: f64) -> bool {
+    seconds.rem_euclid(BECKON_EVERY) < BECKON_FOR
 }
 
 /// Tells a web page which part of tcs-sim's window must fit on a small
@@ -1368,8 +1409,11 @@ fn regions(ui: &MainWindow) {
 }
 
 /// Has the autopilot, while it flies the lander, hold the joystick where it
-/// wants it; and lets go, and stops it, once the lander has landed or
-/// crashed. Nothing while the world is paused.
+/// wants it; and lets go, and stops it, once the lander has landed. While
+/// the lander lies crashed it lets go and waits, and flies again from the
+/// start once the lander is restarted -- by Restart, or by itself with
+/// autorestart on -- so that Autoland pressed during a crash is not lost.
+/// Nothing while the world is paused.
 ///
 /// # Arguments
 ///
@@ -1388,10 +1432,16 @@ fn fly(ui: &MainWindow, scene: &Scene, pilot: &RefCell<Option<Autopilot>>) {
         return;
     }
     let out = scene.world.glance_component(scene.lander, Instant::now());
-    if out[LANDED] > 0.5 || out[CRASHED] > 0.5 {
+    if out[LANDED] > 0.5 {
         *flying = None;
         hold_stick(ui, scene, stick, (0.0, 0.0));
         ui.global::<LanderScene>().set_autoland(false);
+        return;
+    }
+    if out[CRASHED] > 0.5 {
+        // Afresh for the next flight, whatever it had worked out of this.
+        *autopilot = Autopilot::default();
+        hold_stick(ui, scene, stick, (0.0, 0.0));
         return;
     }
     let axes = autopilot.steer(&scene.figures, &out);

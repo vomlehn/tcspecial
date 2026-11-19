@@ -45,6 +45,14 @@ export component Joystick34 inherits Rectangle {
     in property <bool> steered: false;
     // Whether the world is paused: then a press takes no hold of it.
     in property <bool> paused: false;
+    // Whether it beckons: its square flashing, with a note above and to the
+    // right of it saying what it is for and an arrow from the note to the
+    // square -- at first, and when the lander starts again, until somebody
+    // takes hold of it or presses a button. And whether the square is lit
+    // now, which Rust flashes. The note says it in words, so that the
+    // flashing does not say it by colour alone.
+    in property <bool> beckon: false;
+    in property <bool> beckon-lit: false;
     // The pointer, held, is this far from the square's middle.
     callback moved(length, length);
     // The button was let go.
@@ -87,9 +95,64 @@ export component Joystick34 inherits Rectangle {
         y: root.arm;
         width: root.square;
         height: root.square;
-        background: #f3f4f6;
+        background: root.beckon && root.beckon-lit ? #E69F00 : #f3f4f6;
         border-width: 1px;
         border-color: #374151;
+    }
+    // Beckoning: a ring round the square, lit as the square is, so that so
+    // small a square is seen to flash; and the note, and its arrow pointing
+    // down and to the left at the square.
+    if root.beckon && root.beckon-lit: Rectangle {
+        x: root.reach - root.square * 1.5;
+        y: root.reach - root.square * 1.5;
+        width: root.square * 3;
+        height: root.square * 3;
+        border-radius: self.width / 2;
+        border-width: 2px;
+        border-color: #E69F00;
+    }
+    if root.beckon: Text {
+        x: root.reach + 30px;
+        y: root.arm - 62px;
+        // Two lines, so that it stays within the pane.
+        text: "Click or tap, and drag,\nto control";
+        color: #111827;
+    }
+    if root.beckon: Path {
+        // From the note's left, half way down its two lines, to just above
+        // and to the right of the square, with a head at the square's end.
+        property <float> tip-x: (root.arm + root.square) / 1px + 2;
+        property <float> tip-y: root.arm / 1px - 2;
+        property <float> tail-x: root.reach / 1px + 26;
+        property <float> tail-y: root.arm / 1px - 44;
+        property <float> long: Math.sqrt((self.tail-x - self.tip-x)
+            * (self.tail-x - self.tip-x) + (self.tail-y - self.tip-y)
+            * (self.tail-y - self.tip-y));
+        property <float> ux: (self.tail-x - self.tip-x) / self.long;
+        property <float> uy: (self.tail-y - self.tip-y) / self.long;
+        // The head's two strokes, back along the shaft and half a radian
+        // either side of it, nine pixels long.
+        property <float> h1x: self.tip-x
+            + 9 * (self.ux * 0.8776 - self.uy * 0.4794);
+        property <float> h1y: self.tip-y
+            + 9 * (self.ux * 0.4794 + self.uy * 0.8776);
+        property <float> h2x: self.tip-x
+            + 9 * (self.ux * 0.8776 + self.uy * 0.4794);
+        property <float> h2y: self.tip-y
+            + 9 * (-self.ux * 0.4794 + self.uy * 0.8776);
+        x: 0;
+        y: 0;
+        width: root.width;
+        height: root.height;
+        viewbox-width: root.width / 1px;
+        viewbox-height: root.height / 1px;
+        commands: "M " + self.tail-x + " " + self.tail-y
+            + " L " + self.tip-x + " " + self.tip-y
+            + " M " + self.h1x + " " + self.h1y
+            + " L " + self.tip-x + " " + self.tip-y
+            + " L " + self.h2x + " " + self.h2y;
+        stroke: #374151;
+        stroke-width: 1.5px;
     }
     // The hatchmarks, outside each rectangle along both its long sides: a
     // tenth of its travel apart, the half and the full marks longer.
@@ -295,6 +358,10 @@ export global LanderScene {
     // lander: set by Rust, which the two buttons ask to change them.
     in-out property <bool> paused: false;
     in-out property <bool> autoland: false;
+    // Whether the joystick beckons, and whether its square is lit in the
+    // flashing: set by Rust. See Joystick34.
+    in-out property <bool> beckon: false;
+    in-out property <bool> beckon-lit: false;
     // Whether there is a joystick for the autopilot to fly through.
     in-out property <bool> has-joystick_3_4: true;
     callback pause-clicked();
@@ -624,6 +691,8 @@ export component LanderPane inherits Rectangle {
                 stick := Joystick34 {
                     dot-x: LanderScene.dot-x;
                     dot-y: LanderScene.dot-y;
+                    beckon: LanderScene.beckon;
+                    beckon-lit: LanderScene.beckon-lit;
                     steered: LanderScene.autoland;
                     paused: LanderScene.paused;
                     moved(px, py) => { LanderScene.stick-moved(px, py); }

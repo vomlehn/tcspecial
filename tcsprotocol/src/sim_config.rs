@@ -1526,6 +1526,12 @@ pub struct SimConfigFile {
     /// tcs-sim to start, and a harness to wait: see [`SimConfigFile::ready`].
     #[serde(default, rename = "tcs-sim")]
     pub tcs_sim: Option<SimTcsSim>,
+    /// Bit errors on the link to the ground, for a test of a ground station
+    /// against a link that loses packets: read by a tcspecial built with the
+    /// `bit-errors` feature, which never flies, and refused by any other.
+    /// Unstated is a link that loses nothing. See [`SimGateway`].
+    #[serde(default)]
+    pub gateway: Option<SimGateway>,
     /// The groups of settings, in name order.
     #[serde(default, deserialize_with = "crate::sim_grouped::groups")]
     pub simulated_payload_groups: Vec<SimGroup>,
@@ -1610,6 +1616,126 @@ pub struct SimTcsSim {
     /// which it reports as it starts.
     #[serde(default, deserialize_with = "blank_is_unstated")]
     pub seed: Option<u64>,
+}
+
+/// The simulator file's `gateway` section: bit errors on the link to the
+/// ground.
+///
+/// Every packet that crosses the link, up or down, is lost whole with the
+/// chance that at least one of its bits flips: `1 - (1 - p)^bits` for a
+/// packet of `bits` bits at `bit_error_rate` `p`. tcspecial applies it, in a
+/// build with the `bit-errors` feature and under `--simulate=some` or `all`;
+/// see "Test Code Never Flies" in `docs/tcspecial-design.rst`.
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SimGateway {
+    /// Flips per bit, from 0 to 1. Unstated, or blank, is none.
+    #[serde(default, deserialize_with = "probability")]
+    pub bit_error_rate: Option<f64>,
+    /// What the bit errors' random numbers start from: unstated, or blank,
+    /// is [`DEFAULT_BIT_ERROR_SEED`], so that a run's losses can be had again
+    /// packet for packet without saying how; a number is that number; and
+    /// `random` is a seed drawn from a source of randomness, which tcspecial
+    /// reports as it starts. See [`GatewaySeed`].
+    #[serde(default, deserialize_with = "gateway_seed")]
+    pub seed: Option<GatewaySeed>,
+}
+
+/// The seed the bit errors start from where the simulator file states none:
+/// every such run loses the same packets.
+pub const DEFAULT_BIT_ERROR_SEED: u64 = 1;
+
+/// What the simulator file says the bit errors' seed is, where it says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GatewaySeed {
+    /// This number.
+    Given(u64),
+    /// One drawn from a source of randomness as tcspecial starts: `random`.
+    Random,
+}
+
+impl GatewaySeed {
+    /// The word a file writes for a seed drawn from a source of randomness.
+    pub const RANDOM: &'static str = "random";
+}
+
+impl std::fmt::Display for GatewaySeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GatewaySeed::Given(seed) => write!(f, "{seed}"),
+            GatewaySeed::Random => f.write_str(GatewaySeed::RANDOM),
+        }
+    }
+}
+
+/// Reads the bit errors' seed: a number, `random`, or nothing.
+///
+/// # Arguments
+///
+/// * `d` - The deserializer, at the setting.
+///
+/// # Returns
+///
+/// The seed; `None` for a setting left out or blank, which is
+/// [`DEFAULT_BIT_ERROR_SEED`].
+///
+/// # Errors
+///
+/// A message for a value that is neither a number nor `random`, saying what
+/// to write.
+fn gateway_seed<'de, D>(d: D) -> Result<Option<GatewaySeed>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let said = Option::<crate::Scalar>::deserialize(d)?;
+    let Some(said) = said else { return Ok(None) };
+    let text = said.as_str();
+    if text.is_empty() {
+        return Ok(None);
+    }
+    if text == GatewaySeed::RANDOM {
+        return Ok(Some(GatewaySeed::Random));
+    }
+    text.parse()
+        .map(|seed| Some(GatewaySeed::Given(seed)))
+        .map_err(|_| {
+            serde::de::Error::custom(format!(
+                "a seed of \"{text}\" is neither a number nor random: give a \
+             whole number from 0 up, random for one drawn from a source of \
+             randomness, or nothing for the default, \
+             {DEFAULT_BIT_ERROR_SEED}"
+            ))
+        })
+}
+
+/// Reads a probability: a number from 0 to 1, or nothing.
+///
+/// # Arguments
+///
+/// * `d` - The deserializer, at the setting.
+///
+/// # Returns
+///
+/// The number; `None` for a setting left out or blank.
+///
+/// # Errors
+///
+/// A message for a value that is not a number from 0 to 1, saying what to
+/// write.
+fn probability<'de, D>(d: D) -> Result<Option<f64>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let said: Option<f64> = blank_is_unstated(d)?;
+    match said {
+        Some(p) if !(0.0..=1.0).contains(&p) => {
+            Err(serde::de::Error::custom(format!(
+                "a bit error rate of {p} is not a probability: give flips \
+                 per bit from 0 to 1, such as 1e-6"
+            )))
+        }
+        said => Ok(said),
+    }
 }
 
 /// What a payload is to the physics model.
@@ -4935,6 +5061,56 @@ physics:
         .expect_err("not a key the section has")
         .to_string();
         assert!(why.contains("places"), "{why}");
+    }
+
+    /// The gateway section reads a bit error rate and a seed, blank is
+    /// unstated, and a rate that is no probability is refused as the file
+    /// is read.
+    #[test]
+    fn the_gateway_section_reads_a_bit_error_rate_from_nought_to_one() {
+        let file = parse("gateway:\n  bit_error_rate: 1e-6\n  seed: 42\n");
+        assert_eq!(
+            file.gateway,
+            Some(SimGateway {
+                bit_error_rate: Some(1e-6),
+                seed: Some(GatewaySeed::Given(42)),
+            })
+        );
+        let random =
+            parse("gateway:\n  bit_error_rate: 1e-6\n  seed: random\n");
+        assert_eq!(
+            random.gateway.and_then(|g| g.seed),
+            Some(GatewaySeed::Random)
+        );
+        let why = SimConfigFile::parse(
+            "gateway:\n  bit_error_rate: 1e-6\n  seed: lucky\n",
+            ConfigFormat::Yaml,
+        )
+        .expect_err("neither a number nor random")
+        .to_string();
+        assert!(why.contains("lucky") && why.contains("random"), "{why}");
+        let blank = parse("gateway:\n  bit_error_rate:\n  seed:\n");
+        assert_eq!(blank.gateway, Some(SimGateway::default()));
+        assert!(parse("description: none\n").gateway.is_none());
+        for bad in ["1.5", "-1e-6", "lots"] {
+            let why = SimConfigFile::parse(
+                &format!("gateway:\n  bit_error_rate: {bad}\n"),
+                ConfigFormat::Yaml,
+            )
+            .expect_err("not a probability")
+            .to_string();
+            assert!(
+                why.contains("not a probability") || why.contains(bad),
+                "{why}"
+            );
+        }
+        let why = SimConfigFile::parse(
+            "gateway:\n  error_rate: 1e-6\n",
+            ConfigFormat::Yaml,
+        )
+        .expect_err("not a key the section has")
+        .to_string();
+        assert!(why.contains("error_rate"), "{why}");
     }
 
     /// A sensor joined to an output reports it, in its unit, and a heater

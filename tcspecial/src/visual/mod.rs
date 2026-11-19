@@ -184,20 +184,25 @@ fn lines_of(graph: &Graph) -> Vec<Line> {
 ///
 /// # Arguments
 ///
-/// * `path` - The vehicle's configuration file.
-/// * `mode` - The `--simulate` mode to run it under.
+/// * `path`    - The vehicle's configuration file.
+/// * `mode`    - The `--simulate` mode to run it under.
+/// * `checked` - That every check for test code has been made.
 ///
 /// # Returns
 ///
 /// The exit status: the vehicle's, or 1 if the window or the vehicle's
 /// thread cannot be started.
-pub fn run(path: &str, mode: tcsprotocol::simulate::Mode) -> i32 {
+pub fn run(
+    path: &str,
+    mode: tcsprotocol::simulate::Mode,
+    checked: crate::flight_checks::Checked,
+) -> i32 {
     // Read again rather than handed over: the vehicle reads its own copy,
     // and checked it before this was called.
     let graph = match Graph::load(path) {
         Ok(graph) => graph,
         // Said by the vehicle, which reads the same file and says why.
-        Err(_) => return runtime::start::run_or_report(path, mode),
+        Err(_) => return runtime::start::run_or_report(path, mode, checked),
     };
     let lines = lines_of(&graph);
     watch(lines.len());
@@ -250,7 +255,7 @@ pub fn run(path: &str, mode: tcsprotocol::simulate::Mode) -> i32 {
         tcsos::thread::Builder::new()
             .name("vehicle".to_string())
             .spawn(move || {
-                let said = runtime::start::run_or_report(&path, mode);
+                let said = runtime::start::run_or_report(&path, mode, checked);
                 // The window goes with the vehicle. Asked of the window's
                 // own thread, which is the one that may close it.
                 let _ = slint::invoke_from_event_loop(|| {

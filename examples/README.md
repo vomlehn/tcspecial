@@ -174,16 +174,17 @@ nothing in it is its own:
   beacons are, starts the loop on a thread, and puts each pass in the window.
   That is all of it, but for a button.
 
-A beacon is a line of text, seven fields with a colon between each: the name
+A beacon is a line of text, eight fields with a colon between each: the name
 `tcspecial`, the version as `major.minor.patch`, the configuration's MD5
 digest in lower-case hex, the beacon's number in decimal, `restart` while a
 restart the ground commanded is under way and the MOC has not connected
-since or `normal` otherwise, the link digest -- of what tcspecial worked out
-of its configuration, as `tcs-verify --links` prints it -- and the
+since or `normal` otherwise, `flight` or `test` for whether tcspecial found
+test code in its run or its build, the link digest -- of what tcspecial
+worked out of its configuration, as `tcs-verify --links` prints it -- and the
 interface's digest, both in hex:
 
 ```
-tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:89ab...4567:0123...cdef
+tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:flight:89ab...4567:0123...cdef
 ```
 
 It is text so that it can be read as it is, in a packet capture or with any UDP

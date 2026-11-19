@@ -24,6 +24,7 @@ use tcsprotocol::simulate::{judge, refusals, Host, Judged, Mode};
 use tcsprotocol::Links;
 
 use crate::beacon_send::BeaconSend;
+use crate::flight_checks::Checked;
 use crate::runtime::bus::{Bus, BusReader};
 use crate::runtime::choose;
 use crate::runtime::command::{Commands, Flying};
@@ -99,8 +100,10 @@ pub fn summary(line: impl std::fmt::Display) {
 ///
 /// # Arguments
 ///
-/// * `path` - The configuration on tcspecial's command line.
-/// * `mode` - The run's simulation mode, `--simulate`.
+/// * `path`    - The configuration on tcspecial's command line.
+/// * `mode`    - The run's simulation mode, `--simulate`.
+/// * `checked` - That every check for test code has been made, which the
+///               beacons say the outcome of: see `crate::flight_checks`.
 ///
 /// # Returns
 ///
@@ -113,7 +116,11 @@ pub fn summary(line: impl std::fmt::Display) {
 /// with the file it is about: a file that does not load, the checks'
 /// problems, types this build lacks, payloads the mode refuses, and anything
 /// that could not be opened, bound or started; and whether that is final.
-pub fn run_graph(path: &str, mode: Mode) -> Result<(), Failed> {
+pub fn run_graph(
+    path: &str,
+    mode: Mode,
+    checked: Checked,
+) -> Result<(), Failed> {
     let _ = MODE.set(mode);
 
     // Which configuration, before anything else: the state file and the
@@ -243,6 +250,7 @@ pub fn run_graph(path: &str, mode: Mode) -> Result<(), Failed> {
     let beacon = beacons(
         graph,
         digest,
+        checked,
         telemetry_log.clone(),
         matched.clone(),
         shared.as_ref(),
@@ -594,6 +602,8 @@ fn open_bus(graph: &Graph) -> Result<Option<(Bus, BusReader)>, String> {
 /// * `graph`         - The checked configuration.
 /// * `digest`        - The configuration's digest, which every beacon
 ///                     carries.
+/// * `checked`       - That every check for test code has been made, and
+///                     what they found, which every beacon carries.
 /// * `telemetry_log` - Where each beacon sent is recorded.
 /// * `matched`       - Whether the ground has matched this start, which the
 ///                     restart flag says the opposite of.
@@ -613,6 +623,7 @@ fn open_bus(graph: &Graph) -> Result<Option<(Bus, BusReader)>, String> {
 fn beacons(
     graph: &Graph,
     digest: ConfigDigest,
+    checked: Checked,
     telemetry_log: TelemetryLog,
     matched: Matched,
     bus: Option<&Bus>,
@@ -644,6 +655,7 @@ fn beacons(
                 ConfigVersion::of_this_build(),
                 digest,
                 links,
+                checked,
                 matched,
             )
             .map_err(|e| e.to_string())?,
@@ -671,6 +683,7 @@ fn beacons(
                 ConfigVersion::of_this_build(),
                 digest,
                 links,
+                checked,
                 matched,
             ),
             format!(
@@ -686,8 +699,9 @@ fn beacons(
     };
     if sending.is_some() {
         summary(format!(
-            "{} ms beacon: {way}, link digest {links}",
-            ci.beacon_interval.as_millis()
+            "{} ms beacon: {way}, link digest {links}, flight check {}",
+            ci.beacon_interval.as_millis(),
+            checked.found()
         ));
     }
     Ok(sending)
@@ -879,8 +893,9 @@ fn listen_for_stop() {
 ///
 /// # Arguments
 ///
-/// * `path` - The configuration file.
-/// * `mode` - The run's simulation mode, `--simulate`.
+/// * `path`    - The configuration file.
+/// * `mode`    - The run's simulation mode, `--simulate`.
+/// * `checked` - That every check for test code has been made.
 ///
 /// # Returns
 ///
@@ -888,8 +903,8 @@ fn listen_for_stop() {
 /// vehicle that ran and stopped, `RESTART` for one that stopped for a
 /// RESTART, `BAD` for one that could not start, and `FATAL` for one whose
 /// failure is final (see [`Failed::final_`]).
-pub fn run_or_report(path: &str, mode: Mode) -> i32 {
-    match run_graph(path, mode) {
+pub fn run_or_report(path: &str, mode: Mode, checked: Checked) -> i32 {
+    match run_graph(path, mode, checked) {
         // The restart status where a RESTART asked for one, for the
         // supervisor to start a child on what it pushed.
         Ok(()) => restart::status(),
@@ -941,8 +956,12 @@ vehicle:
         )
         .expect("the file is written");
 
-        let failed = run_graph(path.to_str().expect("a path"), Mode::All)
-            .expect_err("a configuration with faults");
+        let failed = run_graph(
+            path.to_str().expect("a path"),
+            Mode::All,
+            Checked::for_a_test(),
+        )
+        .expect_err("a configuration with faults");
         assert!(failed.final_, "the command line's, refused before opening");
         let problems = failed.problems;
         assert!(

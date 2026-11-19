@@ -82,7 +82,12 @@ the beacon box
   running. So the field shows whenever the vehicle has not been matched,
   and is telling the operator what to do next: press ``Connect``, with the
   configuration whose checksum the beacons carry, which clears it. A
-  ``Connect`` carrying another checksum leaves it set. While the flag is set
+  ``Connect`` carrying another checksum leaves it set. The message line says
+  ``, FLIGHT`` or ``, TEST`` after the digest, which is the beacon's flight
+  check: whether tcspecial found test code in its run or its build. Under
+  ``--simulate=none``, a beacon saying ``test`` puts ``TEST CODE`` first on
+  the line and asks whether to go on, as a configuration that differs does,
+  without ending the match. While the flag is set
   the message line also ends ``, RESTARTED, NOT YET MATCHED``, which is how
   the window writes it. The
   ``beacon`` example's window has the panel without this field, since it
@@ -252,7 +257,7 @@ Coming up and connecting
       :alt: The top of the window after the first beacon: a green
             indicator, the field beside it reading Restarted—connect, Last
             rcvd a time of day, and Last msg "tcspecial v0.1.0 md5
-            9327ee80..., RESTARTED, NOT YET MATCHED". The link still says
+            9327ee80..., TEST, RESTARTED, NOT YET MATCHED". The link still says
             Disconnected.
 
       The first beacon, with the restart flag set.

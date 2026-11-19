@@ -37,6 +37,29 @@
       ],
       "additionalProperties": false
     },
+    "gateway": {
+      "description": "Bit errors on the link to the ground, for a test of a ground station against a link that loses packets: every packet up or down is lost whole with the chance that at least one of its bits flips, 1 - (1 - p)^bits. Applied by a tcspecial built with the bit-errors feature, which never flies, under --simulate=some or all; any other tcspecial refuses a file that states a rate. Unstated is a link that loses nothing.",
+      "type": "object",
+      "properties": {
+        "bit_error_rate": {
+          "type": [
+            "number",
+            "string",
+            "null"
+          ],
+          "description": "Flips per bit, from 0 to 1, such as 1e-6. Blank is none."
+        },
+        "seed": {
+          "type": [
+            "integer",
+            "string",
+            "null"
+          ],
+          "description": "What the bit errors' random numbers start from: a whole number; random, for one drawn from a source of randomness, which tcspecial reports as it starts; or nothing, for the default, 1, so that a run's losses can be had again packet for packet."
+        }
+      },
+      "additionalProperties": false
+    },
     "world": {
       "type": "object",
       "description": "The world the simulated payloads are joined to: the temperature its surroundings are about, and its physics. YAML only: a simulator file written in XML has none.",

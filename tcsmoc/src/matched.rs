@@ -175,9 +175,12 @@ impl Matched {
     pub fn heard(&self, pass: &Pass) {
         // A beacon whose link digest or interface is not this station's is
         // from a vehicle this station would misread, whatever its checksum
-        // says: matched by no checksum, as one that has none.
+        // says: matched by no checksum, as one that has none. Test code in
+        // the vehicle is said, and loudly, but is not misread: a station
+        // run as flight still commands it, since the commands that would
+        // take it out of the run may be the ones it needs.
         let digest = match pass.mismatch {
-            None => pass.digest,
+            None | Some(crate::beacon::Mismatch::TestCode) => pass.digest,
             Some(_) => None,
         };
         self.beacon(

@@ -42,6 +42,7 @@ use std::io;
 use tcsos::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, UdpSocket};
 use tcsos::time::{Duration, SystemTime};
 
+use tcsprotocol::beacon::FlightCheck;
 use tcsprotocol::graph::link_table::LinkDigest;
 use tcsprotocol::{
     came_from, Beacon, BeaconError, ConfigDigest, ConfigVersion,
@@ -595,6 +596,9 @@ pub struct Heard {
     /// Whether its restart flag was set: the vehicle has started, or taken a
     /// RESTART, and has not been matched since.
     pub restart_flag: bool,
+    /// Whether its flight check said flight code and nothing else; false
+    /// for test code, and for a datagram that was no beacon.
+    pub flight: bool,
     /// What is wrong with the configuration it announces, what it worked
     /// out of it or the interface it speaks, if anything: see [`Mismatch`].
     pub differs: Option<String>,
@@ -615,6 +619,10 @@ pub enum Mismatch {
     /// link digest and this station's. The two were built from versions of
     /// tcsprotocol that work them out differently.
     Links(LinkDigest, LinkDigest),
+    /// tcspecial says it has test code in its run or its build, and this
+    /// station is run as flight, under `--simulate=none`: see
+    /// [`Beacons::flying`].
+    TestCode,
 }
 
 impl Mismatch {
@@ -627,6 +635,8 @@ impl Mismatch {
     ///                it has none to compare with.
     /// * `links`    - This station's link digest, or `None` where it has
     ///                none.
+    /// * `flying`   - Whether this station is run as flight, so that a
+    ///                beacon saying `test` is a mismatch.
     ///
     /// # Returns
     ///
@@ -637,6 +647,7 @@ impl Mismatch {
         beacon: &Beacon,
         expected: Option<ConfigDigest>,
         links: Option<LinkDigest>,
+        flying: bool,
     ) -> Option<Mismatch> {
         let interface = InterfaceDigest::of_this_build();
         if let Some(ours) = expected.filter(|ours| *ours != beacon.digest) {
@@ -647,6 +658,9 @@ impl Mismatch {
         }
         if let Some(ours) = links.filter(|ours| *ours != beacon.links) {
             return Some(Mismatch::Links(beacon.links, ours));
+        }
+        if flying && beacon.flight_check == FlightCheck::Test {
+            return Some(Mismatch::TestCode);
         }
         None
     }
@@ -676,6 +690,11 @@ impl Mismatch {
                      the configuration, and this MOC {ours}"
                 );
             }
+            Mismatch::TestCode => out.push_str(
+                "TEST CODE: tcspecial says it has test code in its run or \
+                 its build, and this MOC is run as flight, \
+                 --simulate=none",
+            ),
         }
     }
 
@@ -694,6 +713,7 @@ impl Mismatch {
             Mismatch::Links(..) => {
                 "tcspecial worked the configuration out differently"
             }
+            Mismatch::TestCode => "tcspecial is running test code",
         }
     }
 
@@ -719,11 +739,14 @@ impl Mismatch {
 /// What the datagram turned out to be, and what a window shows for it.
 pub fn hear(datagram: &[u8], expected: Option<ConfigDigest>) -> Heard {
     let mut message = String::new();
-    let reading = read_into(datagram, expected, None, &mut message);
+    let reading = read_into(datagram, expected, None, false, &mut message);
     Heard {
         message,
         sequence: reading.sequence,
         restart_flag: reading.beacon.is_some_and(|beacon| beacon.restart_flag),
+        flight: reading
+            .beacon
+            .is_some_and(|beacon| beacon.flight_check == FlightCheck::Flight),
         differs: reading.mismatch.map(|mismatch| mismatch.said()),
     }
 }
@@ -749,6 +772,8 @@ struct Reading {
 ///                where it has none to compare with.
 /// * `links`    - This station's own link digest, or `None` where it has
 ///                none to compare with.
+/// * `flying`   - Whether this station is run as flight: see
+///                [`Beacons::flying`].
 /// * `message`  - Where what a window shows for it is written, cleared
 ///                first.
 ///
@@ -759,13 +784,14 @@ fn read_into(
     datagram: &[u8],
     expected: Option<ConfigDigest>,
     links: Option<LinkDigest>,
+    flying: bool,
     message: &mut String,
 ) -> Reading {
     message.clear();
     let read = Beacon::read(datagram);
     let beacon = read.as_ref().ok();
     let mismatch =
-        beacon.and_then(|beacon| Mismatch::of(beacon, expected, links));
+        beacon.and_then(|beacon| Mismatch::of(beacon, expected, links, flying));
     if let Some(mismatch) = mismatch {
         mismatch.write(message);
         message.push_str(" -- ");
@@ -847,6 +873,7 @@ fn write_message(
     match read {
         Ok(beacon) => {
             write_what_it_read(beacon.version, beacon.digest, out);
+            out.push_str(flight_check_said(beacon.flight_check));
             if beacon.restart_flag {
                 out.push_str(RESTART_FLAG_SAID);
             }
@@ -914,6 +941,24 @@ pub fn counted(last: Option<u32>, now: u32) -> Counted {
         Some(last) if now < last => Counted::Restarted,
         Some(last) if now == last + 1 => Counted::Next,
         Some(last) => Counted::Missed(now - last - 1),
+    }
+}
+
+/// What a beacon's message says after what the vehicle read, of its flight
+/// check: `FLIGHT` for flight code and nothing else, `TEST` for test code in
+/// its run or its build. Said of every beacon, as every beacon says it.
+///
+/// # Arguments
+///
+/// * `check` - What the beacon's flight check says.
+///
+/// # Returns
+///
+/// The words, with the comma before them.
+pub fn flight_check_said(check: FlightCheck) -> &'static str {
+    match check {
+        FlightCheck::Flight => ", FLIGHT",
+        FlightCheck::Test => ", TEST",
     }
 }
 
@@ -1003,6 +1048,9 @@ pub struct Beacons {
     /// read, which every beacon's is compared with: see
     /// [`Beacons::with_links`]. `None` where it has none.
     links: Option<LinkDigest>,
+    /// Whether this station is run as flight, under `--simulate=none`, so
+    /// that a beacon saying `test` is a mismatch: see [`Beacons::flying`].
+    flying: bool,
     /// When the last beacon arrived.
     at: Option<SystemTime>,
     /// The last pass, which the next is made in: its message, remarks and
@@ -1203,6 +1251,7 @@ impl Beacons {
             schedule,
             expected,
             links: None,
+            flying: false,
             at: None,
             last,
             count: None,
@@ -1227,6 +1276,21 @@ impl Beacons {
     /// This watch, comparing it.
     pub fn with_links(mut self, links: LinkDigest) -> Beacons {
         self.links = Some(links);
+        self
+    }
+
+    /// Holds every beacon to flight code: this station is run as flight,
+    /// under `--simulate=none`, and a vehicle whose beacon says `test` has
+    /// test code in its run or its build, which is said as a mismatch
+    /// would be -- on the console, in the window's line, and to whoever is
+    /// asked whether to go on. Every beacon says it, so a station that
+    /// missed the first beacons hears it in the next.
+    ///
+    /// # Returns
+    ///
+    /// This watch, holding beacons to flight code.
+    pub fn flying(mut self) -> Beacons {
+        self.flying = true;
         self
     }
 
@@ -1301,6 +1365,7 @@ impl Beacons {
                     &buffer[..size],
                     self.expected,
                     self.links,
+                    self.flying,
                     &mut self.last.said,
                 );
                 let remarks = &mut self.last.remarks;
@@ -1735,6 +1800,37 @@ mod tests {
         assert_eq!(missed(Duration::from_secs(10), Duration::ZERO), 0);
     }
 
+    /// A station run as flight hears a beacon saying `test` as a mismatch,
+    /// and one saying `flight` as none; a station that is not run as
+    /// flight hears neither as one.
+    #[test]
+    fn a_flight_station_hearing_test_code_says_so() {
+        let digest = ConfigDigest([0xab; 16]);
+        let version = ConfigVersion::of_this_build();
+        let test = Beacon::new(1, version, digest, links());
+        let flight = test.flight_check(FlightCheck::Flight);
+        let ours = Some(links());
+
+        let mismatch = Mismatch::of(&test, Some(digest), ours, true);
+        assert_eq!(mismatch, Some(Mismatch::TestCode));
+        let said = mismatch.expect("test code").said();
+        assert!(said.starts_with("TEST CODE"), "{said}");
+        assert!(said.contains("--simulate=none"), "{said}");
+        assert_eq!(Mismatch::of(&flight, Some(digest), ours, true), None);
+        assert_eq!(Mismatch::of(&test, Some(digest), ours, false), None);
+
+        // A configuration that differs is said before test code: it is
+        // the likelier reason for the rest.
+        let elsewhere = Beacon {
+            digest: ConfigDigest([0xcd; 16]),
+            ..test
+        };
+        assert!(matches!(
+            Mismatch::of(&elsewhere, Some(digest), ours, true),
+            Some(Mismatch::Configuration(..))
+        ));
+    }
+
     /// The link digest the tests' beacons carry.
     fn links() -> LinkDigest {
         LinkDigest([0x6b; 16])
@@ -1751,22 +1847,25 @@ mod tests {
         let version = ConfigVersion::of_this_build();
         let beacon = Beacon::new(1, version, digest, theirs);
 
-        let mismatch = Mismatch::of(&beacon, Some(digest), Some(ours));
+        let mismatch = Mismatch::of(&beacon, Some(digest), Some(ours), false);
         assert_eq!(mismatch, Some(Mismatch::Links(theirs, ours)));
         let said = mismatch.expect("they differ").said();
         assert!(said.starts_with("LINKS DIFFER"), "{said}");
         assert!(said.contains(&theirs.to_string()), "{said}");
         assert!(said.contains(&ours.to_string()), "{said}");
-        assert_eq!(Mismatch::of(&beacon, Some(digest), Some(theirs)), None);
+        assert_eq!(
+            Mismatch::of(&beacon, Some(digest), Some(theirs), false),
+            None
+        );
         // With no link digest of its own, a station compares none.
-        assert_eq!(Mismatch::of(&beacon, Some(digest), None), None);
+        assert_eq!(Mismatch::of(&beacon, Some(digest), None, false), None);
 
         let other = InterfaceDigest([0x11; 16]);
         let speaks = Beacon {
             interface: other,
             ..beacon
         };
-        let said = Mismatch::of(&speaks, Some(digest), Some(theirs))
+        let said = Mismatch::of(&speaks, Some(digest), Some(theirs), false)
             .expect("the interface differs")
             .said();
         assert!(said.starts_with("INTERFACE DIFFERS"), "{said}");
@@ -1783,7 +1882,7 @@ mod tests {
             ..speaks
         };
         assert!(matches!(
-            Mismatch::of(&elsewhere, Some(digest), Some(ours)),
+            Mismatch::of(&elsewhere, Some(digest), Some(ours), false),
             Some(Mismatch::Configuration(..))
         ));
     }
@@ -1834,11 +1933,20 @@ mod tests {
         // with nothing between the bytes. No configuration version: a
         // configuration states none.
         let read = format!("tcspecial v1.2.3 md5 {}", "ab".repeat(16));
-        assert_eq!(message_of(&datagram), read);
+        assert_eq!(message_of(&datagram), format!("{read}, TEST"));
 
         // And the answer to a CONNECT is written by the same function, so the
         // two lines cannot come to disagree about how to say it.
         assert_eq!(what_it_read(version, digest), read);
+
+        // A beacon from flight code says so, and is heard as flight.
+        let flight = Beacon::new(3, version, digest, links())
+            .flight_check(FlightCheck::Flight)
+            .to_bytes();
+        assert_eq!(message_of(&flight), format!("{read}, FLIGHT"));
+        assert!(hear(&flight, None).flight);
+        assert!(!hear(&datagram, None).flight);
+        let read = format!("{read}, TEST");
 
         // A beacon sent with the restart flag set says so.
         let flagged = Beacon::new(4, version, digest, links())

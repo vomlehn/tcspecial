@@ -451,7 +451,12 @@ takes a <tt class="docutils literal">Connect</tt> carrying the checksum of the c
 running. So the field shows whenever the vehicle has not been matched,
 and is telling the operator what to do next: press <tt class="docutils literal">Connect</tt>, with the
 configuration whose checksum the beacons carry, which clears it. A
-<tt class="docutils literal">Connect</tt> carrying another checksum leaves it set. While the flag is set
+<tt class="docutils literal">Connect</tt> carrying another checksum leaves it set. The message line says
+<tt class="docutils literal">, FLIGHT</tt> or <tt class="docutils literal">, TEST</tt> after the digest, which is the beacon's flight
+check: whether tcspecial found test code in its run or its build. Under
+<tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, a beacon saying <tt class="docutils literal">test</tt> puts <tt class="docutils literal">TEST CODE</tt> first on
+the line and asks whether to go on, as a configuration that differs does,
+without ending the match. While the flag is set
 the message line also ends <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt>, which is how
 the window writes it. The
 <tt class="docutils literal">beacon</tt> example's window has the panel without this field, since it
@@ -597,7 +602,7 @@ MATCHED</tt>. The indicator is green: the vehicle is being heard from. The
 window is not matched yet, and nothing but beacons and answers comes
 down.</p>
 <div class="figure">
-<img alt="The top of the window after the first beacon: a green indicator, the field beside it reading Restarted—connect, Last rcvd a time of day, and Last msg &quot;tcspecial v0.1.0 md5 9327ee80..., RESTARTED, NOT YET MATCHED&quot;. The link still says Disconnected." src="shots/tcs-moc-first-beacon.png" />
+<img alt="The top of the window after the first beacon: a green indicator, the field beside it reading Restarted—connect, Last rcvd a time of day, and Last msg &quot;tcspecial v0.1.0 md5 9327ee80..., TEST, RESTARTED, NOT YET MATCHED&quot;. The link still says Disconnected." src="shots/tcs-moc-first-beacon.png" />
 <p class="caption">The first beacon, with the restart flag set.</p>
 </div>
 </li>

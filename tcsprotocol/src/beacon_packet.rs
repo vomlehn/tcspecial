@@ -49,6 +49,8 @@ pub struct Beacon {
     pub beacon_number: pk::FixedString<10>,
     /// `/TcsBeacon/BeaconFlag` (/TcsBeacon/BeaconFlagType)
     pub beacon_flag: pk::FixedString<7>,
+    /// `/TcsBeacon/BeaconChecks` (/TcsBeacon/BeaconChecksType)
+    pub beacon_checks: pk::FixedString<6>,
     /// `/TcsBeacon/BeaconLinks` (/TcsBeacon/BeaconLinksType)
     pub beacon_links: pk::FixedString<32>,
     /// `/TcsBeacon/BeaconInterface` (/TcsBeacon/BeaconInterfaceType)
@@ -108,7 +110,7 @@ impl Beacon {
 
 impl Packet for Beacon {
     const NAME: &'static str = "/TcsBeacon/Beacon";
-    const MAX_BYTES: usize = 139;
+    const MAX_BYTES: usize = 146;
 
     fn decode_prefix(data: &[u8]) -> Result<(Self, usize)> {
         let mut r = BitReader::new(data);
@@ -167,7 +169,18 @@ impl Packet for Beacon {
             },
             "BeaconFlag",
         )?;
-        let v6 = pk::read_fixed_string::<32, 33>(
+        let v6 = pk::read_fixed_string::<6, 7>(
+            &mut r,
+            &StringSpec {
+                fixed_bits: None,
+                max_bits: 56,
+                terminator: Some(&[0x3a]),
+                size_tag_bits: 0,
+                charset: pk::Charset::Utf8,
+            },
+            "BeaconChecks",
+        )?;
+        let v7 = pk::read_fixed_string::<32, 33>(
             &mut r,
             &StringSpec {
                 fixed_bits: None,
@@ -178,7 +191,7 @@ impl Packet for Beacon {
             },
             "BeaconLinks",
         )?;
-        let v7 = pk::read_fixed_string::<32, 32>(
+        let v8 = pk::read_fixed_string::<32, 32>(
             &mut r,
             &StringSpec {
                 fixed_bits: Some(256),
@@ -196,8 +209,9 @@ impl Packet for Beacon {
                 beacon_digest: v3,
                 beacon_number: v4,
                 beacon_flag: v5,
-                beacon_links: v6,
-                beacon_interface: v7,
+                beacon_checks: v6,
+                beacon_links: v7,
+                beacon_interface: v8,
             },
             r.used(),
         ))
@@ -268,6 +282,18 @@ impl Packet for Beacon {
             w,
             &StringSpec {
                 fixed_bits: None,
+                max_bits: 56,
+                terminator: Some(&[0x3a]),
+                size_tag_bits: 0,
+                charset: pk::Charset::Utf8,
+            },
+            &self.beacon_checks,
+            "BeaconChecks",
+        )?;
+        pk::write_string(
+            w,
+            &StringSpec {
+                fixed_bits: None,
                 max_bits: 264,
                 terminator: Some(&[0x3a]),
                 size_tag_bits: 0,
@@ -305,6 +331,8 @@ impl fmt::Display for Beacon {
         pk::describe_str(&self.beacon_number, f)?;
         f.write_str(", beacon_flag=")?;
         pk::describe_str(&self.beacon_flag, f)?;
+        f.write_str(", beacon_checks=")?;
+        pk::describe_str(&self.beacon_checks, f)?;
         f.write_str(", beacon_links=")?;
         pk::describe_str(&self.beacon_links, f)?;
         f.write_str(", beacon_interface=")?;

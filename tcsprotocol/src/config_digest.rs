@@ -332,12 +332,21 @@ pub fn interpretation_of_simulator(
             },
         })
     });
-    json!({
+    let mut interpreted = json!({
         "tcs-sim": tcs_sim,
         "simulated_payload_groups": groups,
         "simulated_payloads": payloads,
         "world": world,
-    })
+    });
+    // Only where the file has the section, so that a file without one
+    // interprets, and digests, as it did before a file could have one.
+    if let Some(gateway) = &file.gateway {
+        interpreted["gateway"] = json!({
+            "bit_error_rate": gateway.bit_error_rate,
+            "seed": gateway.seed.map(|seed| seed.to_string()),
+        });
+    }
+    interpreted
 }
 
 /// What a configuration file is read as, as a value tree: the thing its

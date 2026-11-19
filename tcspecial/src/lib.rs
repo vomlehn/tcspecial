@@ -10,6 +10,8 @@ pub mod command_line;
 pub mod config;
 pub mod endpoint;
 pub mod exclusive;
+// The checks that no test code is flying, before the first beacon.
+pub mod flight_checks;
 pub mod node;
 pub mod runtime;
 pub mod segsend;

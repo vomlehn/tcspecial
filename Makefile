@@ -1438,8 +1438,8 @@ endif
 # workspace built with every type never makes. The types are what a build
 # with the defaults says it contains, which is every type, so that the list
 # is not written down a second time here; see "Which Node Types Are Built" in
-# docs/design.rst. And with the visual window, which no default build has
-# and so nothing else would ever build.
+# docs/design.rst. And with the visual window and with the bit errors,
+# test code that no default build has and so nothing else would ever build.
 #
 # And every configuration compared in its two spellings, which must say the
 # same thing: a change made to one and not the other leaves both files valid,
@@ -1466,6 +1466,10 @@ check:
 		--lib visual
 	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
 		--test visual
+	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --features bit-errors \
+		--all-targets -- -D warnings
+	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features bit-errors \
+		--lib -- bit_errors flight_checks
 	cd $(RUST) && cargo fmt -- --check
 	$(MAKE) --no-print-directory comparespellings
 	$(MAKE) --no-print-directory xtce-check

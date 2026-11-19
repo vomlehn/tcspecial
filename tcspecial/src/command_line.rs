@@ -19,6 +19,16 @@
 //! simulated device before anything is opened, and a run whose payloads the
 //! mode does not allow is refused: see `tcspecial::runtime::start`.
 //!
+//! Bit errors on the link to the ground are asked for in the simulator
+//! file's `gateway` section, not on the command line, and applied by a
+//! tcspecial built with the `bit-errors` feature. Never in flight: see
+//! `tcspecial::runtime::bit_errors`. Refused under `--simulate=none`, as
+//! `--visual` is.
+//!
+//! Every check that no test code is flying is made in
+//! `tcspecial::flight_checks`, before anything is read, and what it found
+//! goes in every beacon.
+//!
 //! `--no-memlock` runs the vehicle without locking its memory into RAM,
 //! under any `--simulate`. Without it the vehicle's memory is always locked,
 //! and a lock that fails is said and run without in flight, and stops
@@ -37,9 +47,7 @@ use tcsos::env;
 use tcsos::process;
 
 use crate::runtime;
-#[cfg(feature = "visual")]
-use log::warn;
-use log::{debug, error, trace};
+use log::{debug, error, trace, warn};
 use tcsprotocol::config::{payload_path_from_args, PAYLOAD_CONFIG_PATH_VAR};
 
 /// What `--help` prints.
@@ -128,32 +136,6 @@ pub fn main() {
             process::exit(1);
         }
     };
-
-    // A window asked of a run in the flight setting is refused, whatever the
-    // build, before anything is read or opened. The flight setting is what a
-    // run that leaves --simulate out gets, so a window there would be a window
-    // opened in flight, and a run on real devices alone is either flight or a
-    // mistake about which run this is. First, so that what a flight launch
-    // meets does not depend on the build.
-    if visual && simulate.is_flight() {
-        eprintln!(
-            "tcspecial: --visual is for a run with simulated or dummy \
-             devices, and this one is --simulate={simulate}, the flight \
-             setting: give --simulate=some or --simulate=all with it"
-        );
-        process::exit(1);
-    }
-    // A window asked of a build that has none is refused at once, before
-    // anything is read or opened: a vehicle started without the window that
-    // was asked for is not what was asked for.
-    #[cfg(not(feature = "visual"))]
-    if visual {
-        eprintln!(
-            "tcspecial: --visual is only in a tcspecial built with the visual \
-             feature, which this one was not: build it with --features visual"
-        );
-        process::exit(1);
-    }
     let quiet = !quiet.is_empty();
     if quiet {
         runtime::start::be_quiet();
@@ -174,13 +156,18 @@ pub fn main() {
 
     trace!("main: entered");
 
-    // A build with a window in it is never one to fly, and says so every
-    // time it starts, window or not: a warning, so that quiet says it too.
-    #[cfg(feature = "visual")]
-    warn!(
-        "this tcspecial was built with the visual feature and must not fly: \
-         build the flight software without it"
-    );
+    // A build with test code in it is never one to fly, and says so every
+    // time it starts, whether or not the test code is asked for: a warning,
+    // so that quiet says it too. Its beacons say `test`.
+    let never = crate::flight_checks::never_flies();
+    if !never.is_empty() {
+        warn!(
+            "this tcspecial was built with {} and must not fly: build the \
+             flight software without {}",
+            never.join(" and "),
+            if never.len() == 1 { "it" } else { "them" }
+        );
+    }
 
     debug!("starting");
 
@@ -205,6 +192,29 @@ pub fn main() {
         Ok(payload_path) => payload_path,
         Err(e) => {
             error!("{}", e);
+            process::exit(1);
+        }
+    };
+
+    // Every check that no test code is flying, before the configuration is
+    // read or anything opened, and so before the first beacon, which says
+    // what they found: test code asked of a run in the flight setting, or
+    // of a build without it, is refused. The flight setting is what a run
+    // that leaves --simulate out gets, so test code there would be test
+    // code in flight. See crate::flight_checks.
+    let bit_errors =
+        crate::flight_checks::bit_errors_for(&payload_path, simulate)
+            .unwrap_or_else(|why| {
+                eprintln!("tcspecial: {why}");
+                process::exit(1);
+            });
+    let asked = crate::flight_checks::Asked { visual, bit_errors };
+    let checked = match crate::flight_checks::check(simulate, &asked) {
+        Ok(checked) => checked,
+        Err(refused) => {
+            for why in refused {
+                eprintln!("tcspecial: {why}");
+            }
             process::exit(1);
         }
     };
@@ -271,9 +281,13 @@ pub fn main() {
     // its own beside it, and each stopping the other. See tcspecial::visual.
     #[cfg(feature = "visual")]
     if visual {
-        process::exit(crate::visual::run(&payload_path, simulate));
+        process::exit(crate::visual::run(&payload_path, simulate, checked));
     }
-    process::exit(runtime::start::run_or_report(&payload_path, simulate));
+    process::exit(runtime::start::run_or_report(
+        &payload_path,
+        simulate,
+        checked,
+    ));
 }
 
 /// Says what tcs-verify says about the configuration at `payload_path`, and

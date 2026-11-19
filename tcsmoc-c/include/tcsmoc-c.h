@@ -238,7 +238,8 @@ int tcs_beacons_pass(tcs_beacons *beacons, tcs_pass *pass);
 /** Says what the last beacon said.
  *
  * @param beacons  The beacon watch.
- * @return         "tcspecial v0.1.0 md5 ...", with ", RESTARTED, NOT YET
+ * @return         "tcspecial v0.1.0 md5 ..." and ", FLIGHT" or ", TEST",
+ *                 the beacon's flight check, with ", RESTARTED, NOT YET
  *                 MATCHED" after it while the restart flag is set;
  *                 "<none>" before any beacon; NULL on an error. */
 const char *tcs_beacons_said(const tcs_beacons *beacons);

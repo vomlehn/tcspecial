@@ -5656,8 +5656,8 @@ Asynchronous Telemetry
 ----------------------
 Beacon
 
-The beacon answers no command and has a form of its own: a line of text, six
-fields with a colon between each, and no newline at the end. Its layout is
+The beacon answers no command and has a form of its own: a line of text,
+eight fields with a colon between each, and no newline at the end. Its layout is
 stated in XTCE in ``tcsprotocol/xtce/beacon.xtce``, a document of its own:
 six string fields of UTF-8, each but the last ended by the termination character
 ``:`` (``0x3A``) and no longer than its field can be, and the last 32 characters
@@ -5671,7 +5671,7 @@ the hand-written packer that came before wrote, byte for byte. For example:
 
 .. code-block:: text
 
-   tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
+   tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:flight:89ab...4567:0123...cdef
 
 +-----------+--------------------------------------------------------------+
 | Field     | What it says, and how it is written                          |
@@ -5694,6 +5694,11 @@ the hand-written packer that came before wrote, byte for byte. For example:
 |           | its configuration's checksum, and ``normal`` otherwise: the  |
 |           | *restart flag*, ``restart_flag`` in code                     |
 +-----------+--------------------------------------------------------------+
+| checks    | ``flight`` where this run has no test code in it and this    |
+|           | build none that could be, and ``test`` otherwise: the        |
+|           | *flight check*, ``flight_check`` in code. See `Test Code     |
+|           | Never Flies`_                                                |
++-----------+--------------------------------------------------------------+
 | links     | The *link digest*: MD5 of what this tcspecial worked out of  |
 |           | its configuration -- ports, APIDs, message IDs, the layout   |
 |           | of each consolidation -- as 32 lower-case hex digits: see    |
@@ -5714,9 +5719,9 @@ Requirement
 Requirement
     A beacon is read strictly, by ``tcsprotocol::Beacon::read`` in Rust and
     ``tcsprotocol.beacon.Beacon.read`` in Python, and by nothing else:
-    exactly seven fields, each in the form the table gives. A datagram longer
-    than the longest beacon, 139 bytes (``BEACON_BYTES``), that is not UTF-8,
-    or that has a field out of its form, an eighth field, a trailing colon or a
+    exactly eight fields, each in the form the table gives. A datagram longer
+    than the longest beacon, 146 bytes (``BEACON_BYTES``), that is not UTF-8,
+    or that has a field out of its form, a ninth field, a trailing colon or a
     trailing newline, is not a beacon, and the ground shows what arrived rather than a
     beacon (``BeaconError::Length`` or ``BeaconError::Field``, naming the
     field). Something else sending to the beacon port is then seen for what it
@@ -5750,8 +5755,9 @@ Requirement
 Requirement
     The MOC shows what the last beacon said as one line, each part
     labelled: ``tcspecial v0.1.0 md5`` and the digest's sixteen bytes in
-    hex with nothing between them, then ``, RESTARTED, NOT YET MATCHED``
-    where the restart flag says ``restart``. That is the window's way of
+    hex with nothing between them, then ``, FLIGHT`` or ``, TEST`` for the
+    flight check, then ``, RESTARTED, NOT YET MATCHED`` where the restart
+    flag says ``restart``. That is the window's way of
     writing it, not what is on the wire, which is the beacon's own text
     above. The answer to a ``CONNECT`` is written the same way, up to the
     digest; see `What Each End Read`_.
@@ -8741,7 +8747,8 @@ Requirement
     there would be a window opened in flight; a run with no simulated or dummy
     devices that is not flight is a mistake about which run it is. The refusal
     comes before the build's own, so that what a flight launch meets does not
-    depend on how the binary was built.
+    depend on how the binary was built. It is made with the other checks for
+    test code: see `Test Code Never Flies`_.
 
 Requirement
     The window shows the three working panes as tcs-cfge shows them, with every
@@ -11014,6 +11021,116 @@ Requirement
     Flight software that cannot start a simulator cannot start one by mistake,
     and the code for finding and launching one would be flown although it
     served only testing.
+
+Test Code Never Flies
+---------------------
+Implemented: the checks are ``tcspecial::flight_checks``, the bit errors
+``tcspecial::runtime::bit_errors``, the beacon's field
+``tcsprotocol::beacon::FlightCheck``, and the ground's alarm
+``tcsmoc::beacon::Beacons::flying``.
+
+*Test code* is code in tcspecial that exists for testing and must never run
+aboard: the visual window (``--visual``, see `The Visual Window`_) and bit
+errors on the link to the ground (the simulator file's ``gateway``
+section). The simulation mode
+is what says a run is flight, so each piece of test code is held to it; and
+the ground, which cannot see the build, is told in every beacon what the
+vehicle found.
+
+Requirement
+    Each piece of test code is in tcspecial only with a Cargo feature that
+    is not a default and is never in a build that flies: ``visual`` and
+    ``bit-errors``. A build without it has none of the test code's workings
+    -- the bit errors, in a build without their feature, are a function
+    that answers that no packet is lost, which the compiler takes out --
+    so a flight build has nothing to switch on by mistake.
+    ``tcspecial::flight_checks::NEVER_FLIES`` names every such feature, and
+    a build that has any of them says so as a warning every time it starts.
+
+Requirement
+    Each piece of test code is refused under ``--simulate=none``, the flight
+    setting and what a run that leaves the flag out gets, even in a build
+    that has it, before anything is read or opened, saying to give
+    ``--simulate=some`` or ``--simulate=all`` with it. Asked of a build
+    without its feature, it is refused, saying how to build one that has it.
+    A build that has the feature and is not asked for it runs.
+
+Requirement
+    Every check for test code is made in one place,
+    ``tcspecial::flight_checks::check``, before the first beacon is sent.
+    That function alone makes a ``Checked``, and the beacon sender cannot be
+    made without one, so no beacon can go before the checks are finished.
+    A new piece of test code adds its check there, and nowhere after it.
+
+Requirement
+    Every beacon carries the *flight check*: ``flight`` where the run is
+    under ``--simulate=none`` and the build has no feature that never flies,
+    and ``test`` otherwise -- a run under ``some`` or ``all``, or a build
+    with test code in it, whether or not that is asked for: such a build is
+    not the one that was meant to fly. In every beacon, not in a message
+    sent once, because any one packet can be lost: a ground station that
+    missed the first beacons hears it in the next. See `Asynchronous
+    Telemetry`_.
+
+Requirement
+    A ground station run as flight -- tcs-moc under ``--simulate=none`` --
+    holds every beacon to flight code. A beacon saying ``test`` is said as a
+    mismatch is, ``TEST CODE`` first on the beacon line and on the console,
+    and the operator is asked whether to go on. It does not end the match
+    for commanding, as a configuration that differs does: the vehicle is
+    not misread, and the commands that take it out of the run may be the
+    ones it needs.
+
+Requirement
+    The MOC's procedures, after starting tcspecial, wait for it to start and
+    then check the flight check of a beacon heard since: ``flight`` for a
+    flight, ``test`` for a test. A station that hears no beacon has not heard
+    the check, and a vehicle it cannot hear is not one it may take for
+    flight code.
+
+Bit errors on the link
+~~~~~~~~~~~~~~~~~~~~~~
+Requirement
+    A simulator file's ``gateway`` section states ``bit_error_rate``, ``p``
+    in flips per bit, and tcspecial, in a build with the ``bit-errors``
+    feature and under ``--simulate=some`` or ``all``, loses each packet
+    crossing the link to the ground as ``p`` flips per bit would: a packet
+    of ``n`` bits is lost with probability ``1 - (1 - p)^n``, and a packet
+    with a flipped bit is dropped whole, as a link whose check fails drops
+    it. ``p`` is from 0 to 1. ``n`` is the packet as tcspecial reads or
+    writes it, eight bits a byte, without what the transport adds.
+
+Requirement
+    Up and down alike: the commands arriving and the gateway's data
+    arriving, and the answers, the beacons and the gateway's data leaving.
+    A beacon lost is still recorded in the telemetry log, which is what the
+    vehicle produced, not what the ground heard.
+
+Requirement
+    The section's ``seed`` is where the random numbers start: left out or
+    blank, the default, 1 (``DEFAULT_BIT_ERROR_SEED``); a whole number, that
+    number; ``random``, one drawn from the system's source of randomness
+    (``getrandom``, a dependency of the ``bit-errors`` feature alone). The
+    default makes every run that states no seed lose the same packets, so
+    that a test is repeatable without saying how; ``random`` is asked for,
+    never fallen into. Anything else is refused as the file is read. The
+    rate, the seed, which of the three it was and the file are said in the
+    startup summary, so a random seed can be stated to have its run again.
+
+Requirement
+    The rate is in the simulator file, not on tcspecial's command line or in
+    its configuration: it is a test setting, as the payloads' faults are, and
+    the configuration flown is the one tested, byte for byte. tcspecial
+    reads the file tcs-sim and tcs-moc read for its configuration, the one
+    ``PAYLOAD_SIM_YAML`` names or the one beside it. A build that may fly,
+    run under ``--simulate=none``, does not read it at all.
+
+Requirement
+    A tcspecial without the ``bit-errors`` feature, under ``some`` or
+    ``all``, refuses a simulator file that states a rate, saying how to
+    build one that has it: a test that asked for a lossy link and was given
+    a perfect one would pass for the wrong reason. A file that states one
+    under ``--simulate=none`` is refused by every build that reads it.
 
 Waiting for the Simulator
 -------------------------

@@ -3,8 +3,9 @@
 //! What tcspecial sends every `beacon.default_interval`, whether or not
 //! anything has connected to it: the build it is, the digest of the
 //! configuration it read, the beacon's own number, whether this start has
-//! yet been matched by the ground, the digest of what it worked out of its
-//! configuration, and which interface it speaks. A ground
+//! yet been matched by the ground, whether it found test code in this run
+//! or this build, the digest of what it worked out of its configuration,
+//! and which interface it speaks. A ground
 //! station that is only listening can then see which software is flying,
 //! which payload set it is serving and whether it has just come back, rather
 //! than having to ask before it can know.
@@ -14,17 +15,18 @@
 //! as it is, with no decoder. Numbers are decimal and digests hexadecimal:
 //!
 //! ```text
-//! tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
+//! tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:flight:89ab...4567:0123...cdef
 //! ```
 //!
 //! which is the name, the version, the configuration's digest, the beacon's
-//! number, `restart` or `normal` for the restart flag, the link digest (see
+//! number, `restart` or `normal` for the restart flag, `flight` or `test` for
+//! the flight check (see [`FlightCheck`]), the link digest (see
 //! [`crate::graph::link_table`]) and the interface's digest. It is read strictly: anything else at the beacon
 //! port, or a field out of its form, is not a beacon. A beacon carries no
 //! check of its own: the transport under it checks it, as UDP's checksum
 //! does here.
 //!
-//! Its layout -- seven text fields, each but the last ended by a colon, the
+//! Its layout -- eight text fields, each but the last ended by a colon, the
 //! last 32 characters that end the datagram -- is stated in XTCE in
 //! `xtce/beacon.xtce`, which changes only deliberately, and packed and unpacked by the code
 //! tcs-xtce generates from it, which allocates nothing. What the text must say
@@ -53,10 +55,55 @@ pub const RESTART_FLAG: &str = "restart";
 /// What it says when none is.
 pub const NORMAL_FLAG: &str = "normal";
 
+/// What the flight check's field says of a run with no test code in it.
+pub const FLIGHT_CHECK: &str = "flight";
+/// What it says of a run that has test code in it, or might.
+pub const TEST_CHECK: &str = "test";
+
+/// What tcspecial found when it checked, before its first beacon, whether
+/// test code is in this run.
+///
+/// Said in every beacon, and not once, because any one packet can be lost:
+/// a ground station that heard none of the first beacons still hears this in
+/// the next. Every check is made before the first beacon goes, so a beacon
+/// that says this says it of checks that are finished. See "Test Code Never
+/// Flies" in `docs/tcspecial-design.rst`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlightCheck {
+    /// Flight code and nothing else: a run under `--simulate=none`, from a
+    /// build with no feature that never flies.
+    Flight,
+    /// Test code is in this run or in this build, or the sender has not
+    /// said: a run under `--simulate=some` or `all`, or a build with a
+    /// feature that never flies, whether or not it is in use.
+    Test,
+}
+
+impl FlightCheck {
+    /// Names the check as the beacon writes it.
+    ///
+    /// # Returns
+    ///
+    /// [`FLIGHT_CHECK`] or [`TEST_CHECK`].
+    pub fn name(self) -> &'static str {
+        match self {
+            FlightCheck::Flight => FLIGHT_CHECK,
+            FlightCheck::Test => TEST_CHECK,
+        }
+    }
+}
+
+impl fmt::Display for FlightCheck {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
 /// The longest a beacon is: the name, a version of three parts of up to
 /// three digits, three digests of thirty-two hex digits, a number of up to
-/// ten digits and the longer flag, with the six colons between them.
-pub const BEACON_BYTES: usize = 9 + 11 + 32 + 10 + 7 + 32 + 32 + 6;
+/// ten digits, the longer restart flag and the longer flight check, with
+/// the seven colons between them.
+pub const BEACON_BYTES: usize = 9 + 11 + 32 + 10 + 7 + 6 + 32 + 32 + 7;
 
 /// What a beacon says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -85,6 +132,9 @@ pub struct Beacon {
     /// See "Configurations named by their checksum" in
     /// `docs/tcspecial-design.rst`.
     pub restart_flag: bool,
+    /// Whether the sender found test code in its run or its build, checked
+    /// before its first beacon: see [`FlightCheck`].
+    pub flight_check: FlightCheck,
     /// The digest of what the sender worked out of its configuration: its
     /// ports, APIDs and message IDs, and how it lays out consolidations. See
     /// [`crate::graph::link_table`]. A ground station that worked out
@@ -96,8 +146,9 @@ pub struct Beacon {
 }
 
 impl Beacon {
-    /// Makes a beacon with its restart flag clear, speaking the
-    /// interface this build was generated from.
+    /// Makes a beacon with its restart flag clear and its flight check
+    /// [`FlightCheck::Test`], which claims nothing, speaking the interface
+    /// this build was generated from.
     ///
     /// # Arguments
     ///
@@ -108,7 +159,7 @@ impl Beacon {
     ///
     /// # Returns
     ///
-    /// The beacon, with `restart_flag` clear.
+    /// The beacon, with `restart_flag` clear and `flight_check` `Test`.
     pub fn new(
         sequence: u32,
         version: ConfigVersion,
@@ -120,6 +171,7 @@ impl Beacon {
             version,
             digest,
             restart_flag: false,
+            flight_check: FlightCheck::Test,
             links,
             interface: InterfaceDigest::of_this_build(),
         }
@@ -138,6 +190,22 @@ impl Beacon {
     pub fn restart_flag(self, restart_flag: bool) -> Self {
         Self {
             restart_flag,
+            ..self
+        }
+    }
+
+    /// Says what the sender's flight check found.
+    ///
+    /// # Arguments
+    ///
+    /// * `flight_check` - Whether test code is in the run or the build.
+    ///
+    /// # Returns
+    ///
+    /// This beacon, with `flight_check` set to the value given.
+    pub fn flight_check(self, flight_check: FlightCheck) -> Self {
+        Self {
+            flight_check,
             ..self
         }
     }
@@ -176,7 +244,7 @@ impl Beacon {
         let (fields, used) = packet::Beacon::decode_prefix(datagram)
             .map_err(|why| BeaconError::Field(missing(&why)))?;
         if used != datagram.len() {
-            return Err(BeaconError::Field("it has more than seven fields"));
+            return Err(BeaconError::Field("it has more than eight fields"));
         }
 
         if fields.beacon_name.as_str() != BEACON_NAME {
@@ -197,6 +265,15 @@ impl Beacon {
                     "the restart flag is neither \"restart\" nor \"normal\"",
                 )),
             };
+        let flight_check = match fields.beacon_checks.as_str() {
+            FLIGHT_CHECK => FlightCheck::Flight,
+            TEST_CHECK => FlightCheck::Test,
+            _ => {
+                return Err(BeaconError::Field(
+                    "the flight check is neither \"flight\" nor \"test\"",
+                ))
+            }
+        };
         let links = hex_of(&fields.beacon_links).ok_or(BeaconError::Field(
             "the link digest is not 32 hex digits",
         ))?;
@@ -208,6 +285,7 @@ impl Beacon {
             version,
             digest: ConfigDigest(digest),
             restart_flag,
+            flight_check,
             links: LinkDigest(links),
             interface: InterfaceDigest(interface),
         })
@@ -255,7 +333,11 @@ fn missing(why: &PacketError) -> &'static str {
         ("BeaconFlag", true) => {
             "the restart flag is neither \"restart\" nor \"normal\""
         }
-        ("BeaconFlag", false) => "it has no link digest",
+        ("BeaconFlag", false) => "it has no flight check",
+        ("BeaconChecks", true) => {
+            "the flight check is neither \"flight\" nor \"test\""
+        }
+        ("BeaconChecks", false) => "it has no link digest",
         ("BeaconLinks", true) => "the link digest is not 32 hex digits",
         ("BeaconLinks", false) => "it has no interface digest",
         _ => "the interface digest is not 32 hex digits",
@@ -380,6 +462,7 @@ impl BeaconPacker {
             } else {
                 NORMAL_FLAG
             }),
+            beacon_checks: text(beacon.flight_check),
             beacon_links: text(beacon.links),
             beacon_interface: text(beacon.interface),
         };
@@ -464,15 +547,30 @@ mod tests {
             .restart_flag(true);
         let want = format!(
             "tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:\
-             restart:{LINKS}:{}",
+             restart:test:{LINKS}:{}",
             InterfaceDigest::of_this_build()
         );
         assert_eq!(beacon.to_bytes(), want.as_bytes());
         let normal = Beacon::new(7, version(), digest(), links()).to_bytes();
         assert!(
-            String::from_utf8(normal).unwrap().contains(":7:normal:"),
+            String::from_utf8(normal)
+                .unwrap()
+                .contains(":7:normal:test:"),
             "the flag in words"
         );
+    }
+
+    /// A beacon claims flight only where its sender said so: `new` makes
+    /// one that says `test`, and each reads back as itself.
+    #[test]
+    fn a_beacon_says_test_unless_its_sender_says_flight() {
+        let made = Beacon::new(7, version(), digest(), links());
+        assert_eq!(made.flight_check, FlightCheck::Test);
+        let flight = made.flight_check(FlightCheck::Flight);
+        let text = String::from_utf8(flight.to_bytes()).unwrap();
+        assert!(text.contains(":7:normal:flight:"), "{text}");
+        assert_eq!(Beacon::read(text.as_bytes()), Ok(flight));
+        assert_eq!(Beacon::read(&made.to_bytes()), Ok(made));
     }
 
     /// The longest beacon there can be fits the packer, exactly.
@@ -488,7 +586,8 @@ mod tests {
             digest(),
             links(),
         )
-        .restart_flag(true);
+        .restart_flag(true)
+        .flight_check(FlightCheck::Flight);
         let packed = longest.to_bytes();
         assert_eq!(packed.len(), BEACON_BYTES);
         assert_eq!(Beacon::read(&packed), Ok(longest));
@@ -502,7 +601,9 @@ mod tests {
     /// The beacon the generated code packs is byte for byte the one the
     /// hand-written packer that came before it wrote, for the same beacons,
     /// with the link digest the beacon has carried since 2026-11-15 before
-    /// the interface's: these are what it wrote, with that.
+    /// the interface's, and the flight check it has carried since
+    /// 2026-11-18 after the restart flag: these are what it wrote, with
+    /// those.
     #[test]
     fn the_beacon_is_what_the_hand_written_packer_wrote() {
         let interface = InterfaceDigest([0xab; 16]);
@@ -511,7 +612,7 @@ mod tests {
                 Beacon::new(0x01020304, version(), digest(), links())
                     .restart_flag(true),
                 "tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:16909060:\
-                 restart:5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:\
+                 restart:test:5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:\
                  abababababababababababababababab",
             ),
             (
@@ -520,9 +621,10 @@ mod tests {
                     ConfigVersion::of_text("0.1.0").unwrap(),
                     digest(),
                     links(),
-                ),
+                )
+                .flight_check(FlightCheck::Flight),
                 "tcspecial:0.1.0:d41d8cd98f00b204e9800998ecf8427e:1:normal:\
-                 5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:\
+                 flight:5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a:\
                  abababababababababababababababab",
             ),
             (
@@ -538,7 +640,7 @@ mod tests {
                 )
                 .restart_flag(true),
                 "tcspecial:255.255.255:00000000000000000000000000000000:\
-                 4294967295:restart:ffffffffffffffffffffffffffffffff:\
+                 4294967295:restart:test:ffffffffffffffffffffffffffffffff:\
                  abababababababababababababababab",
             ),
         ] {
@@ -593,22 +695,36 @@ mod tests {
         let md5 = digest().to_string();
         let upper = md5.to_uppercase();
         let l = LINKS;
+        let f = "flight";
         for bad in [
-            format!("Tcspecial:1.2.3:{md5}:1:normal:{l}:{interface}"),
-            format!("tcspecial:1.2:{md5}:1:normal:{l}:{interface}"),
-            format!("tcspecial:1.2.256:{md5}:1:normal:{l}:{interface}"),
-            format!("tcspecial:1.2.3:{}:1:normal:{l}:{interface}", &md5[1..]),
-            format!("tcspecial:1.2.3:{upper}:1:normal:{l}:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:+1:normal:{l}:{interface}"),
-            format!("tcspecial:1.2.3:{md5}: 1:normal:{l}:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:4294967296:normal:{l}:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:1:yes:{l}:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:1:normal:{}:{interface}", &l[1..]),
-            format!("tcspecial:1.2.3:{md5}:1:normal:{upper}:{interface}"),
-            // A beacon of the six fields before the link digest.
+            format!("Tcspecial:1.2.3:{md5}:1:normal:{f}:{l}:{interface}"),
+            format!("tcspecial:1.2:{md5}:1:normal:{f}:{l}:{interface}"),
+            format!("tcspecial:1.2.256:{md5}:1:normal:{f}:{l}:{interface}"),
+            format!(
+                "tcspecial:1.2.3:{}:1:normal:{f}:{l}:{interface}",
+                &md5[1..]
+            ),
+            format!("tcspecial:1.2.3:{upper}:1:normal:{f}:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:+1:normal:{f}:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}: 1:normal:{f}:{l}:{interface}"),
+            format!(
+                "tcspecial:1.2.3:{md5}:4294967296:normal:{f}:{l}:{interface}"
+            ),
+            format!("tcspecial:1.2.3:{md5}:1:yes:{f}:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:Flight:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:tests:{l}:{interface}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal::{l}:{interface}"),
+            format!(
+                "tcspecial:1.2.3:{md5}:1:normal:{f}:{}:{interface}",
+                &l[1..]
+            ),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{f}:{upper}:{interface}"),
+            // A beacon of the seven fields before the flight check, and of
+            // the six before the link digest.
+            format!("tcspecial:1.2.3:{md5}:1:normal:{l}:{interface}"),
             format!("tcspecial:1.2.3:{md5}:1:normal:{interface}"),
-            format!("tcspecial:1.2.3:{md5}:1:normal:{l}"),
-            format!("tcspecial:1.2.3:{md5}:1:normal:{l}:{interface}:"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{f}:{l}"),
+            format!("tcspecial:1.2.3:{md5}:1:normal:{f}:{l}:{interface}:"),
             format!("{good}\n"),
         ] {
             assert!(

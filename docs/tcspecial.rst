@@ -2898,33 +2898,37 @@ none of it is the program's own:
   find where the beacons are, starts the loop on a thread of its own, and puts
   each pass in the window.
 
-A beacon is a line of text, at most 139 bytes and with no newline at the
-end: seven fields with a colon between each -- the name ``tcspecial``, the
+A beacon is a line of text, at most 146 bytes and with no newline at the
+end: eight fields with a colon between each -- the name ``tcspecial``, the
 version as ``major.minor.patch``, the configuration's MD5 digest as 32
 lower-case hex digits, the beacon's number in decimal, the restart flag,
 written ``restart`` from every start of tcspecial -- the first included --
 and from its taking a restart, until it takes a ``CONNECT`` carrying its
-configuration's checksum, and ``normal`` otherwise, the link digest -- the
+configuration's checksum, and ``normal`` otherwise, the flight check --
+``flight`` where the run has no test code in it and the build none that could
+be, ``test`` otherwise, see `Test code and the flight check`_ -- the link
+digest -- the
 MD5 of what tcspecial worked out of its configuration, its ports, APIDs and
 consolidations, as ``tcs-verify --links`` prints them -- and the interface's
 digest, each also as 32 hex digits:
 
 .. code-block:: text
 
-   tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:89ab...4567:0123...cdef
+   tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:flight:89ab...4567:0123...cdef
 
 It is text so that it can be read as it is, in a packet capture, a log or with
 any UDP listener, with nothing to decode it. Its layout is stated in XTCE, in
-``tcsprotocol/xtce/beacon.xtce``, as seven text fields -- each but the last
+``tcsprotocol/xtce/beacon.xtce``, as eight text fields -- each but the last
 ended by its colon -- and nothing else, so a ground system that reads XTCE can
 read it too. That is what goes on the wire; what the window shows on its ``Last
-msg:`` line is written for the window, as ``tcspecial v0.1.0 md5`` and the
-digest. tcspecial writes each beacon, and ``tcsmoc::beacon`` reads it, with
+msg:`` line is written for the window, as ``tcspecial v0.1.0 md5``, the
+digest, and ``FLIGHT`` or ``TEST``. tcspecial writes each beacon, and
+``tcsmoc::beacon`` reads it, with
 ``tcsprotocol::Beacon``, which the Python in
 ``python/tcsprotocol/beacon.py`` says again, held to it by the same examples
 in their tests. The example's test writes the beacon it sends the same way. A
-beacon is read strictly: anything with a field out of its form, an eighth
-field, a trailing colon or newline, or more than 139 bytes, is not a beacon.
+beacon is read strictly: anything with a field out of its form, a ninth
+field, a trailing colon or newline, or more than 146 bytes, is not a beacon.
 A beacon whose configuration digest, link digest or interface digest is not
 the station's says so first on that line -- ``CONFIGURATION DIFFERS``,
 ``LINKS DIFFER`` or ``INTERFACE DIFFERS``, naming both -- and the station is
@@ -5642,6 +5646,71 @@ would be a window opened in flight.
 
 A tcspecial built without the feature refuses ``--visual``, saying how to
 build one that has it.
+
+A lossy link to the ground
+--------------------------
+
+A tcspecial built with the ``bit-errors`` feature can lose packets on its link
+to the ground, to test a ground station against a link that drops them. Never
+build a tcspecial that flies this way. The rate is a test setting, so it is in
+the simulator file, beside the others, in a section of its own:
+
+.. code-block:: yaml
+
+   gateway:
+     bit_error_rate: 1e-5
+     seed: 42
+
+.. code-block:: console
+
+   $ cargo build -p tcspecial --features bit-errors
+   $ target/debug/tcspecial --simulate=all examples/thermostat/thermostat.ytcs
+
+tcspecial reads the simulator file tcs-sim and tcs-moc read: the one
+``PAYLOAD_SIM_YAML`` names, and otherwise the one beside the configuration.
+``bit_error_rate`` is flips per bit, from 0 to 1. Each packet up or down -- a
+command, an answer, a beacon, the gateway's data either way -- is lost whole
+with the chance that at least one of its bits flips, ``1 - (1 - p)^bits``: at
+``1e-5``, a 100-byte packet is lost about one time in 125. ``seed`` is where
+the random numbers start:
+
+* left out, or blank: the default, 1, so that every run loses the same
+  packets;
+* a whole number: that number, to have again the losses of a run that used
+  it;
+* ``random``: one drawn from the system's source of randomness, for losses
+  no run has had before.
+
+The startup summary says the seed and which of the three it was, so that a
+run with a random seed can be had again by stating the seed it drew.
+
+Like ``--visual`` it wants ``--simulate=some`` or ``--simulate=all``: under
+``--simulate=none`` a simulator file that states a rate is refused. A
+tcspecial built without the feature refuses a simulator file that states one,
+saying how to build one that has it, since a test that asked for a lossy link
+and was given a perfect one would pass for the wrong reason.
+
+Test code and the flight check
+------------------------------
+
+``--visual`` and bit errors are *test code*: there for testing, and
+never to fly. tcspecial checks for test code before it sends its first beacon,
+and every beacon then says what it found, in the field after the restart
+flag:
+
+* ``flight``: the run is under ``--simulate=none`` and the build has no
+  feature that never flies.
+* ``test``: anything else -- a run under ``--simulate=some`` or ``all``, or a
+  build with the ``visual`` or ``bit-errors`` feature, whether or not either
+  is asked for.
+
+It is in every beacon, not said once, because any packet can be lost.
+
+After starting tcspecial for a flight, wait long enough for it to start, then
+check the flight check of a beacon heard since: it must say ``flight``. tcs-moc
+started under ``--simulate=none`` does this for you: a beacon saying ``test``
+puts ``TEST CODE`` first on its beacon line and asks whether to go on. A
+station that has heard no beacon has not heard the check.
 
 Testing
 =======

@@ -168,15 +168,16 @@ mod tests {
         let features = features.split("\n[").next().unwrap_or(features);
         // Each type's feature is a line of its own, empty or naming the
         // types it brings with it -- a sensor on a thermal mass brings its
-        // bus. Not the defaults, which span lines, and not a feature that
-        // brings in a dependency, which is no type.
+        // bus. Not the defaults, which span lines, not a feature that
+        // brings in a dependency, which is no type, and not test code.
         let mut declared: Vec<&str> = features
             .lines()
             .filter_map(|line| {
                 let (name, value) = line.split_once(" = ")?;
                 (value.starts_with('[')
                     && value.ends_with(']')
-                    && !value.contains("dep:"))
+                    && !value.contains("dep:")
+                    && !crate::flight_checks::NEVER_FLIES.contains(&name))
                 .then_some(name)
             })
             .collect();

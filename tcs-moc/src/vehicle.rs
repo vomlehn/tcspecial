@@ -3397,6 +3397,15 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
                 beacons.link().recv,
                 beacons.link().send
             );
+            // A station run as flight holds every beacon to flight code:
+            // test code in the vehicle's run or build is asked about as a
+            // configuration that differs is. Every beacon says it, so one
+            // lost costs nothing. See tcsmoc::beacon::Beacons::flying.
+            let beacons = if mode.is_flight() {
+                beacons.flying()
+            } else {
+                beacons
+            };
             Some(BeaconReceive::new(
                 ui.as_weak(),
                 beacons,

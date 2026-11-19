@@ -560,42 +560,46 @@ ul.auto-toc {
 <li><a class="reference internal" href="#what-each-program-does-with-the-mode" id="toc-entry-145">What Each Program Does With the Mode</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-146">Waiting for the Simulator</a></li>
-<li><a class="reference internal" href="#gui-framework" id="toc-entry-147">GUI Framework</a></li>
+<li><a class="reference internal" href="#test-code-never-flies" id="toc-entry-146">Test Code Never Flies</a><ul>
+<li><a class="reference internal" href="#bit-errors-on-the-link" id="toc-entry-147">Bit errors on the link</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#hints" id="toc-entry-148">Hints</a></li>
-<li><a class="reference internal" href="#possible-enhancements" id="toc-entry-149">Possible Enhancements</a></li>
-<li><a class="reference internal" href="#possible-future-directions" id="toc-entry-150">Possible Future Directions</a></li>
-<li><a class="reference internal" href="#development-approach" id="toc-entry-151">Development Approach</a></li>
-<li><a class="reference internal" href="#requirements" id="toc-entry-152">Requirements</a><ul>
-<li><a class="reference internal" href="#about-the-names-and-the-notes" id="toc-entry-153">About the names and the notes</a></li>
-<li><a class="reference internal" href="#the-name-of-the-project-is-tcspecial" id="toc-entry-154">The name of the project is TCSpecial</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft" id="toc-entry-155">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcsmoc-that-links-with-misssion-control-software" id="toc-entry-156">TCSpecial shall include a library named tcsmoc that links with misssion control software</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcsprotocol-that-is-shared-between-tcspecial-and-tcsmoc" id="toc-entry-157">TCSpecial shall include a library named tcsprotocol that is shared between tcspecial and tcsmoc</a></li>
-<li><a class="reference internal" href="#tcspecial-shall-include-applications-named-tcs-moc-and-tcs-sim-that-provide-guis-for-testing-tcspecial-tcsprotocol-and-tcsmoc" id="toc-entry-158">TCSpecial shall include applications named tcs-moc and tcs-sim that provide GUIs for testing tcspecial, tcsprotocol, and tcsmoc</a></li>
-<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcsmoc" id="toc-entry-159">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcsmoc</a></li>
-<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands" id="toc-entry-160">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a><ul>
-<li><a class="reference internal" href="#ci-must-be-implemented-by-ci-udp-that-communicates-with-tcsmoc-via-udp-ip" id="toc-entry-161">CI must be implemented by CI_UDP that communicates with tcsmoc via UDP/IP</a></li>
-<li><a class="reference internal" href="#dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcsmoc" id="toc-entry-162">DH_UDP must implement DH and use UDP to send telemetry to tcsmoc</a></li>
-<li><a class="reference internal" href="#ci-must-have-an-element-named-dh-of-type-btreemap" id="toc-entry-163">CI must have an element named dh of type BTreeMap</a><ul>
-<li><a class="reference internal" href="#ci-must-support-sending-telemetry-responses-to-all-ci-commands" id="toc-entry-164">CI must support sending telemetry responses to all CI commands</a></li>
-<li><a class="reference internal" href="#each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication" id="toc-entry-165">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></li>
-<li><a class="reference internal" href="#ci-must-periodically-send-a-telemetry-beacon-message-with-a-timestamp-and-unique-sequence-number" id="toc-entry-166">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></li>
-<li><a class="reference internal" href="#ci-must-parse-commands-from-the-ground-receved-via-udp-ip" id="toc-entry-167">CI must parse commands from the ground receved via UDP/IP</a></li>
-<li><a class="reference internal" href="#all-ci-commands-must-include-a-sequence-number-that-increments-for-each-command-sent" id="toc-entry-168">All CI commands must include a sequence number that increments for each command sent</a></li>
-<li><a class="reference internal" href="#ci-must-support-an-exit-command-that-terminates-the-tcspecial-process" id="toc-entry-169">CI must support an EXIT command that terminates the tcspecial process</a></li>
+<li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-148">Waiting for the Simulator</a></li>
+<li><a class="reference internal" href="#gui-framework" id="toc-entry-149">GUI Framework</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#tcspecial-includes-zero-or-more-components-named-data-handler-dh" id="toc-entry-170">Tcspecial includes zero or more components named Data Handler (DH)</a></li>
+<li><a class="reference internal" href="#hints" id="toc-entry-150">Hints</a></li>
+<li><a class="reference internal" href="#possible-enhancements" id="toc-entry-151">Possible Enhancements</a></li>
+<li><a class="reference internal" href="#possible-future-directions" id="toc-entry-152">Possible Future Directions</a></li>
+<li><a class="reference internal" href="#development-approach" id="toc-entry-153">Development Approach</a></li>
+<li><a class="reference internal" href="#requirements" id="toc-entry-154">Requirements</a><ul>
+<li><a class="reference internal" href="#about-the-names-and-the-notes" id="toc-entry-155">About the names and the notes</a></li>
+<li><a class="reference internal" href="#the-name-of-the-project-is-tcspecial" id="toc-entry-156">The name of the project is TCSpecial</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft" id="toc-entry-157">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcsmoc-that-links-with-misssion-control-software" id="toc-entry-158">TCSpecial shall include a library named tcsmoc that links with misssion control software</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-a-library-named-tcsprotocol-that-is-shared-between-tcspecial-and-tcsmoc" id="toc-entry-159">TCSpecial shall include a library named tcsprotocol that is shared between tcspecial and tcsmoc</a></li>
+<li><a class="reference internal" href="#tcspecial-shall-include-applications-named-tcs-moc-and-tcs-sim-that-provide-guis-for-testing-tcspecial-tcsprotocol-and-tcsmoc" id="toc-entry-160">TCSpecial shall include applications named tcs-moc and tcs-sim that provide GUIs for testing tcspecial, tcsprotocol, and tcsmoc</a></li>
+<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcsmoc" id="toc-entry-161">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcsmoc</a></li>
+<li><a class="reference internal" href="#tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands" id="toc-entry-162">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a><ul>
+<li><a class="reference internal" href="#ci-must-be-implemented-by-ci-udp-that-communicates-with-tcsmoc-via-udp-ip" id="toc-entry-163">CI must be implemented by CI_UDP that communicates with tcsmoc via UDP/IP</a></li>
+<li><a class="reference internal" href="#dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcsmoc" id="toc-entry-164">DH_UDP must implement DH and use UDP to send telemetry to tcsmoc</a></li>
+<li><a class="reference internal" href="#ci-must-have-an-element-named-dh-of-type-btreemap" id="toc-entry-165">CI must have an element named dh of type BTreeMap</a><ul>
+<li><a class="reference internal" href="#ci-must-support-sending-telemetry-responses-to-all-ci-commands" id="toc-entry-166">CI must support sending telemetry responses to all CI commands</a></li>
+<li><a class="reference internal" href="#each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication" id="toc-entry-167">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></li>
+<li><a class="reference internal" href="#ci-must-periodically-send-a-telemetry-beacon-message-with-a-timestamp-and-unique-sequence-number" id="toc-entry-168">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></li>
+<li><a class="reference internal" href="#ci-must-parse-commands-from-the-ground-receved-via-udp-ip" id="toc-entry-169">CI must parse commands from the ground receved via UDP/IP</a></li>
+<li><a class="reference internal" href="#all-ci-commands-must-include-a-sequence-number-that-increments-for-each-command-sent" id="toc-entry-170">All CI commands must include a sequence number that increments for each command sent</a></li>
+<li><a class="reference internal" href="#ci-must-support-an-exit-command-that-terminates-the-tcspecial-process" id="toc-entry-171">CI must support an EXIT command that terminates the tcspecial process</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-top-part-of-the-tcs-moc-window-is-for-sending-commands-to-tcspecial-s-ci-and-viewing-telemetry-from-tcspecial-s-ci" id="toc-entry-171">The top part of the tcs-moc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></li>
-<li><a class="reference internal" href="#the-middle-part-of-the-tcs-moc-window-is-for-viewing-telemetry-from-individual-dhs" id="toc-entry-172">The middle part of the tcs-moc window is for viewing telemetry from individual DHs</a></li>
+<li><a class="reference internal" href="#tcspecial-includes-zero-or-more-components-named-data-handler-dh" id="toc-entry-172">Tcspecial includes zero or more components named Data Handler (DH)</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-173">See Also</a></li>
+<li><a class="reference internal" href="#the-top-part-of-the-tcs-moc-window-is-for-sending-commands-to-tcspecial-s-ci-and-viewing-telemetry-from-tcspecial-s-ci" id="toc-entry-173">The top part of the tcs-moc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></li>
+<li><a class="reference internal" href="#the-middle-part-of-the-tcs-moc-window-is-for-viewing-telemetry-from-individual-dhs" id="toc-entry-174">The middle part of the tcs-moc window is for viewing telemetry from individual DHs</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-175">See Also</a></li>
 </ul>
 </div>
 <div class="section" id="introduction">
@@ -5940,8 +5944,8 @@ another interval flies a configuration that says so.</p>
 <div class="section" id="asynchronous-telemetry">
 <h2><a class="toc-backref" href="#toc-entry-68">Asynchronous Telemetry</a></h2>
 <p>Beacon</p>
-<p>The beacon answers no command and has a form of its own: a line of text, six
-fields with a colon between each, and no newline at the end. Its layout is
+<p>The beacon answers no command and has a form of its own: a line of text,
+eight fields with a colon between each, and no newline at the end. Its layout is
 stated in XTCE in <tt class="docutils literal">tcsprotocol/xtce/beacon.xtce</tt>, a document of its own:
 six string fields of UTF-8, each but the last ended by the termination character
 <tt class="docutils literal">:</tt> (<tt class="docutils literal">0x3A</tt>) and no longer than its field can be, and the last 32 characters
@@ -5953,7 +5957,7 @@ tcspecial and <tt class="docutils literal">tcsmoc</tt> use, and <tt class="docut
 the two are held to each other by the same examples in their tests, and to what
 the hand-written packer that came before wrote, byte for byte. For example:</p>
 <pre class="code text literal-block">
-tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
+tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:flight:89ab...4567:0123...cdef
 </pre>
 <table border="1" class="docutils">
 <colgroup>
@@ -5989,6 +5993,12 @@ taking a RESTART, until the start takes a CONNECT carrying
 its configuration's checksum, and <tt class="docutils literal">normal</tt> otherwise: the
 <em>restart flag</em>, <tt class="docutils literal">restart_flag</tt> in code</td>
 </tr>
+<tr><td>checks</td>
+<td><tt class="docutils literal">flight</tt> where this run has no test code in it and this
+build none that could be, and <tt class="docutils literal">test</tt> otherwise: the
+<em>flight check</em>, <tt class="docutils literal">flight_check</tt> in code. See <a class="reference internal" href="#test-code-never-flies">Test Code
+Never Flies</a></td>
+</tr>
 <tr><td>links</td>
 <td>The <em>link digest</em>: MD5 of what this tcspecial worked out of
 its configuration -- ports, APIDs, message IDs, the layout
@@ -6012,9 +6022,9 @@ of text fields and nothing else.</dd>
 <dt>Requirement</dt>
 <dd>A beacon is read strictly, by <tt class="docutils literal"><span class="pre">tcsprotocol::Beacon::read</span></tt> in Rust and
 <tt class="docutils literal">tcsprotocol.beacon.Beacon.read</tt> in Python, and by nothing else:
-exactly seven fields, each in the form the table gives. A datagram longer
-than the longest beacon, 139 bytes (<tt class="docutils literal">BEACON_BYTES</tt>), that is not UTF-8,
-or that has a field out of its form, an eighth field, a trailing colon or a
+exactly eight fields, each in the form the table gives. A datagram longer
+than the longest beacon, 146 bytes (<tt class="docutils literal">BEACON_BYTES</tt>), that is not UTF-8,
+or that has a field out of its form, a ninth field, a trailing colon or a
 trailing newline, is not a beacon, and the ground shows what arrived rather than a
 beacon (<tt class="docutils literal"><span class="pre">BeaconError::Length</span></tt> or <tt class="docutils literal"><span class="pre">BeaconError::Field</span></tt>, naming the
 field). Something else sending to the beacon port is then seen for what it
@@ -6043,8 +6053,9 @@ digests, which is the difference a version would have told.</dd>
 <dt>Requirement</dt>
 <dd>The MOC shows what the last beacon said as one line, each part
 labelled: <tt class="docutils literal">tcspecial v0.1.0 md5</tt> and the digest's sixteen bytes in
-hex with nothing between them, then <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt>
-where the restart flag says <tt class="docutils literal">restart</tt>. That is the window's way of
+hex with nothing between them, then <tt class="docutils literal">, FLIGHT</tt> or <tt class="docutils literal">, TEST</tt> for the
+flight check, then <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt> where the restart
+flag says <tt class="docutils literal">restart</tt>. That is the window's way of
 writing it, not what is on the wire, which is the beacon's own text
 above. The answer to a <tt class="docutils literal">CONNECT</tt> is written the same way, up to the
 digest; see <a class="reference internal" href="#what-each-end-read">What Each End Read</a>.</dd>
@@ -9085,7 +9096,8 @@ that leaves <tt class="docutils literal"><span class="pre">--simulate</span></tt
 there would be a window opened in flight; a run with no simulated or dummy
 devices that is not flight is a mistake about which run it is. The refusal
 comes before the build's own, so that what a flight launch meets does not
-depend on how the binary was built.</dd>
+depend on how the binary was built. It is made with the other checks for
+test code: see <a class="reference internal" href="#test-code-never-flies">Test Code Never Flies</a>.</dd>
 <dt>Requirement</dt>
 <dd>The window shows the three working panes as tcs-cfge shows them, with every
 node of the top file where tcs-cfge would place it and every link along the
@@ -11310,8 +11322,111 @@ served only testing.</dd>
 </dl>
 </div>
 </div>
+<div class="section" id="test-code-never-flies">
+<h2><a class="toc-backref" href="#toc-entry-146">Test Code Never Flies</a></h2>
+<p>Implemented: the checks are <tt class="docutils literal"><span class="pre">tcspecial::flight_checks</span></tt>, the bit errors
+<tt class="docutils literal"><span class="pre">tcspecial::runtime::bit_errors</span></tt>, the beacon's field
+<tt class="docutils literal"><span class="pre">tcsprotocol::beacon::FlightCheck</span></tt>, and the ground's alarm
+<tt class="docutils literal"><span class="pre">tcsmoc::beacon::Beacons::flying</span></tt>.</p>
+<p><em>Test code</em> is code in tcspecial that exists for testing and must never run
+aboard: the visual window (<tt class="docutils literal"><span class="pre">--visual</span></tt>, see <a class="reference internal" href="#the-visual-window">The Visual Window</a>) and bit
+errors on the link to the ground (the simulator file's <tt class="docutils literal">gateway</tt>
+section). The simulation mode
+is what says a run is flight, so each piece of test code is held to it; and
+the ground, which cannot see the build, is told in every beacon what the
+vehicle found.</p>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>Each piece of test code is in tcspecial only with a Cargo feature that
+is not a default and is never in a build that flies: <tt class="docutils literal">visual</tt> and
+<tt class="docutils literal"><span class="pre">bit-errors</span></tt>. A build without it has none of the test code's workings
+-- the bit errors, in a build without their feature, are a function
+that answers that no packet is lost, which the compiler takes out --
+so a flight build has nothing to switch on by mistake.
+<tt class="docutils literal"><span class="pre">tcspecial::flight_checks::NEVER_FLIES</span></tt> names every such feature, and
+a build that has any of them says so as a warning every time it starts.</dd>
+<dt>Requirement</dt>
+<dd>Each piece of test code is refused under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, the flight
+setting and what a run that leaves the flag out gets, even in a build
+that has it, before anything is read or opened, saying to give
+<tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal"><span class="pre">--simulate=all</span></tt> with it. Asked of a build
+without its feature, it is refused, saying how to build one that has it.
+A build that has the feature and is not asked for it runs.</dd>
+<dt>Requirement</dt>
+<dd>Every check for test code is made in one place,
+<tt class="docutils literal"><span class="pre">tcspecial::flight_checks::check</span></tt>, before the first beacon is sent.
+That function alone makes a <tt class="docutils literal">Checked</tt>, and the beacon sender cannot be
+made without one, so no beacon can go before the checks are finished.
+A new piece of test code adds its check there, and nowhere after it.</dd>
+<dt>Requirement</dt>
+<dd>Every beacon carries the <em>flight check</em>: <tt class="docutils literal">flight</tt> where the run is
+under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt> and the build has no feature that never flies,
+and <tt class="docutils literal">test</tt> otherwise -- a run under <tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt>, or a build
+with test code in it, whether or not that is asked for: such a build is
+not the one that was meant to fly. In every beacon, not in a message
+sent once, because any one packet can be lost: a ground station that
+missed the first beacons hears it in the next. See <a class="reference internal" href="#asynchronous-telemetry">Asynchronous
+Telemetry</a>.</dd>
+<dt>Requirement</dt>
+<dd>A ground station run as flight -- tcs-moc under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt> --
+holds every beacon to flight code. A beacon saying <tt class="docutils literal">test</tt> is said as a
+mismatch is, <tt class="docutils literal">TEST CODE</tt> first on the beacon line and on the console,
+and the operator is asked whether to go on. It does not end the match
+for commanding, as a configuration that differs does: the vehicle is
+not misread, and the commands that take it out of the run may be the
+ones it needs.</dd>
+<dt>Requirement</dt>
+<dd>The MOC's procedures, after starting tcspecial, wait for it to start and
+then check the flight check of a beacon heard since: <tt class="docutils literal">flight</tt> for a
+flight, <tt class="docutils literal">test</tt> for a test. A station that hears no beacon has not heard
+the check, and a vehicle it cannot hear is not one it may take for
+flight code.</dd>
+</dl>
+<div class="section" id="bit-errors-on-the-link">
+<h3><a class="toc-backref" href="#toc-entry-147">Bit errors on the link</a></h3>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd>A simulator file's <tt class="docutils literal">gateway</tt> section states <tt class="docutils literal">bit_error_rate</tt>, <tt class="docutils literal">p</tt>
+in flips per bit, and tcspecial, in a build with the <tt class="docutils literal"><span class="pre">bit-errors</span></tt>
+feature and under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, loses each packet
+crossing the link to the ground as <tt class="docutils literal">p</tt> flips per bit would: a packet
+of <tt class="docutils literal">n</tt> bits is lost with probability <tt class="docutils literal">1 - (1 - <span class="pre">p)^n</span></tt>, and a packet
+with a flipped bit is dropped whole, as a link whose check fails drops
+it. <tt class="docutils literal">p</tt> is from 0 to 1. <tt class="docutils literal">n</tt> is the packet as tcspecial reads or
+writes it, eight bits a byte, without what the transport adds.</dd>
+<dt>Requirement</dt>
+<dd>Up and down alike: the commands arriving and the gateway's data
+arriving, and the answers, the beacons and the gateway's data leaving.
+A beacon lost is still recorded in the telemetry log, which is what the
+vehicle produced, not what the ground heard.</dd>
+<dt>Requirement</dt>
+<dd>The section's <tt class="docutils literal">seed</tt> is where the random numbers start: left out or
+blank, the default, 1 (<tt class="docutils literal">DEFAULT_BIT_ERROR_SEED</tt>); a whole number, that
+number; <tt class="docutils literal">random</tt>, one drawn from the system's source of randomness
+(<tt class="docutils literal">getrandom</tt>, a dependency of the <tt class="docutils literal"><span class="pre">bit-errors</span></tt> feature alone). The
+default makes every run that states no seed lose the same packets, so
+that a test is repeatable without saying how; <tt class="docutils literal">random</tt> is asked for,
+never fallen into. Anything else is refused as the file is read. The
+rate, the seed, which of the three it was and the file are said in the
+startup summary, so a random seed can be stated to have its run again.</dd>
+<dt>Requirement</dt>
+<dd>The rate is in the simulator file, not on tcspecial's command line or in
+its configuration: it is a test setting, as the payloads' faults are, and
+the configuration flown is the one tested, byte for byte. tcspecial
+reads the file tcs-sim and tcs-moc read for its configuration, the one
+<tt class="docutils literal">PAYLOAD_SIM_YAML</tt> names or the one beside it. A build that may fly,
+run under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, does not read it at all.</dd>
+<dt>Requirement</dt>
+<dd>A tcspecial without the <tt class="docutils literal"><span class="pre">bit-errors</span></tt> feature, under <tt class="docutils literal">some</tt> or
+<tt class="docutils literal">all</tt>, refuses a simulator file that states a rate, saying how to
+build one that has it: a test that asked for a lossy link and was given
+a perfect one would pass for the wrong reason. A file that states one
+under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt> is refused by every build that reads it.</dd>
+</dl>
+</div>
+</div>
 <div class="section" id="waiting-for-the-simulator">
-<h2><a class="toc-backref" href="#toc-entry-146">Waiting for the Simulator</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-148">Waiting for the Simulator</a></h2>
 <p>Implemented: the messages are <tt class="docutils literal"><span class="pre">tcsprotocol::ready</span></tt>, tcs-sim's end is
 <tt class="docutils literal"><span class="pre">tcs-sim/src/ready.rs</span></tt>, a harness waits through <tt class="docutils literal"><span class="pre">tcsmoc::simulator</span></tt> or
 <tt class="docutils literal">python/tcsmoc/simulator.py</tt>, and tcs-moc and <tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--wait</span></tt> are
@@ -11439,7 +11554,7 @@ a harness neither starts one nor asks.</dd>
 </dl>
 </div>
 <div class="section" id="gui-framework">
-<h2><a class="toc-backref" href="#toc-entry-147">GUI Framework</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-149">GUI Framework</a></h2>
 <p>The testing GUIs will all use
 the Rust slint crate
 with black on white. All windows will have a go away box which will shut down
@@ -11454,7 +11569,7 @@ outside them rather than on any press, a press inside being somebody selecting.<
 </div>
 </div>
 <div class="section" id="hints">
-<h1><a class="toc-backref" href="#toc-entry-148">Hints</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-150">Hints</a></h1>
 <p>These are some things that Claude doesn't seem to figure out by itself.</p>
 <ul class="simple">
 <li>Do not pass an i32 to PollFd::new() as the first argument. Instead, pass the i32
@@ -11469,7 +11584,7 @@ JSON.</li>
 </ul>
 </div>
 <div class="section" id="possible-enhancements">
-<h1><a class="toc-backref" href="#toc-entry-149">Possible Enhancements</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-151">Possible Enhancements</a></h1>
 <p>Build-time selection of CI and DH protocols to OC/spacecraft radio</p>
 <blockquote>
 Though most or all of on-board spacecraft protocols are based on datagrams, use
@@ -11487,7 +11602,7 @@ The EndpointWaitable trait, and each device interface, could be
 extended to other operating systems: see <a class="reference internal" href="#platforms-and-porting">Platforms and Porting</a>.</blockquote>
 </div>
 <div class="section" id="possible-future-directions">
-<h1><a class="toc-backref" href="#toc-entry-150">Possible Future Directions</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-152">Possible Future Directions</a></h1>
 <p>pkg-config files and the naming rule</p>
 <blockquote>
 <p>A pkg-config file tells a C or C++ build how to compile and link with an
@@ -11558,7 +11673,7 @@ code, so for now a name of one of these says only what it belongs to.</p>
 </blockquote>
 </div>
 <div class="section" id="development-approach">
-<h1><a class="toc-backref" href="#toc-entry-151">Development Approach</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-153">Development Approach</a></h1>
 <p>As of this writing, this design document is all there is of TCSpecial. The intent
 is to use AI to generate it from this code. Going from design to code, if
 AI is ready, should both save time and improve quality but these will only
@@ -11566,7 +11681,7 @@ be true to the extent that the design is accurate and complete. Right now
 I am using Claude Code as the AI code generator.</p>
 </div>
 <div class="section" id="requirements">
-<h1><a class="toc-backref" href="#toc-entry-152">Requirements</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-154">Requirements</a></h1>
 <p>These are the requirements TCSpecial was written against, as they were
 written, with the implementation notes that say where the software does
 something else. They are here rather than in a file of their own so that a
@@ -11576,7 +11691,7 @@ kept somewhere else is a requirement nobody reads while making a decision.</p>
 operations center and for conduiting telemetry from the payloads back to it.
 What follows sets out the requirements for its operation.</p>
 <div class="section" id="about-the-names-and-the-notes">
-<h2><a class="toc-backref" href="#toc-entry-153">About the names and the notes</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-155">About the names and the notes</a></h2>
 <p>The requirements below are as they were written, with two types of change.</p>
 <p>The names are the ones the software goes by. Three were settled differently
 after this was written: the spacecraft process is <strong>tcspecial</strong>, not <tt class="docutils literal">tcssvr</tt>;
@@ -11606,19 +11721,19 @@ RS-485 on a serial line, and the <tt class="docutils literal">iio</tt>, <tt clas
 each has been flown against the kernel's dummy device for it.</p>
 </div>
 <div class="section" id="the-name-of-the-project-is-tcspecial">
-<h2><a class="toc-backref" href="#toc-entry-154">The name of the project is TCSpecial</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-156">The name of the project is TCSpecial</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-a-process-named-tcspecial-that-runs-on-the-spacecraft">
-<h2><a class="toc-backref" href="#toc-entry-155">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-157">TCSpecial shall include a process named tcspecial that runs on the spacecraft</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-a-library-named-tcsmoc-that-links-with-misssion-control-software">
-<h2><a class="toc-backref" href="#toc-entry-156">TCSpecial shall include a library named tcsmoc that links with misssion control software</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-158">TCSpecial shall include a library named tcsmoc that links with misssion control software</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-a-library-named-tcsprotocol-that-is-shared-between-tcspecial-and-tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-157">TCSpecial shall include a library named tcsprotocol that is shared between tcspecial and tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-159">TCSpecial shall include a library named tcsprotocol that is shared between tcspecial and tcsmoc</a></h2>
 </div>
 <div class="section" id="tcspecial-shall-include-applications-named-tcs-moc-and-tcs-sim-that-provide-guis-for-testing-tcspecial-tcsprotocol-and-tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-158">TCSpecial shall include applications named tcs-moc and tcs-sim that provide GUIs for testing tcspecial, tcsprotocol, and tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-160">TCSpecial shall include applications named tcs-moc and tcs-sim that provide GUIs for testing tcspecial, tcsprotocol, and tcsmoc</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented as two programs rather than one. Tcs-moc simulates the
@@ -11627,7 +11742,7 @@ ends of every link and one window driving both says less about either.</p>
 </div>
 </div>
 <div class="section" id="tcspecial-must-have-a-trait-named-command-interpreter-ci-that-parses-commands-sent-by-tcsmoc">
-<h2><a class="toc-backref" href="#toc-entry-159">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcsmoc</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-161">TCSpecial must have a trait named Command Interpreter (CI) that parses commands sent by tcsmoc</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. <tt class="docutils literal">CommandInterpreter</tt> is a struct, not a trait:
@@ -11638,7 +11753,7 @@ there really are many implementations, one per type of endpoint.</p>
 </div>
 </div>
 <div class="section" id="tcspecial-must-have-a-trait-named-data-handler-dh-that-is-called-by-ci-to-process-commands">
-<h2><a class="toc-backref" href="#toc-entry-160">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-162">TCSpecial must have a trait named data handler (DH) that is called by CI to process commands</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently, for the reason above: <tt class="docutils literal">DataHandler</tt> is a struct.
@@ -11646,7 +11761,7 @@ What differs between handlers is the endpoints they open, which is where
 the traits are.</p>
 </div>
 <div class="section" id="ci-must-be-implemented-by-ci-udp-that-communicates-with-tcsmoc-via-udp-ip">
-<h3><a class="toc-backref" href="#toc-entry-161">CI must be implemented by CI_UDP that communicates with tcsmoc via UDP/IP</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-163">CI must be implemented by CI_UDP that communicates with tcsmoc via UDP/IP</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">CI_UDP</tt>: the command interpreter
@@ -11655,7 +11770,7 @@ and one for commands about a payload.</p>
 </div>
 </div>
 <div class="section" id="dh-udp-must-implement-dh-and-use-udp-to-send-telemetry-to-tcsmoc">
-<h3><a class="toc-backref" href="#toc-entry-162">DH_UDP must implement DH and use UDP to send telemetry to tcsmoc</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-164">DH_UDP must implement DH and use UDP to send telemetry to tcsmoc</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented differently. There is no <tt class="docutils literal">DH_UDP</tt>. A node's endpoint is per
@@ -11690,7 +11805,7 @@ the <tt class="docutils literal">commands</tt> section says the ground may set.<
 </div>
 </div>
 <div class="section" id="ci-must-have-an-element-named-dh-of-type-btreemap">
-<h3><a class="toc-backref" href="#toc-entry-163">CI must have an element named dh of type BTreeMap</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-165">CI must have an element named dh of type BTreeMap</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented as a <tt class="docutils literal">BTreeMap</tt>, of nodes rather than of handlers and under
@@ -11702,10 +11817,10 @@ whole map, so a node held open for a slow read does not hold up a command
 about another.</p>
 </div>
 <div class="section" id="ci-must-support-sending-telemetry-responses-to-all-ci-commands">
-<h4><a class="toc-backref" href="#toc-entry-164">CI must support sending telemetry responses to all CI commands</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-166">CI must support sending telemetry responses to all CI commands</a></h4>
 </div>
 <div class="section" id="each-ci-telemetry-response-to-a-command-must-contain-a-timestamp-command-sequence-number-a-success-or-error-indication">
-<h4><a class="toc-backref" href="#toc-entry-165">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-167">Each CI telemetry response to a command must contain a timestamp, command sequence number, a success or error indication</a></h4>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented. <tt class="docutils literal">TelemetryHeader</tt> carries the sequence number, the
@@ -11718,7 +11833,7 @@ read.</p>
 </div>
 </div>
 <div class="section" id="ci-must-periodically-send-a-telemetry-beacon-message-with-a-timestamp-and-unique-sequence-number">
-<h4><a class="toc-backref" href="#toc-entry-166">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-168">CI must periodically send a Telemetry::Beacon message with a timestamp and unique sequence number</a></h4>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p>Implemented, from one stated socket to another: a beacon went to a
@@ -11737,13 +11852,13 @@ says otherwise and is not met: one of the two is to change.</p>
 </div>
 </div>
 <div class="section" id="ci-must-parse-commands-from-the-ground-receved-via-udp-ip">
-<h4><a class="toc-backref" href="#toc-entry-167">CI must parse commands from the ground receved via UDP/IP</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-169">CI must parse commands from the ground receved via UDP/IP</a></h4>
 </div>
 <div class="section" id="all-ci-commands-must-include-a-sequence-number-that-increments-for-each-command-sent">
-<h4><a class="toc-backref" href="#toc-entry-168">All CI commands must include a sequence number that increments for each command sent</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-170">All CI commands must include a sequence number that increments for each command sent</a></h4>
 </div>
 <div class="section" id="ci-must-support-an-exit-command-that-terminates-the-tcspecial-process">
-<h4><a class="toc-backref" href="#toc-entry-169">CI must support an EXIT command that terminates the tcspecial process</a></h4>
+<h4><a class="toc-backref" href="#toc-entry-171">CI must support an EXIT command that terminates the tcspecial process</a></h4>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Not implemented. There is no EXIT command. RESTART comes nearest, and is
@@ -11762,7 +11877,7 @@ gave; a ground station asks about every node by asking about each.</p>
 </div>
 </div>
 <div class="section" id="tcspecial-includes-zero-or-more-components-named-data-handler-dh">
-<h3><a class="toc-backref" href="#toc-entry-170">Tcspecial includes zero or more components named Data Handler (DH)</a></h3>
+<h3><a class="toc-backref" href="#toc-entry-172">Tcspecial includes zero or more components named Data Handler (DH)</a></h3>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented, as nodes: a configuration draws zero or more, and what a
@@ -11774,10 +11889,10 @@ let a decision be made aboard.</p>
 </div>
 </div>
 <div class="section" id="the-top-part-of-the-tcs-moc-window-is-for-sending-commands-to-tcspecial-s-ci-and-viewing-telemetry-from-tcspecial-s-ci">
-<h2><a class="toc-backref" href="#toc-entry-171">The top part of the tcs-moc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-173">The top part of the tcs-moc window is for sending commands to tcspecial's CI and viewing telemetry from tcspecial's CI</a></h2>
 </div>
 <div class="section" id="the-middle-part-of-the-tcs-moc-window-is-for-viewing-telemetry-from-individual-dhs">
-<h2><a class="toc-backref" href="#toc-entry-172">The middle part of the tcs-moc window is for viewing telemetry from individual DHs</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-174">The middle part of the tcs-moc window is for viewing telemetry from individual DHs</a></h2>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">Implemented, one panel per node the configuration draws. What the panel
@@ -11790,7 +11905,7 @@ payload nobody sends to.</p>
 </div>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-173">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-175">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="https://vomlehn.github.io/tcs-xtce/docs/manual.html">tcs-xtce manual</a></dt>
 <dd>tcs-xtce turns an XTCE description of telemetry and command packets

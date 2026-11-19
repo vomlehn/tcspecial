@@ -825,6 +825,11 @@ impl Serving {
                 return false;
             }
         };
+        // Lost on the way up, in a test of a lossy link: never in a build
+        // that flies, where this is `false`. See runtime::bit_errors.
+        if crate::runtime::bit_errors::lost(size) {
+            return false;
+        }
 
         // Only from where the configuration says the ground commands from, and
         // nothing is sent back to anywhere else: an answer would tell whoever
@@ -908,13 +913,20 @@ impl Serving {
         if matched_now {
             drop_queued(nodes, CommandLink::Payload);
         }
+        // An answer lost on the way down, in a test of a lossy link: never
+        // in a build that flies, where `lost` is `false`.
+        let lost = crate::runtime::bit_errors::lost;
         self.send_answer(&answer, |data| match framing {
             None => {
-                let _ = socket.send_to(data, from);
+                if !lost(data.len()) {
+                    let _ = socket.send_to(data, from);
+                }
             }
             Some(framing) => match framing.answers.frame(buffer, data) {
                 Ok(packet) => {
-                    let _ = socket.send_to(packet, from);
+                    if !lost(packet.len()) {
+                        let _ = socket.send_to(packet, from);
+                    }
                 }
                 Err(fault) => {
                     error!("{}: an answer not sent: {fault}", spelling(which))

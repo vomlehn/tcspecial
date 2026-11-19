@@ -917,9 +917,13 @@ mod tests {
     /// It changed once, deliberately, on 2026-11-15, from `36c964e1...`,
     /// when the link digest was added before the interface's: no other
     /// field could carry to a station that only listens whether the vehicle
-    /// worked its configuration out as the station did. A test that fails
-    /// here is a change to undo unless it is as deliberate, and says so here.
-    const BEACON_DIGEST: &str = "6d8f5990e6fa621fd8df2e47a0058148";
+    /// worked its configuration out as the station did. It changed again,
+    /// as deliberately, on 2026-11-18, from `6d8f5990...`, when the flight
+    /// check was added after the restart flag: whether test code is in the
+    /// run must be said in every beacon, since any one packet can be lost,
+    /// and no other field could say it. A test that fails here is a change
+    /// to undo unless it is as deliberate, and says so here.
+    const BEACON_DIGEST: &str = "11e3c1223709ab51125e75f806297842";
 
     /// Makes one command of every kind, and a SET_NODE as long as one can be.
     ///

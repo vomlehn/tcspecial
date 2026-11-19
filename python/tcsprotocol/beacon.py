@@ -4,16 +4,18 @@ The Python spelling of ``tcsprotocol/src/beacon.rs``. A beacon is text, and
 nothing but text: its fields in order, a colon between each, so that a person
 reading a packet capture or a log reads it as it is, with no decoder::
 
-    tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:89ab...4567:0123...cdef
+    tcspecial:1.2.3:d41d8cd98f00b204e9800998ecf8427e:42:normal:flight:89ab...4567:0123...cdef
 
 which is the name, the version, the configuration's digest, the beacon's
-number, ``restart`` or ``normal`` for the restart flag, the link digest of
-what the sender worked out of its configuration (``graph::link_table``) and
-the interface's digest, numbers in decimal and digests in lower-case hex. It is
-read strictly, as the Rust reads it. A beacon carries no check of its own:
-the transport under it checks it, as UDP's checksum does here.
+number, ``restart`` or ``normal`` for the restart flag, ``flight`` or
+``test`` for the flight check (whether the sender found test code in its run
+or its build), the link digest of what the sender worked out of its
+configuration (``graph::link_table``) and the interface's digest, numbers
+in decimal and digests in lower-case hex. It is read strictly, as the Rust
+reads it. A beacon carries no check of its own: the transport under it
+checks it, as UDP's checksum does here.
 
-Its layout -- seven text fields, each but the last ended by a colon, the last
+Its layout -- eight text fields, each but the last ended by a colon, the last
 32 characters that end the datagram -- is in ``tcsprotocol/xtce/beacon.xtce``,
 and is packed and unpacked here by the code tcs-xtce generates from it,
 :class:`tcsprotocol.beacon_packet.Beacon`. What the
@@ -32,11 +34,17 @@ BEACON_NAME = "tcspecial"
 #: not yet been matched, or has taken a RESTART -- and when it is clear.
 RESTART_FLAG = "restart"
 NORMAL_FLAG = "normal"
+#: What the flight check's field says of a run with no test code in it: one
+#: under ``--simulate=none``, from a build with no feature that never flies.
+FLIGHT_CHECK = "flight"
+#: What it says of a run that has test code in it or in its build, or whose
+#: sender has not said: the value that claims less.
+TEST_CHECK = "test"
 #: The longest a beacon is: the name, a version of three parts of up to three
-#: digits, three digests of thirty-two hex digits, a number of up to ten digits
-#: and the longer flag, with the six colons between them -- the longest the
-#: XTCE's layout allows.
-BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 32 + 32 + 6
+#: digits, three digests of thirty-two hex digits, a number of up to ten
+#: digits, the longer restart flag and the longer flight check, with the
+#: seven colons between them -- the longest the XTCE's layout allows.
+BEACON_BYTES = 9 + 11 + 32 + 10 + 7 + 6 + 32 + 32 + 7
 assert BEACON_BYTES == _packet.Beacon.MAX_BYTES
 
 #: What each field's being longer than its room says, by the field's name in
@@ -47,6 +55,7 @@ _TOO_LONG = {
     "BeaconDigest": "the configuration digest is not 32 hex digits",
     "BeaconNumber": "the number is not a number",
     "BeaconFlag": 'the restart flag is neither "restart" nor "normal"',
+    "BeaconChecks": 'the flight check is neither "flight" nor "test"',
     "BeaconLinks": "the link digest is not 32 hex digits",
 }
 
@@ -143,6 +152,11 @@ class Beacon:
     #: ``tcsprotocol::graph::link_table``. Sixteen zero bytes where none is
     #: given, which no configuration's is likely to be.
     links: bytes = None
+    #: Whether the sender found no test code in its run or its build,
+    #: checked before its first beacon: ``flight`` on the link where true,
+    #: ``test`` where false. False where not given, which claims less. Said
+    #: in every beacon, since any one beacon can be lost.
+    flight: bool = False
 
     def __post_init__(self):
         if self.interface is None:
@@ -185,17 +199,18 @@ class Beacon:
                 raise _refused(_TOO_LONG[field]) from None
             if field == "BeaconName":
                 raise _refused('it does not start "tcspecial:"') from None
-            if field == "BeaconInterface" and count == 7:
+            if field == "BeaconInterface" and count == 8:
                 raise _refused(
                     "the interface digest is not 32 hex digits") from None
-            raise _refused(f"it has {count} fields, not seven") from None
+            raise _refused(f"it has {count} fields, not eight") from None
         if used != len(datagram):
-            raise _refused(f"it has {count} fields, not seven")
+            raise _refused(f"it has {count} fields, not eight")
         name = fields.beacon_name
         version = fields.beacon_version
         digest = fields.beacon_digest
         sequence = fields.beacon_number
         flag = fields.beacon_flag
+        check = fields.beacon_checks
         links = fields.beacon_links
         interface = fields.beacon_interface
         if name != BEACON_NAME:
@@ -212,6 +227,9 @@ class Beacon:
         if flag not in (RESTART_FLAG, NORMAL_FLAG):
             raise _refused(
                 'the restart flag is neither "restart" nor "normal"')
+        if check not in (FLIGHT_CHECK, TEST_CHECK):
+            raise _refused(
+                'the flight check is neither "flight" nor "test"')
         links = _hex(links)
         if links is None:
             raise _refused("the link digest is not 32 hex digits")
@@ -225,6 +243,7 @@ class Beacon:
             restart_flag=flag == RESTART_FLAG,
             interface=interface,
             links=links,
+            flight=check == FLIGHT_CHECK,
         )
 
     def to_bytes(self):
@@ -240,6 +259,7 @@ class Beacon:
             beacon_digest=self.digest.hex(),
             beacon_number=str(self.sequence),
             beacon_flag=RESTART_FLAG if self.restart_flag else NORMAL_FLAG,
+            beacon_checks=FLIGHT_CHECK if self.flight else TEST_CHECK,
             beacon_links=self.links.hex(),
             beacon_interface=self.interface.hex(),
         ).to_bytes()

@@ -37,12 +37,16 @@
 //! * [`matched`] is whether the ground has matched this start's
 //!   configuration, which the beacons, the commands and every link to the
 //!   ground ask.
+//! * [`bit_errors`] loses packets on the link to the ground as a bit error
+//!   rate would, for a test, in a build with the `bit-errors` feature,
+//!   which never flies; in any other build it loses none and is nothing.
 //!
 //! The first two open nothing. They are the arithmetic of the graph, and they
 //! are separate from the moving of bytes on purpose: both can be tested
 //! against a configuration with no vehicle present, where a fault in either
 //! would otherwise look like a fault in a device.
 
+pub mod bit_errors;
 pub mod bus;
 pub mod choose;
 pub mod command;

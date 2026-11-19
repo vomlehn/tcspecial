@@ -496,7 +496,8 @@ vehicle:
         format!("configuration: md5 {digest}"),
         "ping before a match: refused, unsent".to_string(),
         "send before a match: refused, unsent".to_string(),
-        format!("beacon: Heard, tcspecial v{version} md5 {digest}"),
+        // The flight check, `test`: the run simulates.
+        format!("beacon: Heard, tcspecial v{version} md5 {digest}, TEST"),
         "matched: listening yes, commanding no".to_string(),
         "connect: agrees".to_string(),
         "matched: listening yes, commanding yes".to_string(),

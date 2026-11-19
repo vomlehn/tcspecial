@@ -392,6 +392,9 @@ class Heard:
     #: Whether its restart flag was set: the vehicle has started, or taken a
     #: RESTART, and has not been matched since.
     restart_flag: bool = False
+    #: Whether its flight check said ``flight``: no test code in the
+    #: sender's run or build. False where it said ``test`` or was not read.
+    flight: bool = False
     #: What is wrong with the configuration it announces, what it worked out
     #: of it or the interface it speaks, if anything: see :func:`mismatch`.
     differs: str = None
@@ -405,9 +408,9 @@ def _beacon_of(datagram):
 
     Returns:
         A dict of the beacon's ``sequence``, ``version``, ``digest``,
-        ``links`` and ``interface`` (each digest as text) and
-        ``restart_flag``, or ``None`` if the datagram is not a beacon this
-        can read.
+        ``links`` and ``interface`` (each digest as text), ``restart_flag``
+        and ``flight`` (whether its flight check said ``flight``), or
+        ``None`` if the datagram is not a beacon this can read.
     """
     try:
         beacon = Beacon.read(datagram)
@@ -418,6 +421,7 @@ def _beacon_of(datagram):
         "version": version_text(beacon.version),
         "digest": digest_text(beacon.digest),
         "restart_flag": beacon.restart_flag,
+        "flight": beacon.flight,
         "links": digest_text(beacon.links),
         "interface": digest_text(beacon.interface),
     }
@@ -446,6 +450,7 @@ def hear(datagram, expected, links=None):
         sequence=None if beacon is None else beacon["sequence"],
         restart_flag=(beacon is not None
                            and beacon["restart_flag"]),
+        flight=beacon is not None and beacon["flight"],
         differs=why,
     )
 
@@ -540,13 +545,16 @@ def message_of(datagram):
         datagram: The bytes that arrived on the beacon link.
 
     Returns:
-        The beacon's version and digest and whether its restart flag was
-        set, as one line. A datagram this cannot read is shown
-        as what arrived, cut short to forty characters.
+        The beacon's version and digest, its flight check (``FLIGHT`` for
+        flight code only, ``TEST`` for test code in the run or the build)
+        and whether its restart flag was set, as one line. A datagram this
+        cannot read is shown as what arrived, cut short to forty
+        characters.
     """
     beacon = _beacon_of(datagram)
     if beacon is not None:
         said = what_it_read(beacon["version"], beacon["digest"])
+        said += ", FLIGHT" if beacon["flight"] else ", TEST"
         return (said + ", RESTARTED, NOT YET MATCHED"
                 if beacon["restart_flag"] else said)
     text = datagram.decode("utf-8", errors="replace")

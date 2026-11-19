@@ -61,6 +61,11 @@ pub struct Simulator {
     /// thing that broke a set that worked.
     #[serde(default, rename = "tcs-sim")]
     pub tcs_sim: Settings,
+    /// The `gateway` section -- bit errors on the link to the ground, for a
+    /// test -- kept so that saving does not drop it, as `tcs-sim` is: an
+    /// editor that wrote it away would turn a lossy test into a perfect one.
+    #[serde(default)]
+    pub gateway: Settings,
     /// The world: the file's `world` section, its ambient temperature and
     /// its physics model's components and their connections. Empty for a
     /// file without one, and written only where it holds something.
@@ -442,6 +447,9 @@ struct File {
     description: Option<String>,
     #[serde(default, rename = "tcs-sim")]
     tcs_sim: BTreeMap<String, Scalar>,
+    /// Bit errors on the link to the ground, kept as written.
+    #[serde(default)]
+    gateway: BTreeMap<String, Scalar>,
     #[serde(default)]
     world: Option<WorldFile>,
     /// A section a simulator file held before the physics model was made of
@@ -703,6 +711,11 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
         .into_iter()
         .map(|(name, value)| (name, value.as_str().to_string()))
         .collect();
+    simulator.gateway = file
+        .gateway
+        .into_iter()
+        .map(|(name, value)| (name, value.as_str().to_string()))
+        .collect();
 
     // Two entries of one name are refused rather than read. A name is how
     // this file is joined to the configuration, so two of them are two sets
@@ -820,6 +833,16 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
     let said = stated(&simulator.tcs_sim);
     if !said.is_empty() {
         out.push_str("\ntcs-sim:\n");
+        for (field, value) in said {
+            out.push_str(&format!("  {field}: {}\n", setting(value)));
+        }
+    }
+
+    // Bit errors on the link to the ground, as the file said them: test
+    // settings, which the editor offers no window for and does not drop.
+    let said = stated(&simulator.gateway);
+    if !said.is_empty() {
+        out.push_str("\ngateway:\n");
         for (field, value) in said {
             out.push_str(&format!("  {field}: {}\n", setting(value)));
         }
@@ -1314,6 +1337,41 @@ mod tests {
         assert!(
             written.contains("thermostat-common: [cabinet]"),
             "{written}"
+        );
+    }
+
+    /// The gateway section's bit errors go back out as they came in, and
+    /// the simulator's own reader takes what the editor wrote.
+    #[test]
+    fn the_bit_errors_survive_the_editor() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehiclesim.yaml");
+        let given = concat!(
+            "tcs-sim:\n",
+            "  ready: \"127.0.0.1:7999\"\n",
+            "\n",
+            "gateway:\n",
+            "  bit_error_rate: 1e-6\n",
+            "  seed: 42\n",
+        );
+        std::fs::write(&path, given).expect("written");
+        let read_in = read(&path).expect("it reads");
+        // The number, which the editor may write in another spelling.
+        let rate: f64 =
+            read_in.gateway["bit_error_rate"].parse().expect("a number");
+        assert_eq!(rate, 1e-6);
+        let written = to_yaml(&read_in, &[]);
+        assert!(written.contains("\ngateway:\n"), "{written}");
+        let file = tcsprotocol::sim_config::SimConfigFile::parse(
+            &written,
+            tcsprotocol::format::ConfigFormat::Yaml,
+        )
+        .expect("the simulator reads it");
+        let gateway = file.gateway.expect("a gateway section");
+        assert_eq!(gateway.bit_error_rate, Some(1e-6));
+        assert_eq!(
+            gateway.seed,
+            Some(tcsprotocol::sim_config::GatewaySeed::Given(42))
         );
     }
 

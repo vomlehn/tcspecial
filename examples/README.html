@@ -555,16 +555,17 @@ two lines beside it.</li>
 find where the beacons are, starts the loop on a thread, and puts each
 pass in the window. That is all of it, but for a button.</li>
 </ul>
-<p>A beacon is a line of text, seven fields with a colon between each:
+<p>A beacon is a line of text, eight fields with a colon between each:
 the name <code>tcspecial</code>, the version as
 <code>major.minor.patch</code>, the configuration’s MD5 digest in
 lower-case hex, the beacon’s number in decimal, <code>restart</code>
 while a restart the ground commanded is under way and the MOC has not
-connected since or <code>normal</code> otherwise, the link digest – of
-what tcspecial worked out of its configuration, as
-<code>tcs-verify --links</code> prints it – and the interface’s digest,
-both in hex:</p>
-<pre><code>tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:89ab...4567:0123...cdef</code></pre>
+connected since or <code>normal</code> otherwise, <code>flight</code> or
+<code>test</code> for whether tcspecial found test code in its run or
+its build, the link digest – of what tcspecial worked out of its
+configuration, as <code>tcs-verify --links</code> prints it – and the
+interface’s digest, both in hex:</p>
+<pre><code>tcspecial:0.1.0:36999e46a4bf436854442d8f97a2248d:42:normal:flight:89ab...4567:0123...cdef</code></pre>
 <p>It is text so that it can be read as it is, in a packet capture or
 with any UDP listener. tcspecial writes every beacon and
 <code>tcsmoc::beacon</code> reads it with

@@ -1228,9 +1228,13 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     // The autopilot, while it flies the lander: see `Autopilot`.
     let pilot: Rc<RefCell<Option<Autopilot>>> = Rc::default();
     // Whether the joystick beckons: at first, and again each time the
-    // lander starts again after a crash with nobody flying it, until the
+    // lander starts again after a crash with nobody flying it -- neither the
+    // autopilot nor a hand on the joystick -- until the
     // joystick is taken hold of or a button pressed. See `Joystick34`.
     let beckoning = Rc::new(Cell::new(scene.joystick_3_4.is_some()));
+    // Whether the joystick is held now, by the pointer: a lander that starts
+    // again meanwhile is being flown, and the joystick does not beckon.
+    let holding = Rc::new(Cell::new(false));
     pane.set_has_joystick_3_4(scene.joystick_3_4.is_some());
     {
         let held = Rc::clone(&scene);
@@ -1272,6 +1276,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let flying = Rc::clone(&pilot);
         let weak = ui.as_weak();
         let beckon = Rc::clone(&beckoning);
+        let hold = Rc::clone(&holding);
         pane.on_stick_moved(move |dx, dy| {
             // Paused, the joystick takes nothing: the window does not take
             // hold of it either.
@@ -1279,6 +1284,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
                 return;
             }
             beckon.set(false);
+            hold.set(true);
             // The pilot takes over from the autopilot.
             if flying.borrow_mut().take().is_some() {
                 if let Some(ui) = weak.upgrade() {
@@ -1307,7 +1313,9 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         });
         let held = Rc::clone(&scene);
         let weak = ui.as_weak();
+        let hold = Rc::clone(&holding);
         pane.on_stick_released(move || {
+            hold.set(false);
             let now = Instant::now();
             for terminal in [SET_X, SET_Y] {
                 held.world.drive_by_hand(
@@ -1347,6 +1355,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             if was_crashed.replace(crashed)
                 && !crashed
                 && pilot.borrow().is_none()
+                && !holding.get()
                 && scene.joystick_3_4.is_some()
             {
                 beckoning.set(true);
@@ -1359,6 +1368,10 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     }
     timer
 }
+
+/// How far round the joystick a touch is the joystick's, in logical
+/// pixels: as far as a press takes hold of it, `Joystick34`'s `grab`.
+const FINGERTIP: f32 = 22.0;
 
 /// How often the beckoning joystick's square flashes, in seconds, and for
 /// how much of each it is lit.
@@ -1399,11 +1412,13 @@ fn regions(ui: &MainWindow) {
             width: pane.get_pane_right(),
             height: pane.get_pane_bottom(),
         },
+        // With a fingertip's reach round it, where a press takes hold
+        // of the stick as well: see `Joystick34`'s `grab`.
         Area {
-            x: pane.get_stick_left(),
-            y: pane.get_stick_top(),
-            width: pane.get_stick_width(),
-            height: pane.get_stick_height(),
+            x: pane.get_stick_left() - FINGERTIP,
+            y: pane.get_stick_top() - FINGERTIP,
+            width: pane.get_stick_width() + 2.0 * FINGERTIP,
+            height: pane.get_stick_height() + 2.0 * FINGERTIP,
         },
     );
 }

@@ -1019,24 +1019,25 @@ both. From the top:
 * The lander's X and Y position, velocity and acceleration, each with its
   unit, and beside them:
 * The joystick, where the world has one: a square, its dead zone, with a
-  rectangle, as thick as the square is wide, extending from its left, right and
-  top -- the lander has no thrust down, so nothing below -- each hatched along
-  its outside a tenth of its travel apart. Press in the square and drag: each
-  axis reads on its own, nought while the pointer is within the square's span
-  along it, rising in a straight line to one across a rectangle, positive to the
-  right and up, and held at one beyond it, so that a drag on a diagonal moves
-  both; below the square, Y stays nought. At rest a plus is drawn across the
-  square; held, two lines track the pointer instead, a vertical one across the
-  left and right rectangles, from end to end, and a horizontal one across the
-  top rectangle, from halfway up the square to its far end. When the button is
-  let go the plus comes back and both axes read nought. The joystick's X, from
-  minus one to one, and Y, from nought to one, are what its ``x`` and ``y`` give
-  out, for the vehicle to read through the simulated payloads joined to them.
-  When the window opens, and each time the lander starts again after a crash
-  with the autopilot not flying it, the joystick beckons: its square flashes
-  orange inside a flashing ring, and "Click or tap, and drag, to control" is
-  written above and to its right, with an arrow pointing down to the square.
-  Taking hold of the square, or pressing Pause or Autoland, ends it.
+  rectangle, as thick as the square is wide, extending from its left, right
+  and top -- the lander has no thrust down, so nothing below -- each hatched
+  along its outside a tenth of its travel apart. Press on the square, or
+  within a fingertip's reach of it, and drag: each axis reads on its own,
+  nought while the pointer is within the square's span along it, rising in a
+  straight line to one across a rectangle, positive to the right and up, and
+  held at one beyond it, so that a drag on a diagonal moves both; below the
+  square, Y stays nought. At rest a plus is drawn across the square; held, two
+  lines track the pointer instead, a vertical one across the left and right
+  rectangles, from end to end, and a horizontal one across the top rectangle,
+  from halfway up the square to its far end. When the button is let go the
+  plus comes back and both axes read nought. The joystick's X, from minus one
+  to one, and Y, from nought to one, are what its ``x`` and ``y`` give out,
+  for the vehicle to read through the simulated payloads joined to them. When
+  the window opens, and each time the lander starts again after a crash with
+  the autopilot not flying it, the joystick beckons: its square flashes orange
+  inside a flashing ring, and "Click or tap, and drag, to control" is written
+  above and to its right, with an arrow pointing down to the square. Taking
+  hold of the square, or pressing Pause or Autoland, ends it.
 
 At the foot of the pane are two buttons:
 

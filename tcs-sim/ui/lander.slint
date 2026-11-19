@@ -23,8 +23,8 @@ import { Colors } from "../../tcs-ui/ui/colors.slint";
 // left and right rectangles are as tall as the square, and the top one as
 // wide; each has hatchmarks along its outside, a tenth of its travel apart.
 //
-// At rest a plus is drawn across the square. A press in the square takes
-// hold, and while the button is held two lines track the pointer instead: a
+// At rest a plus is drawn across the square. A press on the square, or
+// within a fingertip's reach of it, takes hold, and while the button is held two lines track the pointer instead: a
 // vertical one across the left and right rectangles, from the left end of
 // the left one to the right end of the right one, and a horizontal one
 // across the top rectangle, from halfway up the square to the rectangle's
@@ -59,6 +59,12 @@ export component Joystick34 inherits Rectangle {
     callback released();
 
     property <length> reach: root.square / 2 + root.arm;
+    // How near the square's middle a press takes hold of the stick: a
+    // fingertip's reach, much wider than the square, which on a phone's
+    // screen is narrower than a finger. A press there that is off the
+    // square's middle reads as the stick held that far, as a drag there
+    // does.
+    property <length> grab: max(root.square / 2, 22px);
     property <length> thick: root.square;
     // A hatchmark's length, and the half and full marks'.
     property <length> tick: 6px;
@@ -242,8 +248,8 @@ export component Joystick34 inherits Rectangle {
             if (e.kind == PointerEventKind.down
                     && !root.paused
                     && e.button == PointerEventButton.left
-                    && abs(self.mouse-x - root.reach) <= root.square / 2
-                    && abs(self.mouse-y - root.reach) <= root.square / 2) {
+                    && abs(self.mouse-x - root.reach) <= root.grab
+                    && abs(self.mouse-y - root.reach) <= root.grab) {
                 root.held = true;
                 root.moved(self.mouse-x - root.reach,
                            self.mouse-y - root.reach);

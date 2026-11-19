@@ -400,10 +400,13 @@ with the programs each runs, the Rust ground stations
 is too small for tcspecial to lock its memory into RAM, and
 <code>--simulate=MODE</code> gives another simulation mode than
 <code>all</code>. Arguments after the name go to the example’s own
-ground station. The examples through Yamcs need <code>YAMCS_HOME</code>
-set to where a Yamcs release is unpacked. <code>TCSX_EXAMPLES</code> and
-<code>TCSX_BIN</code> point <code>tcsx</code> at other examples and
-programs, such as these and a build’s <code>target/debug</code>.</p>
+ground station. The examples through Yamcs use the Yamcs release
+<code>YAMCS_HOME</code> names, or, where it names none, the one their
+ground station fetches the first time and keeps in
+<code>~/.cache/tcspecial</code>; Yamcs needs Java.
+<code>TCSX_EXAMPLES</code> and <code>TCSX_BIN</code> point
+<code>tcsx</code> at other examples and programs, such as these and a
+build’s <code>target/debug</code>.</p>
 <h1 id="simple-examples">Simple examples</h1>
 <p>Each shows one thing at its simplest: a payload’s data reaching the
 ground, the vehicle saying it is alive, the vehicle answering a ping.
@@ -769,8 +772,8 @@ checks the configuration’s checksum and the beacon’s number and ages the
 indicator just as the ping example’s does. With <code>--pings</code>
 there is no window: it prints the first beacon and each exchange, and
 stops.</p>
-<pre><code>make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0     # the window
-python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
+<pre><code>make run-ping-yamcs     # the window
+python3 examples/ping-yamcs/ping_yamcs.py --pings 3
 python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read</code></pre>
 <p>Yamcs and tcspecial are stopped when the window is closed or the
 pings are done, and are killed with <code>ping_yamcs.py</code> if it is
@@ -794,12 +797,14 @@ fields as text, for the vehicle to unframe and read as the ping
 <code>test_ping_yamcs.py</code>, which also holds every line of the
 written wrapper to 80 columns. None needs Yamcs or opens a window.</p>
 <p><code>YAMCS_HOME</code> is where a Yamcs release is unpacked, holding
-<code>bin/yamcsd</code>; <a
+<code>bin/yamcsd</code>; where it is unset, Yamcs 5.14.0, which it was
+written against, is fetched from <a
 href="https://github.com/yamcs/yamcs/releases"
-class="uri">https://github.com/yamcs/yamcs/releases</a> has them, and it
-was written against 5.14.0. Yamcs’s web interface is at <a
-href="http://localhost:16090" class="uri">http://localhost:16090</a>
-meanwhile, showing every packet and parameter.</p>
+class="uri">https://github.com/yamcs/yamcs/releases</a> the first time,
+checked, and kept in <code>~/.cache/tcspecial</code>. Yamcs’s web
+interface is at <a href="http://localhost:16090"
+class="uri">http://localhost:16090</a> meanwhile, showing every packet
+and parameter.</p>
 <p>Yamcs sends its commands from a port the system chooses and takes the
 answers on the same socket, so the configuration’s
 <code>tcs_cmd.send</code> is <code>127.0.0.1:0</code>: commands from any
@@ -1048,9 +1053,9 @@ what each tcspecial answers: what the whole process has mapped, resident
 and locked, the limit on what it may lock, and, for each thread, what it
 is for, its node, and the most of its stack it has used of the stack it
 was given.</p>
-<pre><code>make run-memusage YAMCS_HOME=~/yamcs-5.14.0
-make run-memusage YAMCS_HOME=~/yamcs-5.14.0 NO_MEMLOCK=1   # a desk&#39;s small limit
-make run-memusage YAMCS_HOME=~/yamcs-5.14.0 \
+<pre><code>make run-memusage
+make run-memusage NO_MEMLOCK=1   # a desk&#39;s small limit
+make run-memusage \
     MEMUSAGE=&quot;examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs&quot;</code></pre>
 <p>The last watches two tcspecials, as a vehicle that runs more than one
 would have them, in one Yamcs: one server, with an instance for each,
@@ -1161,9 +1166,8 @@ switches, so both start enabled; press Disable on one in tcs-sim’s
 window to take its heater away, and its line goes low and stays low
 while the zone falls behind in the cold part of the orbit. Its GPIO
 lines are the thermostat example’s, so the two are not run at once.</p>
-<pre><code>make run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0   # the window
-python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs ~/yamcs-5.14.0 \
-    --seconds 120
+<pre><code>make run-thermostat-yamcs   # the window
+python3 examples/thermostat-yamcs/thermostat_yamcs.py --seconds 120
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --describe</code></pre>
 <p>Yamcs, tcs-sim and tcspecial are stopped when it ends and killed with
 it if it is killed or crashes.</p>
@@ -1319,7 +1323,7 @@ pause; disabled, it stays down until Restart. Closing tcs-sim’s window,
 or the MOC’s, stops everything. Yamcs’s web interface is at <a
 href="http://localhost:19090"
 class="uri">http://localhost:19090</a>.</p>
-<pre><code>make run-lander YAMCS_HOME=&lt;yamcs&gt;</code></pre>
+<pre><code>make run-lander</code></pre>
 <p><code>lander/</code> also builds a second ground station,
 <code>lander-station</code>, in Rust: the same station without Yamcs or
 Python, which is what runs the example in a web page (see the tcswebasm

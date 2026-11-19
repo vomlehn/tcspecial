@@ -105,10 +105,11 @@ tcsx --no-memlock ping -v   # one whose ground station is its own
 `--no-memlock` is for a desk whose limit on locked memory is too small for
 tcspecial to lock its memory into RAM, and `--simulate=MODE` gives another
 simulation mode than `all`. Arguments after the name go to the example's
-own ground station. The examples through Yamcs need `YAMCS_HOME` set to
-where a Yamcs release is unpacked. `TCSX_EXAMPLES` and `TCSX_BIN` point
-`tcsx` at other examples and programs, such as these and a build's
-`target/debug`.
+own ground station. The examples through Yamcs use the Yamcs release
+`YAMCS_HOME` names, or, where it names none, the one their ground station
+fetches the first time and keeps in `~/.cache/tcspecial`; Yamcs needs Java.
+`TCSX_EXAMPLES` and `TCSX_BIN` point `tcsx` at other examples and programs,
+such as these and a build's `target/debug`.
 
 ## Simple examples
 
@@ -368,8 +369,8 @@ indicator just as the ping example's does. With `--pings` there is no window:
 it prints the first beacon and each exchange, and stops.
 
 ```
-make run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0     # the window
-python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
+make run-ping-yamcs     # the window
+python3 examples/ping-yamcs/ping_yamcs.py --pings 3
 python3 examples/ping-yamcs/ping_yamcs.py --describe   # what it read
 ```
 
@@ -395,9 +396,10 @@ holds every line of the written wrapper to 80 columns. None needs Yamcs or opens
 a window.
 
 `YAMCS_HOME` is where a Yamcs release is unpacked, holding `bin/yamcsd`;
-<https://github.com/yamcs/yamcs/releases> has them, and it was written
-against 5.14.0. Yamcs's web interface is at <http://localhost:16090>
-meanwhile, showing every packet and parameter.
+where it is unset, Yamcs 5.14.0, which it was written against, is fetched
+from <https://github.com/yamcs/yamcs/releases> the first time, checked,
+and kept in `~/.cache/tcspecial`. Yamcs's web interface is at
+<http://localhost:16090> meanwhile, showing every packet and parameter.
 
 Yamcs sends its commands from a port the system chooses and takes the
 answers on the same socket, so the configuration's `tcs_cmd.send` is
@@ -587,9 +589,9 @@ thread, what it is for, its node, and the most of its stack it has used of
 the stack it was given.
 
 ```
-make run-memusage YAMCS_HOME=~/yamcs-5.14.0
-make run-memusage YAMCS_HOME=~/yamcs-5.14.0 NO_MEMLOCK=1   # a desk's small limit
-make run-memusage YAMCS_HOME=~/yamcs-5.14.0 \
+make run-memusage
+make run-memusage NO_MEMLOCK=1   # a desk's small limit
+make run-memusage \
     MEMUSAGE="examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs"
 ```
 
@@ -666,9 +668,8 @@ falls behind in the cold part of the orbit. Its GPIO lines are the thermostat
 example's, so the two are not run at once.
 
 ```
-make run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0   # the window
-python3 examples/thermostat-yamcs/thermostat_yamcs.py --yamcs ~/yamcs-5.14.0 \
-    --seconds 120
+make run-thermostat-yamcs   # the window
+python3 examples/thermostat-yamcs/thermostat_yamcs.py --seconds 120
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --describe
 ```
 
@@ -833,7 +834,7 @@ or the MOC's, stops everything. Yamcs's web interface is at
 <http://localhost:19090>.
 
 ```
-make run-lander YAMCS_HOME=<yamcs>
+make run-lander
 ```
 
 `lander/` also builds a second ground station, `lander-station`, in Rust:

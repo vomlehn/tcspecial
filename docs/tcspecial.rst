@@ -2787,7 +2787,7 @@ Closing either window stops everything:
 
 .. code-block:: console
 
-   $ make -C examples run-lander YAMCS_HOME=<yamcs>
+   $ make -C examples run-lander
 
 or, installed, ``tcsx lander``.
 
@@ -3087,13 +3087,14 @@ telemetry of APID ``0x100``; CONNECT and its answer are on ``tcs_cmd.apid``,
 ``apid_base``, ``0x200``, and its answer comes down as telemetry of
 ``apid_base`` plus the ping node's device id, ``0x201``.
 
-``examples/ping-yamcs/ping_yamcs.py`` runs it, given a Yamcs release unpacked
-somewhere (``bin/yamcsd`` under it):
+``examples/ping-yamcs/ping_yamcs.py`` runs it, with the Yamcs release
+``YAMCS_HOME`` names, or, where it names none, Yamcs 5.14.0, fetched the first
+time, checked and kept in ``~/.cache/tcspecial``; Yamcs needs Java:
 
 .. code-block:: sh
 
-   make -C examples run-ping-yamcs YAMCS_HOME=~/yamcs-5.14.0
-   python3 examples/ping-yamcs/ping_yamcs.py --yamcs ~/yamcs-5.14.0 --pings 3
+   make -C examples run-ping-yamcs
+   python3 examples/ping-yamcs/ping_yamcs.py --pings 3
 
 It writes a Yamcs configuration from the tcspecial one into a run directory,
 ``/tmp/ping-yamcs`` unless ``--run-dir`` says, so that the ports and APIDs are
@@ -3187,12 +3188,12 @@ That is a debug build run with ``--no-memlock`` on a desk whose limit is 8
 MiB: locked, it would need a limit of more than the 17.9 MiB it maps. See
 `How deep each thread has been`_ and `Locking memory`_.
 
-It runs given a Yamcs release unpacked somewhere:
+It runs with Yamcs found or fetched as ping-yamcs's is:
 
 .. code-block:: sh
 
-   make -C examples run-memusage YAMCS_HOME=~/yamcs-5.14.0
-   python3 examples/memusage/memusage.py --yamcs ~/yamcs-5.14.0 --polls 1
+   make -C examples run-memusage
+   python3 examples/memusage/memusage.py --polls 1
 
 Given more than one configuration, it watches a tcspecial on each in the one
 Yamcs, an instance for each, as `More than one tcspecial on a vehicle`_
@@ -3201,7 +3202,7 @@ tcs-conflict says can run beside it:
 
 .. code-block:: sh
 
-   make -C examples run-memusage YAMCS_HOME=~/yamcs-5.14.0 \
+   make -C examples run-memusage \
        MEMUSAGE="examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs"
 
 Each instance is named after its configuration's file, ``memusage`` and
@@ -3268,14 +3269,13 @@ and the configuration's diagram has nothing called ambient. A simulator file
 whose world states no ambient temperature gives the run none, and the
 program says so.
 
-``examples/thermostat-yamcs/thermostat_yamcs.py`` runs it, given a Yamcs
-release unpacked somewhere:
+``examples/thermostat-yamcs/thermostat_yamcs.py`` runs it, with Yamcs found
+or fetched as ping-yamcs's is:
 
 .. code-block:: sh
 
-   make -C examples run-thermostat-yamcs YAMCS_HOME=~/yamcs-5.14.0
-   python3 examples/thermostat-yamcs/thermostat_yamcs.py \
-       --yamcs ~/yamcs-5.14.0 --seconds 120
+   make -C examples run-thermostat-yamcs
+   python3 examples/thermostat-yamcs/thermostat_yamcs.py --seconds 120
 
 It starts Yamcs, tcs-sim, with every payload sending from the start, and
 tcspecial once tcs-sim is ready, each killed with it; has Yamcs send CONNECT

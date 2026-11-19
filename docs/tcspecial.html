@@ -3089,7 +3089,7 @@ would take a quench for an order. The design gives the stars' records in
 &quot;The sky, sent down&quot;.</p>
 <p>Closing either window stops everything:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-lander<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>&lt;yamcs&gt;
+<span class="generic prompt">$ </span>make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-lander
 </pre>
 <p>or, installed, <tt class="docutils literal">tcsx lander</tt>.</p>
 <div class="figure">
@@ -3357,11 +3357,12 @@ telemetry of APID <tt class="docutils literal">0x100</tt>; CONNECT and its answe
 <tt class="docutils literal">0x101</tt>; a ping goes up as a telecommand of the gateway node's
 <tt class="docutils literal">apid_base</tt>, <tt class="docutils literal">0x200</tt>, and its answer comes down as telemetry of
 <tt class="docutils literal">apid_base</tt> plus the ping node's device id, <tt class="docutils literal">0x201</tt>.</p>
-<p><tt class="docutils literal"><span class="pre">examples/ping-yamcs/ping_yamcs.py</span></tt> runs it, given a Yamcs release unpacked
-somewhere (<tt class="docutils literal">bin/yamcsd</tt> under it):</p>
+<p><tt class="docutils literal"><span class="pre">examples/ping-yamcs/ping_yamcs.py</span></tt> runs it, with the Yamcs release
+<tt class="docutils literal">YAMCS_HOME</tt> names, or, where it names none, Yamcs 5.14.0, fetched the first
+time, checked and kept in <tt class="docutils literal"><span class="pre">~/.cache/tcspecial</span></tt>; Yamcs needs Java:</p>
 <pre class="code sh literal-block">
-make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-ping-yamcs<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>~/yamcs-5.14.0<span class="whitespace">
-</span>python3<span class="whitespace"> </span>examples/ping-yamcs/ping_yamcs.py<span class="whitespace"> </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--pings<span class="whitespace"> </span><span class="literal number">3</span>
+make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-ping-yamcs<span class="whitespace">
+</span>python3<span class="whitespace"> </span>examples/ping-yamcs/ping_yamcs.py<span class="whitespace"> </span>--pings<span class="whitespace"> </span><span class="literal number">3</span>
 </pre>
 <p>It writes a Yamcs configuration from the tcspecial one into a run directory,
 <tt class="docutils literal"><span class="pre">/tmp/ping-yamcs</span></tt> unless <tt class="docutils literal"><span class="pre">--run-dir</span></tt> says, so that the ports and APIDs are
@@ -3445,17 +3446,17 @@ memusage: 17.9 MiB mapped, 13.4 MiB resident, 0 KiB locked, limit 8192 KiB; 11 t
 <p>That is a debug build run with <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> on a desk whose limit is 8
 MiB: locked, it would need a limit of more than the 17.9 MiB it maps. See
 <a class="reference internal" href="#how-deep-each-thread-has-been">How deep each thread has been</a> and <a class="reference internal" href="#locking-memory">Locking memory</a>.</p>
-<p>It runs given a Yamcs release unpacked somewhere:</p>
+<p>It runs with Yamcs found or fetched as ping-yamcs's is:</p>
 <pre class="code sh literal-block">
-make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-memusage<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>~/yamcs-5.14.0<span class="whitespace">
-</span>python3<span class="whitespace"> </span>examples/memusage/memusage.py<span class="whitespace"> </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--polls<span class="whitespace"> </span><span class="literal number">1</span>
+make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-memusage<span class="whitespace">
+</span>python3<span class="whitespace"> </span>examples/memusage/memusage.py<span class="whitespace"> </span>--polls<span class="whitespace"> </span><span class="literal number">1</span>
 </pre>
 <p>Given more than one configuration, it watches a tcspecial on each in the one
 Yamcs, an instance for each, as <a class="reference internal" href="#more-than-one-tcspecial-on-a-vehicle">More than one tcspecial on a vehicle</a>
 says: ping-yamcs uses other ports and keeps another state file, which
 tcs-conflict says can run beside it:</p>
 <pre class="code sh literal-block">
-make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-memusage<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>~/yamcs-5.14.0<span class="whitespace"> </span><span class="literal string escape">\
+make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-memusage<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span><span class="name variable">MEMUSAGE</span><span class="operator">=</span><span class="literal string double">&quot;examples/memusage/memusage.xtcs examples/ping-yamcs/ping-yamcs.xtcs&quot;</span>
 </pre>
 <p>Each instance is named after its configuration's file, <tt class="docutils literal">memusage</tt> and
@@ -3517,12 +3518,11 @@ has answered CONNECT. So Yamcs has the zone's surroundings beside the zone,
 and the configuration's diagram has nothing called ambient. A simulator file
 whose world states no ambient temperature gives the run none, and the
 program says so.</p>
-<p><tt class="docutils literal"><span class="pre">examples/thermostat-yamcs/thermostat_yamcs.py</span></tt> runs it, given a Yamcs
-release unpacked somewhere:</p>
+<p><tt class="docutils literal"><span class="pre">examples/thermostat-yamcs/thermostat_yamcs.py</span></tt> runs it, with Yamcs found
+or fetched as ping-yamcs's is:</p>
 <pre class="code sh literal-block">
-make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-thermostat-yamcs<span class="whitespace"> </span><span class="name variable">YAMCS_HOME</span><span class="operator">=</span>~/yamcs-5.14.0<span class="whitespace">
-</span>python3<span class="whitespace"> </span>examples/thermostat-yamcs/thermostat_yamcs.py<span class="whitespace"> </span><span class="literal string escape">\
-</span><span class="whitespace">    </span>--yamcs<span class="whitespace"> </span>~/yamcs-5.14.0<span class="whitespace"> </span>--seconds<span class="whitespace"> </span><span class="literal number">120</span>
+make<span class="whitespace"> </span>-C<span class="whitespace"> </span>examples<span class="whitespace"> </span>run-thermostat-yamcs<span class="whitespace">
+</span>python3<span class="whitespace"> </span>examples/thermostat-yamcs/thermostat_yamcs.py<span class="whitespace"> </span>--seconds<span class="whitespace"> </span><span class="literal number">120</span>
 </pre>
 <p>It starts Yamcs, tcs-sim, with every payload sending from the start, and
 tcspecial once tcs-sim is ready, each killed with it; has Yamcs send CONNECT

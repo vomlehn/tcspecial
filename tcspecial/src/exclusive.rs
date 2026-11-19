@@ -307,6 +307,18 @@ mod tests {
     }
 
     /// Opens `path` for reading and writing, as a second process would.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The file to open.
+    ///
+    /// # Returns
+    ///
+    /// The file, open.
+    ///
+    /// # Panics
+    ///
+    /// If it does not open.
     fn open(path: &Path) -> File {
         OpenOptions::new()
             .read(true)

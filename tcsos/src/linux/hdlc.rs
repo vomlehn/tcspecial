@@ -205,6 +205,14 @@ pub enum Refused {
 }
 
 /// The `IF_IFACE_*` a standard is.
+///
+/// # Arguments
+///
+/// * `standard` - The standard.
+///
+/// # Returns
+///
+/// The kernel's number for it.
 fn iface_of(standard: Standard) -> libc::c_uint {
     match standard {
         Standard::V35 => IF_IFACE_V35,
@@ -215,6 +223,15 @@ fn iface_of(standard: Standard) -> libc::c_uint {
 }
 
 /// The port's wiring, as the kernel numbers it.
+///
+/// # Arguments
+///
+/// * `wiring` - The wiring.
+///
+/// # Returns
+///
+/// The kernel's sync settings: the clock's rate and source, and whether
+/// the port loops back.
 fn wiring_of(wiring: &Wiring) -> SyncSerialSettings {
     SyncSerialSettings {
         clock_rate: wiring.clock_rate,
@@ -229,6 +246,14 @@ fn wiring_of(wiring: &Wiring) -> SyncSerialSettings {
 }
 
 /// What the bits mean, as the kernel numbers it.
+///
+/// # Arguments
+///
+/// * `framing` - The framing.
+///
+/// # Returns
+///
+/// The kernel's raw HDLC settings: the encoding and the frame check.
 fn framing_of(framing: &Framing) -> RawHdlcProto {
     RawHdlcProto {
         encoding: match framing.encoding {
@@ -300,6 +325,10 @@ fn request_for(
 /// * `type_`     - What `settings` is.
 /// * `settings`  - The structure, read or filled.
 ///
+/// # Returns
+///
+/// `Ok(Ok(()))` where the call was made and the kernel took it.
+///
 /// # Errors
 ///
 /// [`Refused::TooLong`] for a name too long, and what the kernel said, as
@@ -327,6 +356,14 @@ fn wandev<T>(
 }
 
 /// A packet socket address for an interface, every frame it carries.
+///
+/// # Arguments
+///
+/// * `index` - The interface's index.
+///
+/// # Returns
+///
+/// The address, for every protocol.
 fn address_of(index: u32) -> libc::sockaddr_ll {
     // SAFETY: sockaddr_ll is a C struct of integers and a byte array, for
     // which all zeroes is a valid value.
@@ -548,6 +585,10 @@ mod tests {
 
     /// The simplest wiring and framing: V.35, clocked from the far end,
     /// NRZ, no frame check.
+    ///
+    /// # Returns
+    ///
+    /// The wiring and the framing.
     fn simplest() -> (Wiring, Framing) {
         (
             Wiring {

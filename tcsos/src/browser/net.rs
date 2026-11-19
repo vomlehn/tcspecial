@@ -360,6 +360,7 @@ fn first(addr: impl ToSocketAddrs) -> io::Result<SocketAddr> {
 ///
 /// # Arguments
 ///
+/// * `net`     - The sockets the sources are.
 /// * `sources` - The sources, and what each is wanted ready for.
 /// * `got`     - Set to what each was found ready for.
 ///
@@ -536,6 +537,16 @@ fn blocked(
 }
 
 /// When a read on a socket gives up waiting.
+///
+/// # Arguments
+///
+/// * `net` - The sockets.
+/// * `id`  - The socket's number.
+///
+/// # Returns
+///
+/// Now and the socket's read timeout, or `None` where it has none or
+/// is gone.
 fn deadline_of(net: &Net, id: u32) -> Option<Instant> {
     net.sockets
         .get(&id)

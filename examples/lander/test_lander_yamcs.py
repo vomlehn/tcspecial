@@ -241,6 +241,18 @@ class Shown(unittest.TestCase):
         self.assertEqual(sky.fresh(), (False, []))
 
         def packet(generation, total, *numbers):
+            """Packs a sky packet of star records.
+
+            Args:
+                generation: The sky's generation, in every record.
+                total:      How many stars the whole sky has.
+                *numbers:   Each record's star number, in order.
+
+            Returns:
+                The records, one after another: each star 1.5 pixels
+                across and of brightness 255, its number metres across
+                and 250.5 metres up.
+            """
             return b"".join(
                 struct.pack(lander_yamcs.STAR_LAYOUT, generation, total, n,
                             15, 255, 100 * n, 25050)

@@ -593,8 +593,8 @@ fn on_the_chip(
 ///
 /// # Arguments
 ///
-/// * `what`    - The handler, for what a complaint says.
-/// * `config`  - The node's configuration.
+/// * `what`     - The handler, for what a complaint says.
+/// * `config`   - The node's configuration.
 /// * `_offsets` - Every line of the request, in its order.
 ///
 /// # Returns

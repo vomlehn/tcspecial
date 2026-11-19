@@ -296,6 +296,19 @@ mod tests {
 
     /// A consolidator of two `u8`s, `a` defaulting to 0xaa and `b` to 0xbb,
     /// sending as `send` says, every second where it names interval.
+    ///
+    /// # Arguments
+    ///
+    /// * `send` - Its triggers, as a configuration's `send` states them.
+    /// * `now`  - When it is made.
+    ///
+    /// # Returns
+    ///
+    /// The port.
+    ///
+    /// # Panics
+    ///
+    /// If `send` does not read as triggers, or the port cannot be made.
     fn port(send: &str, now: Instant) -> ConsolidatorPort {
         let input = |name: &str, default: u8| Input {
             name: name.to_string(),
@@ -341,6 +354,14 @@ mod tests {
     }
 
     /// A reading arriving at the input it names.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input's name.
+    ///
+    /// # Returns
+    ///
+    /// Where the reading arrives: at that input, on no stream.
     fn at(input: &str) -> Arriving<'_> {
         Arriving {
             input: Some(input),

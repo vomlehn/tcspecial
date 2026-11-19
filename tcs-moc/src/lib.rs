@@ -863,12 +863,6 @@ impl ProcessManager {
     }
 }
 
-/// Reads the simulation mode and the tcspecial configuration from the
-/// command line, says what is wrong with the configuration, and runs the
-/// window.
-///
-/// Exits with status 1 on a bad command line or a configuration that stops
-/// the MOC.
 /// What `--help` prints.
 const USAGE: &str = "\
 usage: tcs-moc [options] configuration
@@ -882,6 +876,12 @@ usage: tcs-moc [options] configuration
   -h, --help         print this, and exit
 ";
 
+/// Reads the simulation mode and the tcspecial configuration from the
+/// command line, says what is wrong with the configuration, and runs the
+/// window.
+///
+/// Exits with status 1 on a bad command line or a configuration that stops
+/// the MOC.
 pub fn main() {
     // How it is run, before anything is read or started: a flag it does
     // not know would otherwise be taken for the name of a configuration.

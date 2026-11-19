@@ -93,6 +93,10 @@ impl ThreadRole {
     }
 
     /// What the role is called where it is shown.
+    ///
+    /// # Returns
+    ///
+    /// The role's name, in lower case.
     pub fn as_str(self) -> &'static str {
         match self {
             ThreadRole::Main => "main",

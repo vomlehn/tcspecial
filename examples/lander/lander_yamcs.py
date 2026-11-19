@@ -865,6 +865,8 @@ class Readings:
     Args:
         reads: Each vehicle's :class:`Yamcs` and :class:`Craft`, as
                ``(yamcs, craft)``.
+        sky:   The :class:`Sky` each new packet of the ``sky`` node's
+               records is given to, or ``None`` for none.
     """
 
     def __init__(self, reads, sky=None):

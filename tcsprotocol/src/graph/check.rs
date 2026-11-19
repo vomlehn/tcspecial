@@ -2006,23 +2006,6 @@ impl Graph {
         problems
     }
 
-    /// Every named input of this node that a link binds.
-    ///
-    /// A terminal is not one of them. `in0` is which *of several* ways into a
-    /// computation and a mean is built on knowing; `moc-in` is which *way*
-    /// the data is going, and a link may name it on a computation as it does on
-    /// any other type. Counting one as an input would make a mean over `in0`
-    /// and `in1` look like a mean over three things the moment somebody drew a
-    /// line from the ground to it.
-    ///
-    /// # Arguments
-    ///
-    /// * `node` - The node's name.
-    ///
-    /// # Returns
-    ///
-    /// The inputs links name on it, terminals left out, in the links' order and
-    /// once for each link that names one.
     /// What is wrong with a consolidator's place in the graph, which its
     /// node alone cannot say: its inputs and the links that bind them, how
     /// many there are, where its datum goes, and what asks it for one. See
@@ -2142,6 +2125,23 @@ impl Graph {
         problems
     }
 
+    /// Every named input of this node that a link binds.
+    ///
+    /// A terminal is not one of them. `in0` is which *of several* ways into a
+    /// computation and a mean is built on knowing; `moc-in` is which *way*
+    /// the data is going, and a link may name it on a computation as it does on
+    /// any other type. Counting one as an input would make a mean over `in0`
+    /// and `in1` look like a mean over three things the moment somebody drew a
+    /// line from the ground to it.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The inputs links name on it, terminals left out, in the links' order and
+    /// once for each link that names one.
     fn inputs_bound_at(&self, node: &str) -> Vec<String> {
         let mut inputs = Vec::new();
         for link in &self.links {

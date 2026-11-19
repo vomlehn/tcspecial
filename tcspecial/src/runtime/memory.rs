@@ -117,6 +117,14 @@ fn refusal(error: std::io::Error) -> String {
 }
 
 /// A size in bytes, as KiB.
+///
+/// # Arguments
+///
+/// * `bytes` - The size, `u64::MAX` for no limit.
+///
+/// # Returns
+///
+/// The size in whole KiB, as `N KiB`, or `unlimited`.
 fn kib(bytes: u64) -> String {
     if bytes == u64::MAX {
         "unlimited".to_string()

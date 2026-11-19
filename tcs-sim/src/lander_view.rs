@@ -1077,7 +1077,7 @@ pub fn lander(f: &Resolved, place: Point, shapes: bool) -> String {
 /// # Arguments
 ///
 /// * `f`      - The lander's figures.
-/// * `centre` - Its centre, in metres.
+/// * `(x, y)` - Its centre, in metres.
 /// * `radius` - Its radius, in metres.
 ///
 /// # Returns

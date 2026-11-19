@@ -207,6 +207,16 @@ fn meet(a: (Point, Point), b: (Point, Point)) -> bool {
         (q.0 - p.0) * (r.1 - p.1) - (q.1 - p.1) * (r.0 - p.0)
     }
     /// Whether `r`, on the line through `p` and `q`, is between them.
+    ///
+    /// # Arguments
+    ///
+    /// * `p` - One end of the line.
+    /// * `q` - Its other end.
+    /// * `r` - A point on the line through them.
+    ///
+    /// # Returns
+    ///
+    /// Whether `r` is inside the box `p` and `q` are corners of.
     fn within(p: Point, q: Point, r: Point) -> bool {
         r.0 >= p.0.min(q.0)
             && r.0 <= p.0.max(q.0)

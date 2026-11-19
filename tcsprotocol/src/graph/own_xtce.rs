@@ -334,8 +334,10 @@ fn head(out: &mut String, name: &str) {
 ///
 /// # Arguments
 ///
-/// * `out`     - Where they are written.
-/// * `sources` - Each source's type, by its name.
+/// * `out`            - Where they are written.
+/// * `sources`        - Each source's type, by its name.
+/// * `consolidations` - Each consolidator's layout, by its name: its
+///                      members' types are written after the sources'.
 ///
 /// # Errors
 ///
@@ -524,8 +526,10 @@ fn member_type(source: &str, input: &crate::consolidation::Input) -> String {
 ///
 /// # Arguments
 ///
-/// * `out`     - Where they are written.
-/// * `sources` - Each source's type, by its name.
+/// * `out`            - Where they are written.
+/// * `sources`        - Each source's type, by its name.
+/// * `consolidations` - Each consolidator's layout, by its name: each of
+///                      its members is a parameter too.
 fn parameters(
     out: &mut String,
     sources: &BTreeMap<String, LinkType>,
@@ -590,8 +594,10 @@ fn parameters(
 ///
 /// # Arguments
 ///
-/// * `out`     - Where they are written.
-/// * `sources` - Each source's type, by its name.
+/// * `out`            - Where they are written.
+/// * `sources`        - Each source's type, by its name.
+/// * `consolidations` - Each consolidator's layout, by its name: each has
+///                      a container of its members.
 fn containers(
     out: &mut String,
     sources: &BTreeMap<String, LinkType>,

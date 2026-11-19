@@ -230,6 +230,11 @@ mod tests {
     use tcsprotocol::Faults;
 
     /// The first virtual CAN interface this host has up, if it has one.
+    ///
+    /// # Returns
+    ///
+    /// The name of the first of `vcan0` to `vcan3` that is there and up,
+    /// or `None` where none is.
     fn a_virtual_bus() -> Option<String> {
         (0..4).map(|n| format!("vcan{n}")).find(|name| {
             tcsos::linux::can::interface_index(name).is_ok()

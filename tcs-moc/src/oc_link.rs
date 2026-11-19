@@ -74,6 +74,12 @@ pub struct Arrival {
 
 impl Arrival {
     /// The two strings a panel shows: when, and what.
+    ///
+    /// # Returns
+    ///
+    /// The time of day it arrived, and its data: a consolidation's members
+    /// on one line, a space between them, or the data as a number with
+    /// its unit or as hex.
     pub fn panel_lines(&self) -> (String, String) {
         // A consolidation on the panel's one line, a space between its
         // members; its Configuration shows it a member to a line.

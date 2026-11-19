@@ -168,6 +168,14 @@ fn resolved(
 }
 
 /// An absolute path with `.` and `..` taken out.
+///
+/// # Arguments
+///
+/// * `path` - The path, read as though it starts at the root.
+///
+/// # Returns
+///
+/// The path from the root, with no `.` or `..` in it.
 fn normalised(path: &Path) -> PathBuf {
     let mut out = PathBuf::from("/");
     for part in path.components() {
@@ -203,6 +211,14 @@ fn lookup(path: &Path) -> io::Result<(PathBuf, Entry)> {
 }
 
 /// The error a missing path is, naming it.
+///
+/// # Arguments
+///
+/// * `path` - The path that is missing.
+///
+/// # Returns
+///
+/// A `NotFound` error that names the path.
 fn not_found(path: &Path) -> io::Error {
     io::Error::new(
         io::ErrorKind::NotFound,
@@ -351,6 +367,15 @@ pub struct Metadata {
 
 impl Metadata {
     /// Of an entry.
+    ///
+    /// # Arguments
+    ///
+    /// * `entry` - The entry.
+    ///
+    /// # Returns
+    ///
+    /// What is known of it. A link is neither a file nor a directory, and
+    /// only a file has a length.
     fn of(entry: &Entry) -> Metadata {
         let (kind, len) = match &entry.node {
             Node::File(bytes) => {
@@ -490,6 +515,10 @@ impl File {
 
     /// What is known of it.
     ///
+    /// # Returns
+    ///
+    /// What is known of it, with now as when it last changed.
+    ///
     /// # Errors
     ///
     /// None.
@@ -535,6 +564,10 @@ impl File {
     }
 
     /// A second open, sharing where reading and writing are.
+    ///
+    /// # Returns
+    ///
+    /// The second open.
     ///
     /// # Errors
     ///
@@ -591,6 +624,22 @@ impl File {
     }
 
     /// Reads into a buffer from where the open is.
+    ///
+    /// # Arguments
+    ///
+    /// * `into` - The buffer, filled as far as the file goes.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were read: nought at the end of the file.
+    ///
+    /// # Errors
+    ///
+    /// None.
+    ///
+    /// # Panics
+    ///
+    /// Where a thread panicked while it held the file or the place.
     fn read_into(&self, into: &mut [u8]) -> io::Result<usize> {
         let bytes = self.bytes.lock().expect("a file");
         let mut at = self.at.lock().expect("a place");
@@ -602,6 +651,22 @@ impl File {
     }
 
     /// Writes from a buffer at where the open is, or on the end.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - What to write. The file grows to hold it.
+    ///
+    /// # Returns
+    ///
+    /// How many bytes were written: all of them.
+    ///
+    /// # Errors
+    ///
+    /// `PermissionDenied` where the file was not opened to write.
+    ///
+    /// # Panics
+    ///
+    /// Where a thread panicked while it held the file or the place.
     fn write_from(&self, data: &[u8]) -> io::Result<usize> {
         if !self.write {
             return Err(io::Error::from(io::ErrorKind::PermissionDenied));
@@ -621,6 +686,22 @@ impl File {
     }
 
     /// Moves where the open is.
+    ///
+    /// # Arguments
+    ///
+    /// * `to` - Where to, from the start, the end or where it is now.
+    ///
+    /// # Returns
+    ///
+    /// Where it is now, from the start.
+    ///
+    /// # Errors
+    ///
+    /// `InvalidInput` where that is before the start.
+    ///
+    /// # Panics
+    ///
+    /// Where a thread panicked while it held the file or the place.
     fn seek_to(&self, to: SeekFrom) -> io::Result<u64> {
         let len = self.bytes.lock().expect("a file").len() as i64;
         let mut at = self.at.lock().expect("a place");
@@ -726,6 +807,15 @@ impl OpenOptions {
     }
 
     /// To write on the end.
+    ///
+    /// # Arguments
+    ///
+    /// * `on` - Whether to. Writing on the end is writing, so this asks to
+    ///          write as well.
+    ///
+    /// # Returns
+    ///
+    /// The options, to ask for more.
     pub fn append(&mut self, on: bool) -> &mut OpenOptions {
         self.append = on;
         if on {
@@ -1097,6 +1187,10 @@ pub fn metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
 ///
 /// * `path` - Where.
 ///
+/// # Returns
+///
+/// What is known of it, or of the link where it is one.
+///
 /// # Errors
 ///
 /// `NotFound` where nothing is there.
@@ -1114,6 +1208,10 @@ pub fn symlink_metadata(path: impl AsRef<Path>) -> io::Result<Metadata> {
 /// # Arguments
 ///
 /// * `path` - The link.
+///
+/// # Returns
+///
+/// The path the link holds, as it was made.
 ///
 /// # Errors
 ///

@@ -73,6 +73,10 @@ static NEXT: AtomicU32 = AtomicU32::new(2);
 
 /// The page itself, as the program every thread belongs to until it is
 /// started as another.
+///
+/// # Returns
+///
+/// The page's program, made the first time it is asked for.
 fn page() -> &'static Arc<Program> {
     static PAGE: OnceLock<Arc<Program>> = OnceLock::new();
     PAGE.get_or_init(|| {

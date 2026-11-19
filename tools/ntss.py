@@ -192,7 +192,7 @@ def c_like(text, rust):
     Args:
         text: What the file says.
         rust: Whether it is Rust, whose block comments nest, which has
-            raw strings, and whose ' may begin a lifetime.
+              raw strings, and whose ' may begin a lifetime.
 
     Returns:
         The text with every comment character a space and every
@@ -269,7 +269,7 @@ def without_test_items(code):
 
     Args:
         code: A Rust file with its comments blanked and its literals'
-            contents replaced, by c_like.
+              contents replaced, by c_like.
 
     Returns:
         The code with each #[cfg(test)] item, its attribute
@@ -415,7 +415,7 @@ def subprojects(project, files):
 
     Args:
         project: The project's directory.
-        files: The paths git tracks, relative to it.
+        files:   The paths git tracks, relative to it.
 
     Returns:
         The directories, relative to the project, that are
@@ -480,7 +480,7 @@ def subproject_of(relative, dirs):
 
     Args:
         relative: The file's path within its project.
-        dirs: The project's subprojects, deepest first.
+        dirs:     The project's subprojects, deepest first.
 
     Returns:
         The subproject's directory, or None for a file in none.
@@ -555,7 +555,7 @@ def table(rows, width):
     """Lays out rows of counts.
 
     Args:
-        rows: (name, {language: statements}) for each row.
+        rows:  (name, {language: statements}) for each row.
         width: How wide the name column is.
 
     Returns:

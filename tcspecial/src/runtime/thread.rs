@@ -369,6 +369,15 @@ mod tests {
     use super::*;
 
     /// Finds this test's own threads among those measured.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node the test's threads are given.
+    ///
+    /// # Returns
+    ///
+    /// The stack of each measured thread of that node, of the first 64
+    /// measured.
     fn of_role(node: NodeId) -> Vec<ThreadStack> {
         let mut into = [ThreadStack::default(); 64];
         let (_, filled) = stacks(0, &mut into);

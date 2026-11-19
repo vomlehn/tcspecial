@@ -112,6 +112,10 @@ pub struct Input {
 
 impl Input {
     /// The most bytes a reading of it is, as it arrives on its link.
+    ///
+    /// # Returns
+    ///
+    /// Its width, or the most a string or bytes of it may be.
     pub fn largest_link_bytes(&self) -> usize {
         match self.shape {
             Shape::Fixed { bytes } => bytes,
@@ -121,6 +125,10 @@ impl Input {
 
     /// The most bytes it takes in the datum: its width, or its count and
     /// its most.
+    ///
+    /// # Returns
+    ///
+    /// Its width, or its count's bytes and its most together.
     pub fn largest_bytes(&self) -> usize {
         match self.shape {
             Shape::Fixed { bytes } => bytes,
@@ -351,6 +359,10 @@ impl Layout {
 
     /// The bytes every member of a fixed width takes together: where the
     /// counts and bytes of those that vary begin.
+    ///
+    /// # Returns
+    ///
+    /// The sum of the widths of the members of a fixed width.
     pub fn fixed_part(&self) -> usize {
         self.inputs
             .iter()
@@ -392,6 +404,11 @@ impl Layout {
     }
 
     /// The fewest bytes a datum may be: every string and bytes empty.
+    ///
+    /// # Returns
+    ///
+    /// The widths of the members of a fixed width, and the counts of
+    /// those that vary.
     pub fn smallest_bytes(&self) -> usize {
         self.inputs
             .iter()
@@ -404,6 +421,10 @@ impl Layout {
 
     /// The width of every datum, where every input is of a fixed width and
     /// so every datum is as long as every other.
+    ///
+    /// # Returns
+    ///
+    /// The width, or `None` where a member's length varies.
     pub fn fixed_bytes(&self) -> Option<usize> {
         self.inputs
             .iter()
@@ -778,6 +799,15 @@ mod tests {
 
     /// A layout of these inputs, each of this type, its default nought or
     /// empty.
+    ///
+    /// # Arguments
+    ///
+    /// * `kinds` - Each input's name, type, and most bytes, the most
+    ///             counting only for a string or bytes.
+    ///
+    /// # Returns
+    ///
+    /// The layout, each input its own source.
     fn layout(kinds: &[(&str, LinkType, usize)]) -> Layout {
         Layout {
             inputs: kinds
@@ -797,6 +827,10 @@ mod tests {
     /// i8: the members of a fixed width in place, in order, and then the
     /// string's one-byte count and bytes and the bytes' two-byte count and
     /// bytes, in the order they are listed.
+    ///
+    /// # Returns
+    ///
+    /// The layout of the five.
     fn sample() -> Layout {
         layout(&[
             ("flag", LinkType::Basic(Basic::Boolean), 0),

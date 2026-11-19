@@ -307,6 +307,10 @@ fn stub_thread(at: usize) -> ThreadStack {
 }
 
 /// The memory a simulated vehicle says it has.
+///
+/// # Returns
+///
+/// Its sizes, all of what is mapped locked, and no limit on the lock.
 fn stub_memory() -> ProcessMemory {
     ProcessMemory {
         mapped: 9_437_184,
@@ -322,6 +326,10 @@ const STUB_INPUTS: usize = INPUTS_PER_ANSWER + 3;
 
 /// The counts of a simulated vehicle's consolidator, each unlike the
 /// others.
+///
+/// # Returns
+///
+/// The counts, each its own number.
 fn stub_consolidator() -> ConsolidatorCounts {
     ConsolidatorCounts {
         sent: 900,

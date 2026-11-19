@@ -5,6 +5,10 @@ use wasm_bindgen::prelude::wasm_bindgen;
 #[wasm_bindgen]
 extern "C" {
     /// The console's `error`, which shows a line in red.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The line to show.
     #[wasm_bindgen(js_namespace = console, js_name = error)]
     fn console_error(said: &str);
 }
@@ -21,6 +25,10 @@ pub fn error_bytes(said: &[u8]) {
 #[wasm_bindgen]
 extern "C" {
     /// The console's `log`, which shows a line plainly.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The line to show.
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn console_log(said: &str);
 }

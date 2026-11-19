@@ -33,8 +33,9 @@ with, and docs/manual.rst links to their documents.
 
 > **Note:** integration with cFS and F´ is a work in progress, and the plan
 > may change as it is. A vehicle can answer to an F´ flight computer through
-> the bridge component in fprime/ (`make fprime-test` tests it); none of the
-> cFS integration is built yet.
+> the bridge component in fprime/ (`make fprime-test` tests it), and to cFS's
+> software bus through SBN (`make cfs-test` flies the cfs example against a
+> real cFS).
 
 # Quick start
 
@@ -53,27 +54,87 @@ Ubuntu 22.04 or later, or Debian 12 or later:
 Then press `Connect` in tcs-moc's window. The guide also covers Fedora,
 the lander through Yamcs, and a container for older systems.
 
-# To Run From a Checkout
+# Building from a checkout
 
 This is an alpha release: it is not fully tested and not feature complete.
 There is a design document for each program, listed in docs/design.rst, a
 manual for each, listed in docs/manual.rst, and a plan for integration with
-cFS and F´ in docs/third-party.rst. The docs/Makefile will build HTML pages of
-each for viewing.
+cFS and F´ in docs/third-party.rst. The manual's "Installing" section, in
+docs/tcspecial.rst, says all of what follows at greater length.
 
-* Clone the source
+First the tools, then the two checkouts every build needs beside this one:
+[tcs-helpers](https://github.com/vomlehn/tcs-helpers), the make rules and
+packaging scripts the TCS projects share, and
+[tcs-xtce](https://github.com/vomlehn/tcs-xtce), whose Python package
+generates the link's codecs. `make install-tools` installs, with apt-get or
+dnf under sudo, everything building, testing, checking, documenting and
+packaging need (`DRY_RUN=1` shows the commands, `PACKAGING=0` leaves out
+the packaging tools), and says what it cannot: a Rust older than 1.92, a
+Python older than 3.11, and the checkouts. tcslog, the telemetry log, comes
+from crates.io, so it needs no checkout.
 
-* Type:
+     git clone https://github.com/vomlehn/tcspecial.git
+     git clone https://github.com/vomlehn/tcs-helpers.git
+     git clone https://github.com/vomlehn/tcs-xtce.git
+     make -C tcs-xtce python/tcs_xtce/generated.py
+     cd tcspecial
+     make install-tools
 
-     make runmoc
+Then build, and run:
 
-  to run the test software
+     make                 # build tcspecial, then run every test
+     cargo build --workspace   # every program and library: tcs-moc,
+                          # tcs-sim, tcs-cfge, tcs-verify, tcsmoc-c, ...
+     make buildmoc        # tcs-moc alone; buildsim, buildgui (tcs-cfge) too
+     make test            # every test; tcs-sim's opens a window
+     make check           # cargo check, clippy, rustfmt, and the rest
+     make docs            # every page under docs/, with rst2html
+     make runmocy         # run tcs-moc on example.ytcs, which starts
+                          # tcspecial and tcs-sim; runmocx on example.xtcs
+     make run             # run tcspecial alone
+     make clean           # and make distclean
 
-* To run just TCSpecial, use:
+`make help` lists the rest. A tcspecial for a vehicle is built with only
+the payload types it flies: see "Building tcspecial for a vehicle" in
+docs/tcspecial.rst. The examples build and run from examples/, as
+[its README](examples/README.md) says, and the Python, the C library and
+the packages as *Installing*, below, says.
 
-     make run
+The cFS and F´ sides are built from their own projects' trees, which this
+one does not hold:
 
-* There are make clean and make distclean targets.
+     make fprime-build FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
+     make fprime-test  FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
+     make cfs-build CFS_PRISTINE=$HOME/cFS SBN_SRC=$HOME/sbn
+     make cfs-test  CFS_PRISTINE=$HOME/cFS SBN_SRC=$HOME/sbn
+
+The F´ side needs an F´ checkout, v4.4.1 or later, and a Python environment
+holding F´'s tools; the cFS side a cFS checkout and a git checkout of SBN
+v7.0.1. Left out, each is looked for beside this checkout: see "The fprime
+example" and "The cfs example" in docs/tcspecial.rst.
+[container/](container/README.md) builds and tries a checkout, and the
+packages, in a Podman container of its own.
+
+## The other TCS projects
+
+Each is built from its own checkout, beside this one, as its README says:
+
+* [tcs-xtce](https://github.com/vomlehn/tcs-xtce#building), the XTCE
+  library, packet compiler and editor: its README's "Building", with `make
+  install-tools` of its own.
+* [tcslog](https://github.com/vomlehn/tcslog#building), the telemetry log
+  and its C and Python bindings: its README's "Building", with `make
+  install-tools` of its own.
+* [tcslog-tools](https://github.com/vomlehn/tcslog-tools#building-from-a-checkout),
+  the log readers `tcslog-dump` and `tcslog-dumphdr`: its README's
+  "Building from a checkout", built beside a tcslog checkout.
+* [tcs-helpers](https://github.com/vomlehn/tcs-helpers), the shared make
+  rules and packaging scripts: nothing to build, used where it is checked
+  out.
+* [tcswebasm](https://github.com/vomlehn/tcswebasm), the examples in a web
+  page: built from this checkout, beside it, for WebAssembly, with nightly
+  Rust, the `wasm32-unknown-unknown` target and `wasm-bindgen-cli`, as its
+  manual, docs/manual.rst, says.
 
 # Installing
 
@@ -136,7 +197,9 @@ sudo, cron and other minimal environments do not see it. To make a
 package's programs available everywhere, link them into `/usr/local/bin`,
 and to undo it, take the links away:
 
-     sudo /opt/tcs/sbin/tcspecial-links          # likewise -ground, -test
+     sudo /opt/tcs/sbin/tcspecial-links          # likewise tcs-tools-links,
+                                                 # tcspecial-test-links and
+                                                 # tcspecial-examples-links
      sudo /opt/tcs/sbin/tcspecial-links --remove
      sudo make links                         # after make install-files
      sudo make unlinks
@@ -172,6 +235,9 @@ Operational code, which a mission depends on while it operates:
 * [`tcsverify/`](tcsverify/): the configuration checker as a library, which
   tcspecial and every program that reads a configuration asks.
 * [`tcsapp/`](tcsapp/): the file interfaces an app node's program runs with.
+* [`tcsos/`](tcsos/): what tcspecial and the rest ask of the operating
+  system -- files, sockets, processes, time -- on Linux, and in a web page
+  the browser's substitutes for them, which tcswebasm runs on.
 * [`python/`](python/): the Python spellings of tcsprotocol and tcsmoc,
   for ground stations written in Python.
 
@@ -214,6 +280,8 @@ Infrastructure, which builds, packages, documents and checks the rest:
 * [`docs/`](docs/): every manual and design document.
 * [`packaging/`](packaging/): what the `.deb` and `.rpm` packages are made
   from: their control files, specs and install hooks.
+* [`container/`](container/): the test container, in which the packages
+  are installed and a checkout built without touching the machine.
 * `bin/install-tools`, which `make install-tools` runs, and
   `tools/ntss.py`, which `make ntss` runs: it counts the non-test source
   statements of every tcs project checked out beside this one, by category,

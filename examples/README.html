@@ -385,7 +385,10 @@ schema (<code>../../tcsprotocol/schema/...</code>).</li>
 from this file, with <code>style.html</code> in its head – which is
 where the tables’ cells are told to sit at the top of their row,
 markdown having no way to say so. <code>make help</code> lists the
-targets, including the ones that run tcspecial on each example.</p>
+targets, including the ones that run tcspecial on each example. Each
+<code>make run-*</code> below is run in this directory, or from the
+repository’s top as <code>make -C examples run-*</code>, and builds what
+it runs first.</p>
 <h1 id="installed-tcsx">Installed: tcsx</h1>
 <p>The <code>tcspecial-examples</code> package installs every example
 under <code>/opt/tcs/share/examples/tcspecial</code>, laid out as here,

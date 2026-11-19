@@ -190,7 +190,7 @@ Where next
 * `The TCS documentation <manual.html>`__ lists the manuals of tcs-moc,
   tcs-sim, tcs-cfge -- the configuration editor -- and the rest, and the
   design documents.
-* To build from source, see "Installing" in the README.
+* To build from source, see "Building from a checkout" in the README.
 
 TCSpecial is an alpha release: it is not fully tested and not feature
 complete. Feedback is welcome: open an issue at

@@ -9,6 +9,7 @@ pub mod gpio;
 pub mod hdlc;
 pub mod i2c;
 pub mod interfaces;
+pub mod local;
 pub mod memory;
 pub mod net;
 pub mod process;

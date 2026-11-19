@@ -37,7 +37,10 @@ use crate::runtime::supervisor;
 /// The status the child ends with when memory runs out:
 /// [`supervisor::SHORT`] in flight, and [`supervisor::FATAL`] once [`lock`]
 /// has been told the mode is `--simulate=some` or `all`.
-static SHORT_STATUS: AtomicI32 = AtomicI32::new(supervisor::SHORT);
+static SHORT_STATUS: tcsos::local::Local<AtomicI32> =
+    tcsos::local::Local::new(AtomicI32::new(supervisor::SHORT), || {
+        AtomicI32::new(supervisor::SHORT)
+    });
 
 /// What became of the lock.
 #[derive(Debug, Clone, PartialEq, Eq)]

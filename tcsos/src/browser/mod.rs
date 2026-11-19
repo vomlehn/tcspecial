@@ -7,6 +7,7 @@ pub mod context;
 pub mod env;
 pub mod fs;
 pub mod interfaces;
+pub mod local;
 pub mod memory;
 pub mod net;
 pub mod page;

@@ -173,6 +173,9 @@ pub struct Command {
     cwd: Option<PathBuf>,
     /// The interfaces it is handed, by slot.
     slots: [Option<crate::browser::net::TcpStream>; 3],
+    /// Whether it is asked to stop when the program that starts it ends:
+    /// see `crate::browser::child::dies_with_parent`.
+    dies_with_parent: bool,
 }
 
 impl Command {
@@ -192,7 +195,14 @@ impl Command {
             env: crate::browser::env::vars().collect(),
             cwd: None,
             slots: [None, None, None],
+            dies_with_parent: false,
         }
+    }
+
+    /// Has the program asked to stop when the program that starts it ends,
+    /// as the kernel's parent-death signal does on Linux.
+    pub(crate) fn die_with_parent(&mut self) {
+        self.dies_with_parent = true;
     }
 
     /// Adds an argument.
@@ -399,9 +409,15 @@ impl Command {
             crate::browser::env::current_dir().unwrap_or_default()
         });
         let program = context::new_program(args.clone(), self.env.clone(), cwd);
+        program
+            .dies_with_parent
+            .store(self.dies_with_parent, std::sync::atomic::Ordering::SeqCst);
         if let Ok(mut slots) = program.slots.lock() {
             for (to, from) in slots.iter_mut().zip(self.slots.iter_mut()) {
                 *to = from.take();
+                if let Some(stream) = to.as_ref() {
+                    crate::browser::net::hand_to(stream.id, program.id);
+                }
             }
         }
         let started = program.clone();
@@ -496,7 +512,9 @@ impl Child {
         Ok(self.program.ended().map(ExitStatus))
     }
 
-    /// Waits for it to end.
+    /// Waits for it to end, and for what it started that dies with it:
+    /// on Linux the kernel ends those as it ends, and a program waiting for
+    /// it finds the ports they held free, as here.
     ///
     /// # Returns
     ///
@@ -508,7 +526,9 @@ impl Child {
     pub fn wait(&mut self) -> io::Result<ExitStatus> {
         loop {
             if let Some(code) = self.program.ended() {
-                return Ok(ExitStatus(code));
+                if !context::has_dependents(self.program.id) {
+                    return Ok(ExitStatus(code));
+                }
             }
             crate::browser::thread::sleep(std::time::Duration::from_millis(10));
         }

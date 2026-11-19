@@ -36,6 +36,9 @@ pub struct Program {
     pub parent: u32,
     /// What it ended with, once it has.
     pub ended: Mutex<Option<i32>>,
+    /// Whether it is asked to stop when its parent ends, as the kernel's
+    /// parent-death signal stops a process on Linux.
+    pub dies_with_parent: AtomicBool,
 }
 
 impl Program {
@@ -48,6 +51,10 @@ impl Program {
     pub fn end(&self, code: i32) {
         if let Ok(mut ended) = self.ended.lock() {
             ended.get_or_insert(code);
+        }
+        crate::browser::net::close_owned_by(self.id);
+        for child in dependents(self.id) {
+            child.stop.store(true, Ordering::SeqCst);
         }
     }
 
@@ -78,6 +85,7 @@ fn page() -> &'static Arc<Program> {
             slots: Mutex::new([None, None, None]),
             parent: 0,
             ended: Mutex::new(None),
+            dies_with_parent: AtomicBool::new(false),
         })
     })
 }
@@ -153,6 +161,7 @@ pub fn new_program(
         slots: Mutex::new([None, None, None]),
         parent: current().id,
         ended: Mutex::new(None),
+        dies_with_parent: AtomicBool::new(false),
     });
     note(&program);
     program
@@ -203,6 +212,46 @@ pub fn ask_to_stop(id: u32) -> bool {
         }
         None => false,
     }
+}
+
+/// The programs a program started that die with it, still running.
+///
+/// # Arguments
+///
+/// * `parent` - The program's number.
+///
+/// # Returns
+///
+/// Them.
+fn dependents(parent: u32) -> Vec<Arc<Program>> {
+    let Ok(started) = started().lock() else {
+        return Vec::new();
+    };
+    started
+        .values()
+        .filter_map(|weak| weak.upgrade())
+        .filter(|program| {
+            program.parent == parent
+                && program.dies_with_parent.load(Ordering::SeqCst)
+                && program.ended().is_none()
+        })
+        .collect()
+}
+
+/// Whether a program has started anything that dies with it and has not
+/// yet ended, at any depth: what is waited for with it.
+///
+/// # Arguments
+///
+/// * `parent` - The program's number.
+///
+/// # Returns
+///
+/// `true` while one runs.
+pub fn has_dependents(parent: u32) -> bool {
+    dependents(parent)
+        .iter()
+        .any(|child| child.ended().is_none() || has_dependents(child.id))
 }
 
 /// Asks every program in the page to stop, as the page's Stop does.

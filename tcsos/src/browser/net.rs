@@ -80,6 +80,9 @@ struct Socket {
     read_timeout: Option<Duration>,
     /// How many handles there are on it; it goes when the last does.
     handles: usize,
+    /// The program it belongs to, whose ending closes it as a process's
+    /// exit closes its sockets on Linux: see [`close_owned_by`].
+    owner: u32,
 }
 
 /// Every socket in the page.
@@ -95,6 +98,10 @@ struct Net {
     tcp: BTreeMap<u16, u32>,
     /// The next port given to a socket bound to port nought.
     ephemeral: u16,
+    /// The sockets closed by their program's ending: what a thread of that
+    /// program sends on one after, which on Linux would never be sent, the
+    /// process being gone, goes nowhere and is not refused.
+    gone: std::collections::BTreeSet<u32>,
 }
 
 /// The page's network.
@@ -190,6 +197,7 @@ impl Net {
                 nonblocking: false,
                 read_timeout: None,
                 handles: 1,
+                owner: context::current().id,
             },
         );
         id
@@ -442,6 +450,47 @@ pub(crate) fn set_wakeup(id: u32, poked: bool) {
     drop(held);
     if poked {
         notify();
+    }
+}
+
+/// Closes every socket a program holds, as a process's exit closes its
+/// sockets on Linux: their ports are free again at once, and a thread of
+/// the program still using one finds it gone. Its wakeups are left to its
+/// threads.
+///
+/// # Arguments
+///
+/// * `owner` - The program's number.
+pub(crate) fn close_owned_by(owner: u32) {
+    let mut held = net();
+    let net = held.as_mut().expect("made");
+    let owned: Vec<u32> = net
+        .sockets
+        .iter()
+        .filter(|(_, socket)| {
+            socket.owner == owner && !matches!(socket.kind, Kind::Wakeup { .. })
+        })
+        .map(|(id, _)| *id)
+        .collect();
+    for id in owned {
+        if let Some(socket) = net.sockets.get_mut(&id) {
+            socket.handles = 1;
+        }
+        net.release(id);
+        net.gone.insert(id);
+    }
+}
+
+/// Hands a socket to another program, as a descriptor handed to a child
+/// stays open in the child when its parent ends.
+///
+/// # Arguments
+///
+/// * `id`    - The socket's number.
+/// * `owner` - The program's number.
+pub(crate) fn hand_to(id: u32, owner: u32) {
+    if let Some(socket) = net().as_mut().expect("made").sockets.get_mut(&id) {
+        socket.owner = owner;
     }
 }
 
@@ -722,6 +771,9 @@ impl UdpSocket {
         let to = first(to)?;
         let mut held = net();
         let net = held.as_mut().expect("made");
+        if net.gone.contains(&self.id) {
+            return Ok(data.len());
+        }
         let from = net.get(self.id)?.addr;
         let from = if from.ip().is_unspecified() {
             SocketAddr::new(Ipv4Addr::LOCALHOST.into(), from.port())
@@ -758,6 +810,9 @@ impl UdpSocket {
     ///
     /// `NotConnected` where it is not connected.
     pub fn send(&self, data: &[u8]) -> io::Result<usize> {
+        if net().as_ref().expect("made").gone.contains(&self.id) {
+            return Ok(data.len());
+        }
         let to = self.peer_addr()?;
         self.send_to(data, to)
     }
@@ -1021,7 +1076,7 @@ impl TcpListener {
 #[derive(Debug)]
 pub struct TcpStream {
     /// Its number.
-    id: u32,
+    pub(crate) id: u32,
 }
 
 settings!(TcpStream);
@@ -1092,6 +1147,9 @@ impl TcpStream {
             },
             to,
         );
+        // The far end is the listening program's, whose ending closes it.
+        let listening = net.get(listener)?.owner;
+        net.get(theirs)?.owner = listening;
         if let Kind::Listener { backlog } = &mut net.get(listener)?.kind {
             backlog.push_back(theirs);
         }

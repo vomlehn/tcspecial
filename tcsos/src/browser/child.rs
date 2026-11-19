@@ -183,18 +183,22 @@ pub enum Ending {
     Kill,
 }
 
-/// Does nothing: in a page, every program goes with the page.
+/// Has the child asked to stop when the program that starts it ends, as
+/// the kernel's parent-death signal does on Linux; and a wait for its
+/// parent waits for it too. Asked, either way the ending says: a thread
+/// cannot be killed, only asked.
 ///
 /// # Arguments
 ///
-/// * `_command` - The command, not yet spawned.
-/// * `_ending`  - What the child would be sent.
-/// * `_gone`    - What its start would fail with, its parent gone.
+/// * `command` - The command, not yet spawned.
+/// * `_ending` - What the child would be sent.
+/// * `_gone`   - What its start would fail with, its parent gone.
 pub fn dies_with_parent(
-    _command: &mut Command,
+    command: &mut Command,
     _ending: Ending,
     _gone: &'static str,
 ) {
+    command.die_with_parent();
 }
 
 /// Runs a program with one argument and waits for it, where the page has

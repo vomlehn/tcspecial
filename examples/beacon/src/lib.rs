@@ -3,7 +3,9 @@
 //! A library beside the binary so that the window can be opened by a test as
 //! well as by a person: what the test checks is the wiring below, which is the
 //! whole of what this example adds to the two halves it is made of -- see
-//! `src/bin/beacon.rs`.
+//! [`program`], which `src/bin/beacon.rs` runs, as a web page does.
+
+pub mod program;
 
 use slint::ComponentHandle;
 use tcs_ui::Shown;
@@ -109,7 +111,7 @@ pub const STOP: &str = "Stop tcspecial";
 pub struct Vehicle {
     program: std::path::PathBuf,
     args: Vec<String>,
-    running: Option<std::process::Child>,
+    running: Option<tcsos::process::Child>,
 }
 
 impl Vehicle {
@@ -165,7 +167,7 @@ impl Vehicle {
         verbose: bool,
         memlock: bool,
     ) -> Result<Vehicle, String> {
-        let here = std::env::current_exe().map_err(|e| {
+        let here = tcsos::env::current_exe().map_err(|e| {
             format!("cannot tell where this program is, to find tcspecial: {e}")
         })?;
         let program = here.with_file_name("tcspecial");
@@ -242,7 +244,7 @@ impl Vehicle {
         if self.is_running() {
             return Ok(());
         }
-        let mut command = std::process::Command::new(&self.program);
+        let mut command = tcsos::process::Command::new(&self.program);
         command.args(&self.args);
         // Killed when this window goes, so that a vehicle is never left
         // beaconing with no button to stop it.

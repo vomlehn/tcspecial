@@ -39,6 +39,6 @@ pub mod browser;
 use browser as system;
 
 pub use system::{
-    child, env, fs, interfaces, memory, net, process, signals, sync, thread,
-    time, wait,
+    child, env, fs, interfaces, local, memory, net, process, signals, sync,
+    thread, time, wait,
 };

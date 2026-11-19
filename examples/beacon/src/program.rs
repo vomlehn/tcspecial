@@ -1,0 +1,372 @@
+//! The example's ground end: a window showing the spacecraft's beacon.
+//!
+//! What a ground station can know about a spacecraft without asking it
+//! anything. tcspecial beacons every `beacon.default_interval` for as long
+//! as it runs, over a socket of its own, whether or not anything has
+//! connected to it -- so this program commands nothing, connects to nothing,
+//! and still says whether the vehicle is alive, which build it is, which
+//! version of a configuration it is serving and whether that is the
+//! configuration this end read.
+//!
+//! It is also the example of how the two halves fit together. Nothing about
+//! beacons is written here:
+//!
+//! * [`tcsmoc::beacon`] binds the socket, reads each datagram, counts the
+//!   beacons that did not arrive, compares the digest with this end's own and
+//!   says how stale the last one is.
+//! * `tcs-ui` holds the panel and works out what to show on it.
+//!
+//! What is left is this program: read the configuration, start the loop, put
+//! each pass in the window. And a button that starts tcspecial on the same
+//! configuration and stops it again, so that the indicator can be watched
+//! coming on and going out: see [`crate::Vehicle`]. tcs-moc does the
+//! same thing with the same two halves, in a panel beside its command link;
+//! an operator who has read one has read the other.
+//!
+//! Arguments, all optional: the configuration; `--yaml` or `--xml`, but not
+//! both, saying which of the example's two files to read, YAML where neither
+//! is given; `-v` or `--verbose`; and `--no-memlock`, which runs tcspecial
+//! without locking its memory, for a desk whose limit is too small for the
+//! lock. Run from the repository's root it needs none.
+//!
+//! Quiet unless `-v` or `--verbose` is given: the console then says where it
+//! is listening, each remark a beacon pass makes -- beacons missed, a vehicle
+//! that restarted, a configuration that differs -- and a tcspecial that
+//! stopped by itself. Without it the window is the whole account. Errors and
+//! warnings are said either way, because a program that cannot do what was
+//! asked, or is doing less of it, must say so to whoever started it.
+
+use std::cell::RefCell;
+use std::rc::Rc;
+
+use slint::ComponentHandle;
+use tcsos::process::exit;
+use tcsos::thread;
+use tcsos::time::Duration;
+
+use crate::{notice_exit, prepare, show_on, wire, Vehicle, WatchWindow};
+use tcs_ui::Shown;
+use tcsmoc::beacon::{Beacons, Schedule, STANDARD_INTERVAL};
+use tcsprotocol::config_digest::digest_of_file;
+use tcsprotocol::graph::parameters::{beacon_interval_of, beacon_of};
+use tcsprotocol::graph::Graph;
+use tcsprotocol::{ConfigFormat, Spelling};
+
+/// The example's configuration, without its extension: `.yaml` or `.xml`,
+/// the two saying the same thing.
+const CONFIGURATION: &str = "examples/beacon/beacon";
+
+/// The spelling read where neither `--yaml` nor `--xml` is given.
+const SPELLING: ConfigFormat = ConfigFormat::Yaml;
+
+/// What the command line says.
+struct Arguments {
+    /// The configuration.
+    path: String,
+    /// Whether to talk.
+    verbose: bool,
+    /// Whether tcspecial is to lock its memory.
+    memlock: bool,
+}
+
+impl Arguments {
+    /// Reads the command line's arguments.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - The arguments, without the program's name.
+    ///
+    /// # Returns
+    ///
+    /// The configuration to read, chosen by `--yaml` or `--xml` where none
+    /// is named, and whether to talk.
+    ///
+    /// # Errors
+    ///
+    /// What is wrong with them, said for the person who typed them: an
+    /// option that is not one, more than one configuration, both spellings,
+    /// or a named file whose extension disagrees with the spelling asked for.
+    fn of(args: impl Iterator<Item = String>) -> Result<Arguments, String> {
+        let mut path = None;
+        let mut verbose = false;
+        let mut memlock = true;
+        let mut spelling = Spelling::default();
+        for arg in args {
+            if spelling.take(&arg)? {
+                continue;
+            }
+            match arg.as_str() {
+                "-v" | "--verbose" => verbose = true,
+                "--no-memlock" => memlock = false,
+                flag if flag.starts_with('-') => {
+                    return Err(format!(
+                        "{flag} is not an option: the options are --yaml, \
+                         --xml, -v, --verbose and --no-memlock"
+                    ))
+                }
+                _ if path.is_some() => {
+                    return Err(format!(
+                        "{arg}: one configuration, and only one, may be named"
+                    ))
+                }
+                _ => path = Some(arg),
+            }
+        }
+        Ok(Arguments {
+            path: spelling.configuration(path, CONFIGURATION, SPELLING)?,
+            verbose,
+            memlock,
+        })
+    }
+}
+
+/// Runs the example: reads the configuration, listens for its beacons, and
+/// shows them in a window with a button that starts and stops tcspecial.
+///
+/// A command line that is wrong exits with status 2, and a configuration
+/// that cannot be read, has no beacon link or cannot be listened on, a
+/// tcspecial that is not built, or a window that cannot be made, with
+/// status 1, each said on stderr.
+///
+/// The window is made where windows are made -- this thread on Linux, the
+/// page's in a web page -- and this returns once it has closed: see
+/// `tcs_ui::windows`.
+pub fn main() {
+    let Arguments {
+        path,
+        verbose,
+        memlock,
+    } = match Arguments::of(tcsos::env::args().skip(1)) {
+        Ok(arguments) => arguments,
+        Err(why) => {
+            eprintln!("{why}");
+            eprintln!(
+                "usage: beacon [--yaml | --xml] [-v | --verbose] \
+                 [--no-memlock] [configuration]"
+            );
+            exit(2);
+        }
+    };
+
+    let graph = match Graph::load(&path) {
+        Ok(graph) => graph,
+        Err(why) => {
+            eprintln!("{path}: {why}");
+            exit(1);
+        }
+    };
+
+    // Where the beacons are, which the configuration says and this program
+    // does not: a station listening where the spacecraft is not sending hears
+    // nothing and says nothing about why.
+    let link = match beacon_of(&graph) {
+        Ok(Some(link)) => link,
+        Ok(None) => {
+            eprintln!(
+                "{path} has no tcspecial section, so it says nothing about \
+                 where its beacons go -- and a configuration with no section \
+                 sends none"
+            );
+            exit(1);
+        }
+        Err(why) => {
+            eprintln!("{path}: {why}");
+            exit(1);
+        }
+    };
+
+    // The digest of the configuration this end read, which every beacon's
+    // digest is compared with. A difference is the one thing a beacon can say
+    // that makes everything else suspect: the vehicle is serving a
+    // configuration this station has not read, so what this station believes
+    // about the vehicle's nodes may not be what is aboard. Nothing is
+    // compared where this cannot be worked out.
+    let expected = match digest_of_file(&path) {
+        Ok(digest) => Some(digest),
+        Err(why) => {
+            eprintln!(
+                "{path} cannot be digested, so no beacon's digest is \
+                 checked: {why}"
+            );
+            None
+        }
+    };
+
+    // How late a beacon is depends on how often they are sent, which is the
+    // configuration's to say. The section was read for the link just now, so
+    // it can be read for this; the standard interval is only for the
+    // configuration that has neither.
+    let interval = beacon_interval_of(&graph)
+        .ok()
+        .flatten()
+        .unwrap_or(STANDARD_INTERVAL);
+
+    let schedule = Schedule::for_interval(interval);
+    let mut beacons = match Beacons::listening(link, schedule, expected) {
+        Ok(beacons) => beacons,
+        Err(e) => {
+            eprintln!("beacons cannot be received: {e}");
+            exit(1);
+        }
+    };
+    // And the digest of what this end worked out of the configuration --
+    // ports, APIDs, consolidations -- which every beacon's link digest is
+    // compared with: the same file worked out otherwise is read otherwise.
+    match tcsprotocol::graph::link_table::digest_of(&graph) {
+        Ok(links) => beacons = beacons.with_links(links),
+        Err(refused) => eprintln!(
+            "{path}: its links do not work out, so no beacon's link digest \
+             is checked: {}",
+            refused.why
+        ),
+    }
+    if verbose {
+        eprintln!(
+            "Listening for beacons at {}, which {} sends from",
+            beacons.link().recv,
+            beacons.link().send
+        );
+    }
+
+    // The vehicle the button starts, which is not running until it is
+    // pressed. Found before the window opens, so that a tcspecial nobody has
+    // built is said once, here, and not on every press.
+    let vehicle = match Vehicle::beside_this_program(&path, verbose, memlock) {
+        Ok(vehicle) => vehicle,
+        Err(why) => {
+            eprintln!("{why}");
+            exit(1);
+        }
+    };
+    tcs_ui::windows::on_window_thread(move |closed| {
+        if let Err(why) = watch(vehicle, beacons, verbose, closed) {
+            eprintln!("the window cannot be shown: {why}");
+            exit(1);
+        }
+    });
+}
+
+/// Opens the window, on the thread windows are made on, and runs it until
+/// it closes; then the vehicle it started is stopped, by [`Vehicle`]'s
+/// `Drop`, rather than left beaconing with no button to stop it.
+///
+/// # Arguments
+///
+/// * `vehicle` - The vehicle the button starts and stops.
+/// * `beacons` - The beacons, listened for.
+/// * `verbose` - Whether to talk.
+/// * `closed`  - What says the window has closed.
+///
+/// # Errors
+///
+/// The window cannot be made or shown.
+fn watch(
+    vehicle: Vehicle,
+    beacons: Beacons,
+    verbose: bool,
+    closed: tcs_ui::windows::Closed,
+) -> Result<(), slint::PlatformError> {
+    let vehicle = Rc::new(RefCell::new(vehicle));
+
+    let window = WatchWindow::new()?;
+    prepare(&window);
+    let weak = window.as_weak();
+    wire(&window, Rc::clone(&vehicle));
+
+    // Twice a second, whether the vehicle has stopped by itself, so that the
+    // button does not go on offering to stop a tcspecial that is gone.
+    let watching = slint::Timer::default();
+    {
+        let weak = window.as_weak();
+        let vehicle = Rc::clone(&vehicle);
+        watching.start(
+            slint::TimerMode::Repeated,
+            Duration::from_millis(500),
+            move || {
+                if let Some(window) = weak.upgrade() {
+                    notice_exit(&window, &mut vehicle.borrow_mut(), verbose);
+                }
+            },
+        );
+    }
+
+    // One thread, for as long as the window is open. A pass waits for a
+    // beacon or for the moment the indicator would change by itself, so the
+    // indicator blinks whether or not anything arrives.
+    let mut beacons = beacons;
+    thread::spawn(move || loop {
+        let pass = beacons.pass();
+
+        // What did not arrive, said where a terminal can keep it, when asked
+        // to be: beacons
+        // that were missed, a spacecraft that restarted, a configuration that
+        // differs. The window has room for what did arrive.
+        if verbose {
+            for remark in &pass.remarks {
+                eprintln!("{remark}");
+            }
+        }
+        // And what is wrong, whether or not it was asked for: a beacon from
+        // where beacons do not come from, which is the one explanation of a
+        // indicator going red while the spacecraft is beaconing.
+        for warning in &pass.warnings {
+            eprintln!("{warning}");
+        }
+
+        // Into the window, on the thread that owns it.
+        show_on(&weak, Shown::of(pass));
+    });
+
+    tcs_ui::windows::run(window, (watching, vehicle), closed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn of(args: &[&str]) -> Result<Arguments, String> {
+        Arguments::of(args.iter().map(|arg| arg.to_string()))
+    }
+
+    /// Quiet unless asked, by either spelling, before or after the
+    /// configuration.
+    #[test]
+    fn verbose_is_asked_for() {
+        let quiet = of(&[]).expect("no arguments are arguments");
+        assert!(!quiet.verbose);
+        assert_eq!(quiet.path, "examples/beacon/beacon.ytcs");
+
+        for args in [
+            &["-v"][..],
+            &["--verbose"],
+            &["a.ytcs", "-v"],
+            &["-v", "a.ytcs"],
+        ] {
+            assert!(of(args).expect("they read").verbose, "{args:?}");
+        }
+        assert_eq!(of(&["-v", "a.ytcs"]).expect("they read").path, "a.ytcs");
+    }
+
+    /// What is not an option, and a second configuration, are refused rather
+    /// than taken for something.
+    #[test]
+    fn what_is_not_understood_is_refused() {
+        assert!(of(&["-q"]).is_err());
+        assert!(of(&["a.ytcs", "b.ytcs"]).is_err());
+    }
+
+    /// YAML where nobody says, XML with --xml, and not both.
+    #[test]
+    fn the_spelling_is_yaml_unless_xml_is_asked_for() {
+        assert_eq!(
+            of(&["--xml"]).expect("it reads").path,
+            "examples/beacon/beacon.xtcs"
+        );
+        assert_eq!(
+            of(&["--yaml", "-v"]).expect("it reads").path,
+            "examples/beacon/beacon.ytcs"
+        );
+        assert!(of(&["--yaml", "--xml"]).is_err());
+        assert!(of(&["--yaml", "a.xtcs"]).is_err());
+    }
+}

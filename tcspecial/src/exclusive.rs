@@ -208,7 +208,8 @@ pub fn on_bus(
 
 /// The state file's lock, held from the start until the process ends or
 /// runs itself again, and which state file it is the lock of.
-static STATE_LOCK: Mutex<Option<(PathBuf, File)>> = Mutex::new(None);
+static STATE_LOCK: tcsos::local::Local<Mutex<Option<(PathBuf, File)>>> =
+    tcsos::local::Local::new(Mutex::new(None), || Mutex::new(None));
 
 /// The file locked for state file `path`: beside it, with `.lock` added.
 ///

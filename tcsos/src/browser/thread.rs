@@ -5,15 +5,36 @@
 //! starts a worker in its place. This wraps it so that a thread knows which
 //! program it is part of -- see [`crate::browser::context`] -- and that it
 //! may wait. Everything else is the standard library's, which works in a
-//! worker: sleeping, parking, the current thread.
+//! worker: parking, the current thread; and sleeping, but for on the page's
+//! own thread, which the browser does not let wait: see [`sleep`].
 
 pub use std::thread::{
-    current, panicking, park, park_timeout, sleep, yield_now, AccessError,
-    LocalKey, Result, Thread, ThreadId,
+    current, panicking, park, park_timeout, yield_now, AccessError, LocalKey,
+    Result, Thread, ThreadId,
 };
 pub use wasm_thread::JoinHandle;
 
 use crate::browser::context;
+
+/// Sleeps for a time: on a worker as the standard library sleeps; on the
+/// page's own thread, whose waiting the browser refuses and ends the page
+/// for, by looking at the page's clock until the time is up. The page draws
+/// nothing meanwhile, so what calls this there -- a window's button that
+/// waits for a program to end -- keeps the time short.
+///
+/// # Arguments
+///
+/// * `time` - How long.
+pub fn sleep(time: std::time::Duration) {
+    if context::may_wait() {
+        std::thread::sleep(time);
+        return;
+    }
+    let until = crate::browser::time::Instant::now() + time;
+    while crate::browser::time::Instant::now() < until {
+        std::hint::spin_loop();
+    }
+}
 
 /// How a thread is to be made: its name and its stack.
 #[derive(Debug)]

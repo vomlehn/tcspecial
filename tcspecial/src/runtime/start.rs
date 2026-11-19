@@ -36,7 +36,8 @@ use crate::segsend::{self, SegSend};
 use crate::telemetry_log::TelemetryLog;
 
 /// Whether something has asked this process to stop.
-static STOPPING: AtomicBool = AtomicBool::new(false);
+static STOPPING: tcsos::local::Local<AtomicBool> =
+    tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
 /// The run's simulation mode, `--simulate`, once `run_graph` has been given
 /// it: none until then, the flight setting.
@@ -54,7 +55,8 @@ pub fn mode() -> Mode {
 }
 
 /// Whether the startup summary is left unsaid: `-q` or `--quiet`.
-static QUIET: AtomicBool = AtomicBool::new(false);
+static QUIET: tcsos::local::Local<AtomicBool> =
+    tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
 /// Leaves the startup summary unsaid, for the rest of this process.
 ///

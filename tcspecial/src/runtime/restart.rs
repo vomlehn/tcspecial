@@ -15,7 +15,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Whether an armed RESTART has asked for one.
-static ASKED: AtomicBool = AtomicBool::new(false);
+static ASKED: tcsos::local::Local<AtomicBool> =
+    tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
 /// Asks for a restart once the vehicle has stopped.
 ///

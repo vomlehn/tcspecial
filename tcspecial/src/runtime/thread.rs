@@ -60,8 +60,10 @@ const UNFILLED: usize = 1024;
 ///
 /// Set once a configuration is chosen, from its `thread_stack`, which
 /// `tcsprotocol` holds to at least `THREAD_STACK_LEAST`.
-static STACK_BYTES: AtomicUsize =
-    AtomicUsize::new(tcsprotocol::THREAD_STACK_DEFAULT as usize);
+static STACK_BYTES: tcsos::local::Local<AtomicUsize> = tcsos::local::Local::new(
+    AtomicUsize::new(tcsprotocol::THREAD_STACK_DEFAULT as usize),
+    || AtomicUsize::new(tcsprotocol::THREAD_STACK_DEFAULT as usize),
+);
 
 /// A measured thread.
 struct Watched {
@@ -84,7 +86,8 @@ struct Watched {
 /// A thread takes itself out as it ends, under this lock, so that a stack
 /// is never read once the thread whose stack it is has gone and it is
 /// unmapped: a reader holds the lock for the whole of a read.
-static WATCHED: Mutex<Vec<Watched>> = Mutex::new(Vec::new());
+static WATCHED: tcsos::local::Local<Mutex<Vec<Watched>>> =
+    tcsos::local::Local::new(Mutex::new(Vec::new()), || Mutex::new(Vec::new()));
 
 /// The key the next measured thread is given.
 static NEXT_KEY: AtomicU64 = AtomicU64::new(0);

@@ -36,18 +36,22 @@ use log::info;
 const WAIT: Duration = Duration::from_millis(50);
 
 /// Whether a stop signal has been taken, by this image.
-static SIGNALLED: AtomicBool = AtomicBool::new(false);
+static SIGNALLED: tcsos::local::Local<AtomicBool> =
+    tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
 /// Whether the vehicle's loop is there to be stopped by a signal, which
 /// [`listening`] says: before it is, a stop ends the process at once, as a
 /// signal nobody handles does.
-static LISTENING: AtomicBool = AtomicBool::new(false);
+static LISTENING: tcsos::local::Local<AtomicBool> =
+    tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
 /// Whether the thread is to end.
-static ENDING: AtomicBool = AtomicBool::new(false);
+static ENDING: tcsos::local::Local<AtomicBool> =
+    tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
 /// The thread, until [`before_exec`] joins it.
-static THREAD: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+static THREAD: tcsos::local::Local<Mutex<Option<JoinHandle<()>>>> =
+    tcsos::local::Local::new(Mutex::new(None), || Mutex::new(None));
 
 /// Blocks the two signals in this thread, and so in every thread made after,
 /// and starts the thread that takes them.

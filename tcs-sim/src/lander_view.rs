@@ -1331,9 +1331,40 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
                 opened.elapsed().as_secs_f64(),
             );
             fly(&ui, &scene, &pilot);
+            regions(&ui);
         });
     }
     timer
+}
+
+/// Tells a web page which part of tcs-sim's window must fit on a small
+/// screen -- from the window's top left to the far corner of the lander's
+/// pane, its picture and its controls -- and that the joystick keeps the
+/// touches that start on it: the panels beside the pane are scrolled to.
+/// Nothing on Linux. See `tcs_ui::windows::regions`.
+///
+/// # Arguments
+///
+/// * `ui` - tcs-sim's window.
+fn regions(ui: &MainWindow) {
+    use tcs_ui::windows::Area;
+
+    let pane = ui.global::<LanderScene>();
+    tcs_ui::windows::regions(
+        ui,
+        Area {
+            x: 0.0,
+            y: 0.0,
+            width: pane.get_pane_right(),
+            height: pane.get_pane_bottom(),
+        },
+        Area {
+            x: pane.get_stick_left(),
+            y: pane.get_stick_top(),
+            width: pane.get_stick_width(),
+            height: pane.get_stick_height(),
+        },
+    );
 }
 
 /// Has the autopilot, while it flies the lander, hold the joystick where it

@@ -299,7 +299,16 @@ export global LanderScene {
     in-out property <bool> has-joystick_3_4: true;
     callback pause-clicked();
     callback autoland-clicked();
-
+    // Where the pane ends in its window, right and down, and where the
+    // joystick is in it, in the window's logical pixels: set by the pane,
+    // for a web page that scales the window to fit the pane and keeps the
+    // touches that start on the joystick. See lander_view's `regions`.
+    in-out property <length> pane-right;
+    in-out property <length> pane-bottom;
+    in-out property <length> stick-left;
+    in-out property <length> stick-top;
+    in-out property <length> stick-width;
+    in-out property <length> stick-height;
 }
 
 // The landscape and the lander over it, drawn to scale, and what it is
@@ -497,6 +506,29 @@ export component LanderPicture inherits Rectangle {
 export component LanderPane inherits Rectangle {
     // The display's height over its width, which the landscape keeps.
     property <float> ratio: LanderScene.world-height / LanderScene.world-width;
+    // Where the pane and its joystick are in the window, said to
+    // LanderScene as they change.
+    property <length> right: root.absolute-position.x + root.width;
+    property <length> bottom: root.absolute-position.y + root.height;
+    property <length> stick-left: stick.absolute-position.x;
+    property <length> stick-top: stick.absolute-position.y;
+    property <length> stick-width: stick.width;
+    property <length> stick-height: stick.height;
+    changed right => { LanderScene.pane-right = self.right; }
+    changed bottom => { LanderScene.pane-bottom = self.bottom; }
+    changed stick-left => { LanderScene.stick-left = self.stick-left; }
+    changed stick-top => { LanderScene.stick-top = self.stick-top; }
+    changed stick-width => { LanderScene.stick-width = self.stick-width; }
+    changed stick-height => { LanderScene.stick-height = self.stick-height; }
+    // And once at the start: a change is said only after a first value.
+    init => {
+        LanderScene.pane-right = self.right;
+        LanderScene.pane-bottom = self.bottom;
+        LanderScene.stick-left = self.stick-left;
+        LanderScene.stick-top = self.stick-top;
+        LanderScene.stick-width = self.stick-width;
+        LanderScene.stick-height = self.stick-height;
+    }
     VerticalLayout {
         padding: 2px;
         spacing: 2px;
@@ -581,7 +613,7 @@ export component LanderPane inherits Rectangle {
             // The joystick, beside them.
             HorizontalLayout {
                 alignment: center;
-                Joystick34 {
+                stick := Joystick34 {
                     dot-x: LanderScene.dot-x;
                     dot-y: LanderScene.dot-y;
                     steered: LanderScene.autoland;

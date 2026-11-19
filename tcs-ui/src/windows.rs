@@ -142,6 +142,68 @@ pub fn hide<C: ComponentHandle + 'static>(
     Ok(())
 }
 
+/// A rectangle of a window, in its logical pixels from its top left.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Area {
+    /// Its left edge.
+    pub x: f32,
+    /// Its top edge.
+    pub y: f32,
+    /// Its width.
+    pub width: f32,
+    /// Its height.
+    pub height: f32,
+}
+
+/// Tells a page which part of a window matters on a small screen, and
+/// which part keeps the touches that start on it.
+///
+/// On a phone a page scales a window down to fit, and lets a touch scroll
+/// the page. A window that says what must fit -- tcs-sim's lander pane,
+/// with the rest of the window beside it -- is scaled so that that part
+/// fits, and the rest is scrolled to; and a touch that starts where the
+/// window is dragged in -- the lander's joystick -- is the window's and
+/// does not scroll. Nothing on Linux, whose windows are as large as they
+/// are.
+///
+/// # Arguments
+///
+/// * `window` - The window.
+/// * `fit`    - What must fit on the screen, measured from the window's top
+///              left.
+/// * `hold`   - What keeps its touches.
+#[cfg(target_arch = "wasm32")]
+pub fn regions<C: ComponentHandle + 'static>(
+    window: &C,
+    fit: Area,
+    hold: Area,
+) {
+    use slint::winit_030::winit::platform::web::WindowExtWebSys;
+    use slint::winit_030::WinitWindowAccessor;
+
+    let said = |a: Area| [a.x, a.y, a.width, a.height];
+    window.window().with_winit_window(|winit| {
+        if let Some(canvas) = winit.canvas() {
+            tcsos::browser::page::set_regions(&canvas, said(fit), said(hold));
+        }
+    });
+}
+
+/// Nothing, but in a page: see the page's `regions`.
+///
+/// # Arguments
+///
+/// * `_window` - The window.
+/// * `_fit`    - What must fit on the screen.
+/// * `_hold`   - What keeps its touches.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn regions<C: ComponentHandle + 'static>(
+    _window: &C,
+    _fit: Area,
+    _hold: Area,
+) {
+}
+
 /// Shows or hides the canvas a window is drawn on, in a page: a browser's
 /// windowing does nothing with a window shown or hidden. See tcsos's
 /// `browser::page`.

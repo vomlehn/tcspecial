@@ -246,6 +246,13 @@ pub fn main() {
         process::exit(runtime::supervisor::run(&payload_path, simulate));
     }
 
+    // The test code armed, said by the child alone: the supervisor made the
+    // same checks, but sends nothing, and under `seed: random` drew a seed
+    // of its own that no packet is lost by.
+    if let Some(armed) = crate::flight_checks::armed() {
+        runtime::start::summary(armed);
+    }
+
     // Locked before the configuration is read, so that everything a load
     // makes is locked as it is made: see `runtime::memory`.
     match runtime::memory::lock(memlock, simulate) {

@@ -119,6 +119,30 @@ impl Checked {
     }
 }
 
+/// What the checks armed, a line for the startup summary: the bit errors'
+/// rate and seed. Kept for the caller to say, since the supervisor makes the
+/// checks too and only the child it starts sends packets: see
+/// [`armed`].
+#[cfg(feature = "bit-errors")]
+static ARMED: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// What the checks armed, for the startup summary.
+///
+/// # Returns
+///
+/// A line saying the bit errors' rate, seed and file, where they were
+/// armed; `None` where nothing was, and always in a build without them.
+pub fn armed() -> Option<String> {
+    #[cfg(feature = "bit-errors")]
+    {
+        ARMED.get().cloned()
+    }
+    #[cfg(not(feature = "bit-errors"))]
+    {
+        None
+    }
+}
+
 /// Every feature that never flies, by name: test code. A feature added for
 /// test code is added here, and to [`never_flies`].
 pub const NEVER_FLIES: [&str; 2] = ["visual", "bit-errors"];
@@ -240,10 +264,14 @@ fn arm_bit_errors(
         },
     };
     match crate::runtime::bit_errors::arm(rate, seed, mode) {
-        Ok(()) => crate::runtime::start::summary(format!(
-            "bit errors: {rate} flips per bit, seed {seed} ({chosen}), \
-             from {sim}: test code"
-        )),
+        Ok(()) => {
+            // Set once, as the bit errors are: a second arming is refused
+            // above.
+            let _ = ARMED.set(format!(
+                "bit errors: {rate} flips per bit, seed {seed} ({chosen}), \
+                 from {sim}: test code"
+            ));
+        }
         Err(why) => refused.push(format!("{sim}: {why}")),
     }
 }
@@ -359,6 +387,30 @@ mod tests {
         if never_flies().is_empty() {
             assert_eq!(bit_errors_for(config, Mode::None), Ok(None));
         }
+    }
+
+    /// What is armed is kept for the summary rather than said, so that
+    /// the supervisor, which makes the checks too, does not say it as well
+    /// as its child. A rate of nought, so that nothing else this process
+    /// sends is lost.
+    #[cfg(feature = "bit-errors")]
+    #[test]
+    fn what_is_armed_is_kept_for_the_summary() {
+        let lossless = Asked {
+            bit_errors: errors(0.0),
+            ..Asked::default()
+        };
+        check(Mode::All, &lossless).expect("armed");
+        let said = armed().expect("kept");
+        assert!(said.contains("seed 7 (as stated)"), "{said}");
+        assert!(said.contains("x-sim.yaml"), "{said}");
+    }
+
+    /// Nothing is armed in a build without the bit errors.
+    #[cfg(not(feature = "bit-errors"))]
+    #[test]
+    fn nothing_is_armed_without_the_bit_errors() {
+        assert_eq!(armed(), None);
     }
 
     /// A build without the bit errors says so when a file asks for them.

@@ -5682,7 +5682,8 @@ the random numbers start:
   no run has had before.
 
 The startup summary says the seed and which of the three it was, so that a
-run with a random seed can be had again by stating the seed it drew.
+run with a random seed can be had again by stating the seed it drew. A
+tcspecial its supervisor starts again draws again, and says the new one.
 
 Like ``--visual`` it wants ``--simulate=some`` or ``--simulate=all``: under
 ``--simulate=none`` a simulator file that states a rate is refused. A

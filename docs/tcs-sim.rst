@@ -42,8 +42,10 @@ The Simulator Configuration
 ===========================
 What simulating a payload takes, which is not a property of the payload: how
 often it produces a packet, and how it divides one into segments. Only tcs-sim
-acts on it; tcs-moc reads it too, to show what the tcs-sim it started is
-simulating, and does without it if it is not there.
+acts on it, but for its ``gateway`` section, which a tcspecial built for
+testing reads (see *Bit errors on the link to the ground*, below); tcs-moc
+reads it too, to show what the tcs-sim it started is simulating, and does
+without it if it is not there.
 
 Every setting but ``simulate`` is optional, and **a setting written empty is a
 setting not stated**: ``packet_interval: ""`` and no ``packet_interval`` at all mean
@@ -811,6 +813,42 @@ so a run is not left to be guessed at afterwards.
            jitter: 50 ms           # and the rest are up to 50 ms late
            packet_interval: 500 ms
            protocol: udp
+
+**Bit errors on the link to the ground: gateway**
+
+The payloads' faults are tcs-sim's; the link between tcspecial and the
+ground is tcspecial's, and so are its faults. The ``gateway`` section asks
+for bit errors on it: each packet up or down -- a command, an answer, a
+beacon, the gateway's data either way -- is lost whole with the chance that
+at least one of its bits flips.
+
+.. code-block:: text
+
+   gateway                         optional
+     bit_error_rate       flips per bit, from 0 to 1, such as 1e-6. Left
+                          out, or blank, for no bit errors
+     seed                 where the random numbers start: left out, or
+                          blank, for the default, 1; a whole number for that
+                          number, to lose again the packets a run lost; or
+                          random, for one drawn from the system's source of
+                          randomness, never the clock
+
+.. code-block:: yaml
+
+   gateway:
+     bit_error_rate: 1e-5    # a 100-byte packet lost about one time in 125
+     seed: random
+
+tcs-sim reads the section and does nothing with it. A tcspecial built with
+the ``bit-errors`` feature, which never flies, reads the file tcs-sim reads
+-- the one ``PAYLOAD_SIM_YAML`` names, and otherwise the one beside the
+configuration -- and loses the packets itself; its startup summary says the
+rate and the seed, so a run with a random one can be had again. Like every
+piece of test code it is refused under ``--simulate=none``, and a tcspecial
+built without the feature refuses a file that states a rate rather than
+passing a test of a lossy link over a perfect one. See `A lossy link to the
+ground <tcspecial.html#a-lossy-link-to-the-ground>`__ in the tcspecial
+manual.
 
 The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line

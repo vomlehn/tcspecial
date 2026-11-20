@@ -670,6 +670,13 @@ run the vehicle yourself, in another terminal, say
 <code>--no-vehicle</code>:</p>
 <pre><code>cargo run --bin tcspecial -- examples/ping/ping.xtcs   # in one terminal
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another</code></pre>
+<p>It gives tcspecial no <code>--simulate</code>, the flight setting,
+and so it is run as flight itself: a beacon saying <code>test</code> –
+from a tcspecial built with <code>visual</code> or
+<code>bit-errors</code>, say – puts <code>TEST CODE</code> first on the
+window’s line, and the pings go on. <code>ping_yamcs.py</code> does the
+same; <code>thermostat_yamcs.py</code> runs tcspecial with
+<code>--simulate=all</code> and expects test code.</p>
 <p>Its ports are all in the seven thousands, which no other example
 uses.</p>
 <p>tcs-moc pings it too:

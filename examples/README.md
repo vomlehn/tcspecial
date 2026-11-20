@@ -301,6 +301,12 @@ cargo run --bin tcspecial -- examples/ping/ping.xtcs   # in one terminal
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another
 ```
 
+It gives tcspecial no `--simulate`, the flight setting, and so it is run as
+flight itself: a beacon saying `test` -- from a tcspecial built with
+`visual` or `bit-errors`, say -- puts `TEST CODE` first on the window's
+line, and the pings go on. `ping_yamcs.py` does the same; `thermostat_yamcs.py`
+runs tcspecial with `--simulate=all` and expects test code.
+
 Its ports are all in the seven thousands, which no other example uses.
 
 tcs-moc pings it too: `make runmocy TCSPECIAL_CONFIG_FILE=examples/ping/ping`,

@@ -158,9 +158,11 @@ pub fn main() {
 
     // A build with test code in it is never one to fly, and says so every
     // time it starts, whether or not the test code is asked for: a warning,
-    // so that quiet says it too. Its beacons say `test`.
+    // so that quiet says it too. Its beacons say `test`. Said by the
+    // supervisor, which every run starts as, and not again by the child it
+    // starts: once a start, even where the child goes no further.
     let never = crate::flight_checks::never_flies();
-    if !never.is_empty() {
+    if !child && !never.is_empty() {
         warn!(
             "this tcspecial was built with {} and must not fly: build the \
              flight software without {}",

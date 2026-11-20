@@ -2770,8 +2770,12 @@ landing does not end a flight: the landed lander stands on the pad until
 thrust greater than its weight lifts it off again. A crash does: until
 autorestart is enabled, a crashed lander stays down until Restart;
 enabled, it starts again by itself, with a full tank, after a pause.
-Each command reaches the lander 1.3 s after it is sent, and is seen 1.3 s
-after that.
+Demo On and Demo Off send one up through ``lander-a``'s third gateway,
+``gateway_demo``, to the payload ``demo``, which puts the lander in
+demonstration mode or takes it out: in it, the lander always starts again
+by itself after a crash, and tcs-sim's window says "Demonstration Mode"
+and leaves only its Pause button working. Each command reaches the lander
+1.3 s after it is sent, and is seen 1.3 s after that.
 
 The MOC's sky is tcs-sim's, sent down: ``lander-a``'s payload ``sky``
 sends the stars a few to a packet, round and round, and the sky fills in
@@ -2780,7 +2784,8 @@ the ground has every star it sends a quench up through ``lander-a``'s
 second gateway, ``gateway_sky``, to the payload ``sky_quench``, and the
 stars stop. The quench has a gateway of its own because a gateway passes
 what the ground sends to every payload it feeds, and ``autorestart``
-would take a quench for an order. The design gives the stars' records in
+would take a quench for an order; ``gateway_demo`` has one for the same
+reason. The design gives the stars' records in
 "The sky, sent down".
 
 Closing either window stops everything:
@@ -2796,8 +2801,9 @@ or, installed, ``tcsx lander``.
          velocity and acceleration, its fuel and the joystick's X, each
          made a value and sent to the Yamcs gateway, with the stars of the
          sky; the joystick's X also drives the X thruster. The gateway
-         passes what the ground sends to the autorestart payload, and a
-         second gateway, gateway_sky, passes the quench to sky_quench.
+         passes what the ground sends to the autorestart payload, a
+         second gateway, gateway_sky, passes the quench to sky_quench, and
+         a third, gateway_demo, passes Demo On and Demo Off to demo.
    :width: 100%
 
    ``lander-a``, the X axis.

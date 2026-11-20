@@ -427,7 +427,7 @@ def _beacon_of(datagram):
     }
 
 
-def hear(datagram, expected, links=None):
+def hear(datagram, expected, links=None, flying=False):
     """Read a datagram from the beacon link.
 
     Args:
@@ -437,13 +437,17 @@ def hear(datagram, expected, links=None):
                   compare nothing.
         links:    This station's own link digest, as hex, which the beacon's
                   is compared with; ``None`` to compare none.
+        flying:   Whether this station is run as flight, so that a beacon
+                  saying ``test`` is a mismatch: see
+                  :meth:`Beacons.flying`.
 
     Returns:
         A :class:`Heard`: what to show, the beacon's numbers if it could be
         read, and what differs, if anything.
     """
     beacon = _beacon_of(datagram)
-    why = None if beacon is None else mismatch(beacon, expected, links)
+    why = (None if beacon is None
+           else mismatch(beacon, expected, links, flying))
     message = message_of(datagram)
     return Heard(
         message=f"{why} -- {message}" if why else message,
@@ -476,7 +480,13 @@ AGREES_AGAIN = ("tcspecial is serving the configuration this MOC read again, "
                 "worked out alike, in the same interface")
 
 
-def mismatch(beacon, expected, links):
+#: What is said of a beacon saying ``test`` to a station run as flight:
+#: ``tcsmoc::beacon::Mismatch::TestCode``.
+TEST_CODE = ("TEST CODE: tcspecial says it has test code in its run or its "
+             "build, and this MOC is run as flight, --simulate=none")
+
+
+def mismatch(beacon, expected, links, flying=False):
     """What a beacon says that this station does not agree with: the first
     of them, in the order a person would look into them --
     ``tcsmoc::beacon::Mismatch``. The interface is compared whatever else the
@@ -486,6 +496,8 @@ def mismatch(beacon, expected, links):
         beacon:   The beacon, as :func:`_beacon_of` gives it.
         expected: This station's configuration digest, as hex, or ``None``.
         links:    This station's link digest, as hex, or ``None``.
+        flying:   Whether this station is run as flight, so that a beacon
+                  saying ``test`` is a mismatch.
 
     Returns:
         What to say of it, or ``None`` where nothing differs.
@@ -499,6 +511,8 @@ def mismatch(beacon, expected, links):
     if links is not None and beacon["links"] != links:
         return (f"LINKS DIFFER: tcspecial worked links {beacon['links']} out "
                 f"of the configuration, and this MOC {links}")
+    if flying and not beacon["flight"]:
+        return TEST_CODE
     return None
 
 
@@ -516,6 +530,8 @@ def heading(why):
         return "tcspecial speaks a different interface"
     if why.startswith("LINKS DIFFER"):
         return "tcspecial worked the configuration out differently"
+    if why.startswith("TEST CODE"):
+        return "tcspecial is running test code"
     return "tcspecial is serving a different configuration"
 
 
@@ -654,6 +670,8 @@ class Beacons:
         # This station's link digest, compared with every beacon's: see
         # with_links. None compares none.
         self._links = None
+        # Whether a beacon saying test is a mismatch: see flying.
+        self._flying = False
         self._clock = clock
         self._socket = None
         self._at = None
@@ -723,6 +741,21 @@ class Beacons:
         self._links = links
         return self
 
+    def flying(self):
+        """Holds every beacon to flight code -- ``Beacons::flying``: this
+        station is run as flight, under ``--simulate=none``, and a vehicle
+        whose beacon says ``test`` has test code in its run or its build,
+        which is said as a mismatch would be. Every beacon says it, so a
+        station that missed the first beacons hears it in the next. Only
+        said: commands go on being sent, as they do to a vehicle whose
+        configuration differs.
+
+        Returns:
+            These beacons, holding them to flight code.
+        """
+        self._flying = True
+        return self
+
     def link(self):
         """Where this is listening and where it expects beacons from."""
         return self._link
@@ -786,7 +819,7 @@ class Beacons:
                 self._stranger = sender
             return self.after(Arrived.NOTHING, remarks, warnings=warnings)
 
-        heard = hear(datagram, self._expected, self._links)
+        heard = hear(datagram, self._expected, self._links, self._flying)
         # A beacon that disagrees is remarked on when it starts and when it
         # stops, and not on every beacon in between.
         if (heard.differs is not None) != self._differed:

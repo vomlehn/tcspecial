@@ -246,7 +246,16 @@ second and shows:
   enable it as soon as the vehicles are connected: enabled, a lander that
   has crashed starts again by itself after its pause; disabled, it stays
   down until it is restarted. A landed lander is still flying, so
-  autorestart does nothing to it.
+  autorestart does nothing to it;
+* in the Yamcs station, Demo On and Demo Off, which send a command up
+  through lander-a's third gateway, ``gateway_demo``, to a simulated
+  payload, ``demo``, joined to the lander's ``demo`` input: 1 puts the
+  lander in demonstration mode, 0 takes it out. In demonstration mode the
+  lander always starts again by itself after a crash, whatever autorestart
+  says; tcs-sim's window says "Demonstration Mode" at the top of the
+  lander's display, in the middle, and of its buttons only Pause works.
+  The command has a gateway of its own for the reason the quench does: a
+  gateway passes what the ground sends to every payload it feeds.
 
 The sky, sent down
 ------------------
@@ -359,3 +368,8 @@ In this order, each stage checked before the next:
 8. **Flying on after a landing.** A landed lander stands on the pad until
    thrust greater than its weight lifts it off, and only a crash ends a
    flight, so autorestart follows crashes alone.
+
+9. **Demonstration mode.** The lander's ``demo`` input, commanded by the
+   Yamcs station's Demo On and Demo Off through ``lander-a``'s
+   ``gateway_demo``: autorestart always on while it is asserted, and
+   tcs-sim's window saying so and leaving only Pause working.

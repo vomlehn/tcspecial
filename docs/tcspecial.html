@@ -3076,8 +3076,12 @@ landing does not end a flight: the landed lander stands on the pad until
 thrust greater than its weight lifts it off again. A crash does: until
 autorestart is enabled, a crashed lander stays down until Restart;
 enabled, it starts again by itself, with a full tank, after a pause.
-Each command reaches the lander 1.3 s after it is sent, and is seen 1.3 s
-after that.</p>
+Demo On and Demo Off send one up through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s third gateway,
+<tt class="docutils literal">gateway_demo</tt>, to the payload <tt class="docutils literal">demo</tt>, which puts the lander in
+demonstration mode or takes it out: in it, the lander always starts again
+by itself after a crash, and tcs-sim's window says &quot;Demonstration Mode&quot;
+and leaves only its Pause button working. Each command reaches the lander
+1.3 s after it is sent, and is seen 1.3 s after that.</p>
 <p>The MOC's sky is tcs-sim's, sent down: <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s payload <tt class="docutils literal">sky</tt>
 sends the stars a few to a packet, round and round, and the sky fills in
 as they arrive, a packet lost leaving it thinner until a later pass. Once
@@ -3085,7 +3089,8 @@ the ground has every star it sends a quench up through <tt class="docutils liter
 second gateway, <tt class="docutils literal">gateway_sky</tt>, to the payload <tt class="docutils literal">sky_quench</tt>, and the
 stars stop. The quench has a gateway of its own because a gateway passes
 what the ground sends to every payload it feeds, and <tt class="docutils literal">autorestart</tt>
-would take a quench for an order. The design gives the stars' records in
+would take a quench for an order; <tt class="docutils literal">gateway_demo</tt> has one for the same
+reason. The design gives the stars' records in
 &quot;The sky, sent down&quot;.</p>
 <p>Closing either window stops everything:</p>
 <pre class="code console literal-block">
@@ -3097,8 +3102,9 @@ would take a quench for an order. The design gives the stars' records in
 velocity and acceleration, its fuel and the joystick's X, each
 made a value and sent to the Yamcs gateway, with the stars of the
 sky; the joystick's X also drives the X thruster. The gateway
-passes what the ground sends to the autorestart payload, and a
-second gateway, gateway_sky, passes the quench to sky_quench.</object>
+passes what the ground sends to the autorestart payload, a
+second gateway, gateway_sky, passes the quench to sky_quench, and
+a third, gateway_demo, passes Demo On and Demo Off to demo.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">lander-a</span></tt>, the X axis.</p>
 </div>
 <div class="figure">

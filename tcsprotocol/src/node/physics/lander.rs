@@ -56,8 +56,10 @@
 //! it flies on: a landing does not end a flight, only a crash does.
 //! Crashed, it stays where it is until it is restarted, by its `restart`
 //! input, or, with its `autorestart` input asserted, for `pause`; then it
-//! starts again where it started, with a full tank. A restart starts it
-//! again however it is, landed or flying too. The arithmetic is tcs-sim's
+//! starts again where it started, with a full tank. Its `demo` input
+//! asserted, demonstration mode, does what `autorestart` does whatever
+//! `autorestart` says. A restart starts it again however it is, landed or
+//! flying too. The arithmetic is tcs-sim's
 //! `physics::lander`.
 //!
 //! # Sky
@@ -116,6 +118,11 @@ pub const TERMINALS: &[Terminal] = &[
     // Driven to the generation of its sky that the ground has whole: while
     // it is the sky's own, the sky is not sent.
     Terminal::input("sky_quench", Kind::Decision),
+    // While asserted, the lander is in demonstration mode: it starts again
+    // by itself after a crash, as though its autorestart were asserted
+    // whatever that is, and tcs-sim's window says so and leaves only its
+    // Pause button working. Nothing driving it, it is not asserted.
+    Terminal::input("demo", Kind::Decision),
 ];
 
 /// How many bytes one of the sky's records is.

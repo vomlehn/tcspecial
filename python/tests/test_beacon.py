@@ -413,6 +413,23 @@ class HearingTest(unittest.TestCase):
                         heard.differs)
         self.assertIn("11" * 16, heard.differs)
 
+    def test_test_code_is_a_mismatch_only_to_a_station_run_as_flight(self):
+        # As tcsmoc::beacon's test of the same says it.
+        test = a_beacon(flight=False)
+        flight = a_beacon(flight=True)
+        heard = beacon.hear(test, None, None, flying=True)
+        self.assertEqual(heard.differs, beacon.TEST_CODE)
+        self.assertIn(heard.differs, heard.message)
+        self.assertEqual(beacon.heading(heard.differs),
+                         "tcspecial is running test code")
+        self.assertIsNone(beacon.hear(flight, None, None, True).differs)
+        self.assertIsNone(beacon.hear(test, None, None).differs,
+                          "a station not run as flight expects test code")
+        # What else differs is said first, as the Rust says it.
+        other = a_beacon(interface_digest=bytes([0x11] * 16))
+        self.assertTrue(beacon.hear(other, None, None, True).differs
+                        .startswith("INTERFACE DIFFERS"))
+
     def test_a_beacons_number_says_what_happened_before_it(self):
         self.assertEqual(beacon.counted(None, 7), (Counted.FIRST, 0))
         self.assertEqual(beacon.counted(7, 8), (Counted.NEXT, 0))
@@ -456,6 +473,20 @@ class LoopTest(unittest.TestCase):
         broken = self.beacons.after(beacon.Arrived.BROKEN, [])
         self.assertEqual(broken.showing.stage, Stage.UNHEARD)
         self.assertEqual(broken.at, AT)
+
+    def test_a_flying_station_remarks_on_test_code_once(self):
+        sender = ("127.0.0.1", 7500)
+        flying = beacon.Beacons(beacon_link(), Schedule.standard(), None,
+                                clock=lambda: self.now).flying()
+        first = flying.heard(a_beacon(sequence=1), sender)
+        self.assertIn(beacon.TEST_CODE, first.remarks)
+        self.assertIn("TEST CODE", first.said)
+        again = flying.heard(a_beacon(sequence=2), sender)
+        self.assertNotIn(beacon.TEST_CODE, again.remarks,
+                         "said once, when it starts")
+        clean = flying.heard(a_beacon(sequence=3, flight=True), sender)
+        self.assertIn(beacon.AGREES_AGAIN, clean.remarks)
+        self.assertNotIn("TEST CODE", clean.said)
 
     def test_remarks_on_missed_beacons_a_restart_and_a_differing_config(self):
         sender = ("127.0.0.1", 7500)

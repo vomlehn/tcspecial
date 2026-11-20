@@ -67,6 +67,9 @@ component PayloadPanel inherits Rectangle {
     in property <string> parameters: "";
     in property <bool> triggered: false;
     in property <string> driving: "";
+    // Whether the lander is in demonstration mode, in which only its Pause
+    // button works: this panel's buttons do not.
+    in property <bool> locked: false;
 
     callback transfer-clicked();
 
@@ -215,6 +218,7 @@ component PayloadPanel inherits Rectangle {
             // what a panel is opened to do.
             Button {
                 text: payload-status == "Running" ? "Disable" : "Enable";
+                enabled: !locked;
                 clicked => { transfer-clicked(); }
             }
             // What the two files said about this payload. On the same row as
@@ -229,6 +233,7 @@ component PayloadPanel inherits Rectangle {
             // empty Text there not being reported either.
             Button {
                 text: "Configuration";
+                enabled: !locked;
                 clicked => { parameters-popup.show(); }
             }
             // The row's spare room, so the buttons are the width of their own
@@ -409,6 +414,9 @@ export component MainWindow inherits Window {
     // Rust's to decide, from the status the button's own label comes from.
     callback transfer-payload(int);
     callback quit-clicked();
+    // Whether the world's lander is in demonstration mode: set by Rust.
+    // Then the lander pane's Pause is the only button that works.
+    in property <bool> demonstration: false;
 
     // What a panel comes to, measured by PanelProbe and handed over.
     //
@@ -506,6 +514,7 @@ export component MainWindow inherits Window {
                             parameters: p.parameters;
                             triggered: p.triggered;
                             driving: p.driving;
+                            locked: root.demonstration;
 
                             transfer-clicked => { transfer-payload(i); }
                         }
@@ -521,6 +530,7 @@ export component MainWindow inherits Window {
             Rectangle { }
             Button {
                 text: "Quit All";
+                enabled: !root.demonstration;
                 clicked => { quit-clicked(); }
             }
         }

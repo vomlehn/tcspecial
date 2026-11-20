@@ -656,7 +656,8 @@ def main(argv):
         beacons = YamcsBeacons(yamcs, setup.beacon,
                                Schedule.for_interval(setup.beacon_interval),
                                setup.digest, setup.beacon_interval,
-                               links=links_of(setup.config))
+                               links=links_of(setup.config),
+                               flying=SIMULATE == "none")
         sources = setup.sources + [setup.world] * (setup.world is not None)
         if setup.world is None:
             status("no simulated world's temperature: "

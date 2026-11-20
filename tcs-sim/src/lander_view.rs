@@ -49,6 +49,11 @@ pub const CRASHED: usize = 8;
 pub const ACCELERATION_X: usize = 9;
 pub const ACCELERATION_Y: usize = 10;
 
+/// The lander's demo input's place, among the same: past the outputs a
+/// ground station's window draws from, so read only where the world's own
+/// terminals are, in tcs-sim's.
+const DEMO: usize = 15;
+
 /// The joystick's inputs' places, in
 /// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
 const SET_X: usize = 0;
@@ -1259,8 +1264,12 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let weak = ui.as_weak();
         let beckon = Rc::clone(&beckoning);
         pane.on_autoland_clicked(move || {
-            beckon.set(false);
             let Some(ui) = weak.upgrade() else { return };
+            // In demonstration mode only Pause works.
+            if ui.global::<LanderScene>().get_demonstration() {
+                return;
+            }
+            beckon.set(false);
             let mut flying = flying.borrow_mut();
             if flying.take().is_some() {
                 // Let go of, as a pilot letting go would.
@@ -1361,6 +1370,11 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
                 beckoning.set(true);
             }
             let pane = ui.global::<LanderScene>();
+            // In demonstration mode, while the lander's demo input is
+            // asserted, the pane says so and only Pause works.
+            let demonstration = out.get(DEMO).is_some_and(|d| *d > 0.5);
+            pane.set_demonstration(demonstration);
+            ui.set_demonstration(demonstration);
             pane.set_beckon(beckoning.get());
             pane.set_beckon_lit(beckoning.get() && beckon_lit(seconds));
             regions(&ui);
@@ -1847,9 +1861,17 @@ pub(crate) mod tests {
         assert_eq!(world.read(x, Instant::now()), 0.5);
     }
 
+    /// The demo input's place here is the type's.
+    #[test]
+    fn demo_is_the_types() {
+        let terminals = tcsprotocol::node::physics::lander::TERMINALS;
+        assert_eq!(terminals[DEMO].name, "demo");
+    }
+
     /// Draws the lander's pane, landed on a pad over a varied ground,
     /// into a picture, to be looked at: run by hand, with the picture's path
-    /// in `LANDER_SHOT`.
+    /// in `LANDER_SHOT`, and in demonstration mode where `LANDER_DEMO` is
+    /// set.
     #[test]
     #[ignore = "draws a picture to be looked at: LANDER_SHOT=<path>"]
     fn draw_the_window() {
@@ -1935,6 +1957,9 @@ pub(crate) mod tests {
         let (_, _, dot_x, dot_y) = axes(70.0, -40.0);
         pane.set_dot_x(dot_x);
         pane.set_dot_y(dot_y);
+        let demonstration = tcsos::env::var("LANDER_DEMO").is_ok();
+        pane.set_demonstration(demonstration);
+        window.set_demonstration(demonstration);
         window.show().expect("shown");
         window.window().set_size(slint::PhysicalSize::new(
             window.get_lander_width() as u32 + 16,

@@ -419,7 +419,9 @@ def main(argv):
         beacons = YamcsBeacons(yamcs, setup.beacon,
                                Schedule.for_interval(setup.beacon_interval),
                                setup.digest, setup.beacon_interval,
-                               links=links_of(setup.config))
+                               links=links_of(setup.config),
+                               # tcspecial is given no --simulate: flight.
+                               flying=True)
         pinger = YamcsPinger(yamcs, setup.ping_command, setup.ping_reply)
         if options.pings is None:
             return run_the_window(setup, beacons, pinger,

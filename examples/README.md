@@ -830,7 +830,11 @@ Disable Autorestart and Enable Autorestart send one up to lander-a, whose
 gateway passes it to the payload that sets the lander's autorestart. The
 station enables it as soon as the vehicles are connected, so after a crash
 the lander starts again by itself after its pause; disabled, it stays down
-until Restart. Closing
+until Restart. Demo On and Demo Off send one up to lander-a's
+`gateway_demo`, which passes it to the payload that puts the lander in
+demonstration mode or takes it out: in it, the lander always starts again
+by itself after a crash, and tcs-sim's window says "Demonstration Mode" and
+leaves only its Pause button working. Closing
 tcs-sim's window,
 or the MOC's, stops everything. Yamcs's web interface is at
 <http://localhost:19090>.

@@ -27,6 +27,10 @@ This program puts the pieces together:
   checksum until the vehicle answers with it, through the delay, and then
   turns the lander's autorestart on, so that a lander nobody flies starts
   again by itself after each crash;
+* its window's Demo On and Demo Off put the lander in demonstration mode
+  and take it out, up through lander-a's ``gateway_demo``: in it the lander
+  always starts again by itself after a crash, and tcs-sim's window says
+  "Demonstration Mode" and leaves only its Pause button working;
 * it shows what arrives in a window -- the landscape and the lander where it
   was said to be, the values, the fuel, where the joystick was held, and
   whether it has landed or crashed -- or, with ``--seconds``, prints it for
@@ -660,7 +664,7 @@ class Craft:
         #: The command the ground sends up through the gateway, by the
         #: payload the gateway passes it to, where the gateway binds aboard
         #: to take it and passes it on by moc-out: lander-a's to autorestart,
-        #: lander-b's to restart.
+        #: sky_quench and demo, lander-b's to restart.
         self.commands = {}
         for uplink in generated.uplinks(self.config):
             if uplink.vehicle is None:
@@ -1216,6 +1220,38 @@ class Autorestart:
         return self._uplink.send(1)
 
 
+class Demo:
+    """Has Yamcs put the lander in demonstration mode, or take it out, up
+    through the vehicle whose gateway passes it to the payload that sets
+    the lander's demo input. In demonstration mode the lander always starts
+    again by itself after a crash, whatever autorestart says, and tcs-sim's
+    window says "Demonstration Mode" and leaves only its Pause button
+    working. Until it is told, the lander is not in it.
+
+    Args:
+        uplink: The :class:`Uplink` to the demo payload's vehicle.
+    """
+
+    def __init__(self, uplink):
+        self._uplink = uplink
+
+    def on(self):
+        """Puts the lander in demonstration mode.
+
+        Returns:
+            The command's arguments.
+        """
+        return self._uplink.send(1)
+
+    def off(self):
+        """Takes the lander out of demonstration mode.
+
+        Returns:
+            The command's arguments.
+        """
+        return self._uplink.send(0)
+
+
 def room_of(path):
     """The width tcs-sim's window left for this program's, as it wrote it.
 
@@ -1285,7 +1321,7 @@ def watch_and_print(readings, seconds, every, stopped):
 
 
 def run_the_window(readings, lander, seed, delay, stopped, restarter,
-                   autorestart, room=None):
+                   autorestart, room=None, demo=None):
     """The window, and the loop that reads Yamcs for it.
 
     At the top left of the display, as no wider than ``room``, where it is
@@ -1305,6 +1341,8 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
                      send by, or ``None``, for none.
         room:        The width it may take, in logical pixels, or ``None``
                      for its own.
+        demo:        The :class:`Demo` its Demo On and Demo Off buttons
+                     send by, or ``None``, for neither.
 
     Returns:
         The exit status, nought, once the window is closed.
@@ -1468,6 +1506,10 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
     if autorestart is not None:
         for text, command in (("Disable Autorestart", autorestart.disable),
                               ("Enable Autorestart", autorestart.enable)):
+            ttk.Button(buttons, text=text, command=command).pack(
+                side="left", padx=(between // 2, 0))
+    if demo is not None:
+        for text, command in (("Demo On", demo.on), ("Demo Off", demo.off)):
             ttk.Button(buttons, text=text, command=command).pack(
                 side="left", padx=(between // 2, 0))
 
@@ -1734,10 +1776,11 @@ def main(argv):
         # itself after each crash; the window's buttons change it after.
         if autorestart is not None:
             autorestart.enable()
+        demo = Demo(uplinks["demo"]) if "demo" in uplinks else None
         if options.seconds is None:
             return run_the_window(readings, lander, seed, options.delay,
                                   stopped, restarter, autorestart,
-                                  room_of(room_file))
+                                  room_of(room_file), demo)
         return watch_and_print(readings, options.seconds, options.every,
                                stopped)
     except (RuntimeError, ValueError, OSError) as why:

@@ -370,6 +370,10 @@ export global LanderScene {
     in-out property <bool> beckon-lit: false;
     // Whether there is a joystick for the autopilot to fly through.
     in-out property <bool> has-joystick_3_4: true;
+    // Whether the lander is in demonstration mode, its demo input asserted:
+    // set by Rust. The picture says so, and of tcs-sim's buttons only Pause
+    // works. A ground station's window leaves it false.
+    in-out property <bool> demonstration: false;
     callback pause-clicked();
     callback autoland-clicked();
     // Where the pane ends in its window, right and down, and where the
@@ -562,10 +566,22 @@ export component LanderPicture inherits Rectangle {
         stroke: #000000;
         stroke-width: 2px;
     }
+    // A line lower in demonstration mode, so that a long one does not run
+    // into what says so.
     Text {
         x: 8px;
-        y: 6px;
+        y: LanderScene.demonstration ? 6px + SimFonts.heading * 1.4 : 6px;
         text: LanderScene.state;
+        font-size: SimFonts.heading;
+        font-weight: 700;
+        color: #ffffff;
+    }
+    // At the top, in the middle, while the lander is in demonstration
+    // mode.
+    if LanderScene.demonstration: Text {
+        x: (parent.width - self.width) / 2;
+        y: 6px;
+        text: "Demonstration Mode";
         font-size: SimFonts.heading;
         font-weight: 700;
         color: #ffffff;
@@ -718,7 +734,8 @@ export component LanderPane inherits Rectangle {
             }
             Button {
                 text: LanderScene.autoland ? "Stop Autoland" : "Autoland";
-                enabled: LanderScene.has-joystick_3_4;
+                enabled: LanderScene.has-joystick_3_4
+                    && !LanderScene.demonstration;
                 clicked => { LanderScene.autoland-clicked(); }
             }
         }

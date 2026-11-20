@@ -838,14 +838,19 @@ class YamcsBeacons:
         clock:    What gives the time now, in nanoseconds since the epoch.
         links:    The configuration's link digest, as hex, which each
                   beacon's is compared with; ``None`` to compare none.
+        flying:   Whether this station is run as flight, under
+                  ``--simulate=none``, so that a beacon saying ``test`` is a
+                  mismatch: see :meth:`tcsmoc.beacon.Beacons.flying`.
     """
 
     def __init__(self, yamcs, link, schedule, expected, interval,
-                 clock=time.time_ns, links=None):
+                 clock=time.time_ns, links=None, flying=False):
         self._yamcs = yamcs
         self._beacons = Beacons(link, schedule, expected)
         if links is not None:
             self._beacons.with_links(links)
+        if flying:
+            self._beacons.flying()
         # Yamcs says nothing of where a beacon came from, and the beacon
         # link to it is its own, so each is taken as from where the
         # configuration says beacons are sent from.

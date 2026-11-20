@@ -63,6 +63,7 @@ const RESTART: usize = 11;
 const AUTORESTART: usize = 12;
 const SKY: usize = 13;
 const SKY_QUENCH: usize = 14;
+const DEMO: usize = 15;
 
 /// The generation of the lander's sky: made once, as it is started, and
 /// never made again in a run, so always the first.
@@ -162,8 +163,9 @@ pub struct Lander {
     /// nought starts it again.
     restart: f64,
     /// Whether it starts again by itself once it has been crashed for its
-    /// pause: its autorestart input asserted. Otherwise, crashed, it stays
-    /// down until it is restarted.
+    /// pause: its autorestart input asserted, or its demo input, which
+    /// asserts autorestart whatever autorestart says. Otherwise, crashed,
+    /// it stays down until it is restarted.
     autorestart: bool,
     /// Its sky, as the records its `sky` output sends.
     sky: Vec<[u8; tcsprotocol::node::physics::lander::STAR_RECORD]>,
@@ -520,7 +522,8 @@ impl Component for Lander {
             self.start_again();
         }
         self.restart = restart;
-        self.autorestart = inputs[AUTORESTART] > 0.5;
+        // In demonstration mode it always starts again by itself.
+        self.autorestart = inputs[AUTORESTART] > 0.5 || inputs[DEMO] > 0.5;
         self.sky_quench = inputs[SKY_QUENCH];
     }
 
@@ -719,6 +722,27 @@ mod tests {
         assert_eq!(l.flight, Flight::Flying);
     }
 
+    /// In demonstration mode a crashed lander starts again by itself once
+    /// its pause has run, with autorestart not asserted; out of it, it
+    /// stays down again.
+    #[test]
+    fn in_demonstration_mode_it_always_starts_again() {
+        let mut l = Lander::new(figures());
+        let mut inputs = held(0.0, 0.0, 0.0);
+        inputs[DEMO] = 1.0;
+        l.hold(&inputs);
+        l.at = (100.0, 60.0);
+        l.flight = Flight::Crashed { since: 1.0 };
+        assert_eq!(l.next_event(1.0), Some(4.0));
+        l.event(4.0);
+        assert_eq!(l.flight, Flight::Flying);
+
+        inputs[DEMO] = 0.0;
+        l.hold(&inputs);
+        l.flight = Flight::Crashed { since: 10.0 };
+        assert_eq!(l.next_event(10.0), None);
+    }
+
     /// The bottom engine, lit, burns at no less than its floor; off, it does
     /// not burn; and it pushes no lower than nought, nor beyond full.
     #[test]
@@ -829,6 +853,10 @@ mod tests {
         assert_eq!(names[ACCELERATION_Y], "acceleration_y");
         assert_eq!(names[RESTART], "restart");
         assert_eq!(names[AUTORESTART], "autorestart");
+        assert_eq!(names[SKY], "sky");
+        assert_eq!(names[SKY_QUENCH], "sky_quench");
+        assert_eq!(names[DEMO], "demo");
+        assert_eq!(names.len(), DEMO + 1);
     }
 
     /// Thrust accelerates it at its force over its mass, more as the tank

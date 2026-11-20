@@ -491,6 +491,12 @@ output, carrying a value in one unit, a decision, or records:
                   sky_quench    in    a whole number: while it is the
                                       sky's generation, the sky is not
                                       sent
+                  demo          in    a decision: while asserted, it is
+                                      in demonstration mode, starting
+                                      again after a crash whatever
+                                      autorestart says, and tcs-sim's
+                                      window says "Demonstration Mode"
+                                      and leaves only Pause working
    joystick_3_4   set_x         in    a ratio, driven by tcs-sim's window
                   set_y         in    a ratio, driven by tcs-sim's window
                   x, y          out   a ratio each, held within minus one
@@ -544,7 +550,12 @@ the pad, burning fuel as its throttles say, until thrust up greater than
 its weight lifts it off and it flies on: only a crash ends a flight.
 Crashed, it stays still until it is restarted or, with its
 ``autorestart`` asserted, for ``pause``; then it starts again where it
-started, with a full tank. A
+started, with a full tank. With its ``demo`` asserted it is in
+demonstration mode, which asserts autorestart whatever ``autorestart``
+says: tcs-sim's window then says "Demonstration Mode" at the top of the
+lander's display, in the middle, and of its buttons only the lander's
+Pause works -- not Autoland, a panel's Enable, Disable and Configuration,
+nor Quit All. A
 joystick gives out what tcs-sim's window sets it to, each axis held within
 minus one and one.
 

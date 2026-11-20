@@ -108,6 +108,17 @@ simulated_payloads:
         enable: true
         protocol: udp
         simulate: true
+      # What the ground's Demo On and Demo Off reach, through lander-a's
+      # gateway_demo: 1 puts the lander in demonstration mode, in which it
+      # always starts again by itself after a crash, and tcs-sim's window
+      # says so and leaves only Pause working; 0, as it is until told, takes
+      # it out.
+      - payload: demo
+        configuration: lander-a
+        connects: lander.demo
+        enable: true
+        protocol: udp
+        simulate: true
       # The lander's sky, four stars a packet, round and round, until the
       # ground has every star and quenches it through lander-a's
       # gateway_sky, driving sky_quench to the sky's generation.

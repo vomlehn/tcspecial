@@ -68,6 +68,31 @@ const ARM: f32 = 105.0;
 /// What the pane says of a crashed lander.
 pub const CRASHED_SAID: &str = "On the Moon, no one can hear you CRASH!";
 
+/// What the pane says the lander is doing while it flies.
+const FLYING: &str = "Flying";
+
+/// What the pane says while the autopilot flies it.
+const FLYING_AUTOLAND: &str = "Flying - autoland engaged";
+
+/// What the pane says at its top: what the lander is doing, and, while it
+/// flies with the autopilot flying it, that autoland is engaged.
+///
+/// # Arguments
+///
+/// * `state`    - What it is doing, as [`painted`] says it.
+/// * `autoland` - Whether the autopilot is flying it.
+///
+/// # Returns
+///
+/// The words.
+fn said(state: &'static str, autoland: bool) -> &'static str {
+    if autoland && state == FLYING {
+        FLYING_AUTOLAND
+    } else {
+        state
+    }
+}
+
 /// How often the window is brought up to the world.
 const REFRESH: Duration = Duration::from_millis(16);
 
@@ -1719,7 +1744,7 @@ fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
     pane.set_fire_left(frame.fire_left);
     pane.set_debris(frame.debris.as_str().into());
     pane.set_face(frame.face.as_str().into());
-    pane.set_state(frame.state.into());
+    pane.set_state(said(frame.state, pane.get_autoland()).into());
     pane.set_fuel(frame.fuel);
     pane.set_position_x(frame.position_x.as_str().into());
     pane.set_position_y(frame.position_y.as_str().into());
@@ -1768,7 +1793,7 @@ fn painted(f: &Resolved, out: &[f64]) -> Frame {
         } else if out[CRASHED] > 0.5 {
             CRASHED_SAID
         } else {
-            "Flying"
+            FLYING
         },
         fuel: out[FUEL] as f32,
         position_x: format!("{:.1}", out[X]),
@@ -1860,6 +1885,16 @@ pub(crate) mod tests {
             540.0,
             "the lander fell, so the clock started"
         );
+    }
+
+    /// Flying with the autopilot, the pane says autoland is engaged; flying
+    /// by hand, landed or crashed, it says what it always has.
+    #[test]
+    fn autoland_is_said_only_while_flying() {
+        assert_eq!(said(FLYING, true), "Flying - autoland engaged");
+        assert_eq!(said(FLYING, false), "Flying");
+        assert_eq!(said("Landed", true), "Landed");
+        assert_eq!(said(CRASHED_SAID, true), CRASHED_SAID);
     }
 
     /// The autorestart input's place here is the type's.

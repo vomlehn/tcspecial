@@ -1055,8 +1055,9 @@ both. From the top:
   flashing on top of each mark; and the lander
   where it is, in white with thin black lines, so that it shows against
   the sky and the ground alike. What it is doing is said in its top
-  corner, *Flying*, *Landed* or, on a crash, *On the Moon, no one can hear
-  you CRASH!*, and while it stands on the pad, landed, a smiling face
+  corner, *Flying* -- *Flying - autoland engaged* while Autoland flies
+  it -- *Landed* or, on a crash, *On the Moon, no one can hear you
+  CRASH!*, and while it stands on the pad, landed, a smiling face
   is drawn over it, gone as it lifts off again.
 * The fuel left, as a percentage and as a bar.
 * The lander's X and Y position, velocity and acceleration, each with its

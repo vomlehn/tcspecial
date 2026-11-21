@@ -314,6 +314,61 @@ impl Session {
         Session { editor, ui, views }
     }
 
+    /// The middle of a row of a selection list, found by the name it
+    /// places, the list scrolled until the row is in view.
+    ///
+    /// # Arguments
+    ///
+    /// * `list` - The selection list.
+    /// * `name` - What the row places: a type, or a compute function.
+    ///
+    /// # Returns
+    ///
+    /// The row's middle, in the window.
+    ///
+    /// # Panics
+    ///
+    /// If the list has no such row, or it cannot be scrolled into view.
+    fn row_in_list(
+        &self,
+        list: &i_slint_backend_testing::ElementHandle,
+        name: &str,
+    ) -> LogicalPosition {
+        let (top, size) = (list.absolute_position(), list.size());
+        // The rows of this list in view, by what each says it places.
+        let middle = || {
+            list.query_descendants()
+                .match_accessible_role(
+                    i_slint_backend_testing::AccessibleRole::Button,
+                )
+                .find_all()
+                .iter()
+                .find(|row| row.accessible_label().as_deref() == Some(name))
+                .map(|row| {
+                    let (at, s) = (row.absolute_position(), row.size());
+                    LogicalPosition::new(
+                        at.x + s.width / 2.0,
+                        at.y + s.height / 2.0,
+                    )
+                })
+        };
+        // Down the list a little at a time until the row is in view, and
+        // well clear of its bottom, so that a marker drawn beside it, and
+        // a picture cut off a little above the window's foot, show it.
+        for _ in 0..200 {
+            match middle() {
+                Some(at) if at.y > top.y + size.height - 160.0 => {
+                    list.scroll(0.0, -40.0);
+                }
+                Some(at) if at.y < top.y + 30.0 => list.scroll(0.0, 40.0),
+                Some(at) => return at,
+                None => list.scroll(0.0, -40.0),
+            }
+            drawn(self.ui.window(), WIDE);
+        }
+        panic!("the row for {name} cannot be scrolled into view")
+    }
+
     /// Where a point on the sheet is in the main window.
     ///
     /// # Arguments
@@ -521,8 +576,7 @@ fn placing_and_joining(out: &Path, work: &Path) {
             "SelectionPane",
         )
         .collect();
-    lists[2].scroll(0.0, -560.0);
-    let log = LogicalPosition::new(100.0, 545.0);
+    let log = session.row_in_list(&lists[2], "log");
     session.click(log, Left);
     assert!(
         session.editor.borrow().document().node("log-1").is_some(),
@@ -543,7 +597,7 @@ fn placing_and_joining(out: &Path, work: &Path) {
         window: ui.window(),
         size: WIDE,
         part: Some((0, 40, 980, 560)),
-        markers: vec![(LogicalPosition::new(160.0, 545.0), "1")],
+        markers: vec![(LogicalPosition::new(log.x + 60.0, log.y), "1")],
     }
     .take(out);
 
@@ -756,9 +810,17 @@ fn opening_with_errors(out: &Path, work: &Path) {
     let dir = copy_example(work, "battery");
     let top = dir.join("battery.ytcs");
     let text = std::fs::read_to_string(&top).expect("the example");
-    let wrong = text.replacen("\"127.0.0.1:5301\"", "\"127.0.0.1:99999\"", 1);
+    // The shunt's port, whichever host the example gives it; changed in
+    // the other spelling too, so that the two agree and the question asked
+    // is about the error, not about the spellings differing.
+    let wrong = text.replacen(":5301\"", ":99999\"", 1);
     assert_ne!(text, wrong, "the shunt's port is where it was");
     std::fs::write(&top, wrong).expect("the example is changed");
+    let xml = dir.join("battery.xtcs");
+    let text = std::fs::read_to_string(&xml).expect("the other spelling");
+    let wrong = text.replacen(":5301<", ":99999<", 1);
+    assert_ne!(text, wrong, "the shunt's port is where it was, in XML");
+    std::fs::write(&xml, wrong).expect("the other spelling is changed");
     let session = Session::open(&top, &dir.join("battery-sim.yaml"), true);
     assert!(session.ui.get_problems_up(), "the question is asked");
     Shot {

@@ -221,6 +221,11 @@ component SelectionPane inherits Rectangle {
                 // are: a gesture that depends on how long it took does the
                 // wrong thing under pressure.
                 if !p.is-heading: TouchArea {
+                    // A button, named for what it places, so that a screen
+                    // reader can say the list, and a test can find a row by
+                    // its name rather than by where it happens to be.
+                    accessible-role: button;
+                    accessible-label: p.node.type-line;
                     // Whether this press has moved far enough to be a carry,
                     // and whether the one just ended was one: a carry let go
                     // over its own row is not a click as well.

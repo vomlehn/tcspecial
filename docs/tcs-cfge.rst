@@ -730,7 +730,7 @@ The setting is kept as ``<autosave>`` in ``$HOME/.tcs-cfge/preferences.xml``,
 .. figure:: shots/tcs-cfge-file-menu.png
    :alt: The File menu open: Save, Save as..., Autosave with a tick beside
          it, then Edit payload groups and Edit simulated payload groups,
-         then Exit.
+         then Print..., then Exit.
 
    The File menu, with Autosave on.
 

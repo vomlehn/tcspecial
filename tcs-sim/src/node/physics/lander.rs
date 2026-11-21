@@ -159,6 +159,9 @@ pub struct Lander {
     /// The fuel it has left, in kilograms.
     fuel: f64,
     flight: Flight,
+    /// Its outline's extent about the place between its feet, worked out
+    /// once: see [`Resolved::extent`].
+    extent: (f64, f64, f64, f64),
     /// Its throttles, as last held, each within minus one and one.
     throttle: Point,
     /// What its restart input was last held at: a new value other than
@@ -256,6 +259,7 @@ impl Lander {
             velocity: (0.0, 0.0),
             fuel: figures.fuel,
             flight: Flight::Flying,
+            extent: figures.extent(),
             throttle: (0.0, 0.0),
             restart: 0.0,
             sky: super::sky::records(&figures, SKY_GENERATION),
@@ -377,6 +381,32 @@ impl Lander {
             .map(|pair| (pair[0], pair[1]))
     }
 
+    /// The highest the ground is anywhere between two Xs, its bottom line
+    /// counted beyond the display's edges.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - The left X, metres.
+    /// * `to`   - The right X, metres.
+    ///
+    /// # Returns
+    ///
+    /// Metres.
+    fn ground_top(&self, from: f64, to: f64) -> f64 {
+        let ground = &self.figures.ground;
+        let mut top = self.ground_at(from).max(self.ground_at(to));
+        // The ground's own points between, found from the first at or past
+        // `from`: the ground runs left to right.
+        let first = ground.partition_point(|&(x, _)| x < from);
+        for &(x, y) in &ground[first..] {
+            if x > to {
+                break;
+            }
+            top = top.max(y);
+        }
+        top
+    }
+
     /// The height of the ground at an X: beyond either edge of the display,
     /// the display's bottom line, nought, which goes on indefinitely either
     /// way, so that a lander flown off a side comes down somewhere.
@@ -418,6 +448,12 @@ impl Lander {
     ///
     /// Whether it would be.
     fn down_at(&self, at: Point) -> bool {
+        // Clear of the highest ground beneath it, as it is nearly all of a
+        // flight, it is not down, and nothing more need be looked at.
+        let (x0, x1, least_y, _) = self.extent;
+        if at.1 + least_y > self.ground_top(at.0 + x0, at.0 + x1) {
+            return false;
+        }
         let segments = self.segments(at);
         let below = segments
             .iter()
@@ -905,6 +941,41 @@ mod tests {
         };
         assert!(since > 5.0, "{since}");
         assert_eq!(l.next_event(12.0), Some(since + 10.0));
+    }
+
+    /// The quick look at the highest ground beneath it never says it is
+    /// clear where the full test says it is down: compared at places all
+    /// over and round the display, at the ground and just above it.
+    #[test]
+    fn the_quick_look_agrees_with_the_full_test() {
+        let mut f = figures();
+        f.ground = vec![
+            (0.0, 60.0),
+            (200.0, 140.0),
+            (470.0, 60.0),
+            (530.0, 60.0),
+            (700.0, 220.0),
+            (1000.0, 90.0),
+        ];
+        f.pad = 2;
+        let l = Lander::new(f);
+        let full = |at: Point| {
+            let segments = l.segments(at);
+            segments
+                .iter()
+                .flat_map(|&(p, q)| [p, q])
+                .any(|(x, y)| y < l.ground_at(x))
+                || segments.iter().any(|&s| l.ground().any(|g| meet(s, g)))
+        };
+        let mut x = -60.0;
+        while x <= 1060.0 {
+            let mut y = 0.0;
+            while y <= 300.0 {
+                assert_eq!(l.down_at((x, y)), full((x, y)), "at {x}, {y}");
+                y += 2.5;
+            }
+            x += 7.0;
+        }
     }
 
     /// Standing on the pad, thrust no greater than its weight leaves it

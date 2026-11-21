@@ -130,9 +130,10 @@ LOWEST_PAD = 0.02
 NOTHING_YET = "--"
 
 #: How often the window takes in what the reading loop has read, in
-#: milliseconds: about as often as a screen is drawn, the lander drawn
-#: between readings by dead reckoning, so that it moves smoothly.
-REFRESH_MS = 16
+#: milliseconds: 20 times a second, a third as often as tcs-sim's own
+#: window, the lander drawn between readings by dead reckoning, so that it
+#: moves smoothly enough, leaving the machine's time to the window flown.
+REFRESH_MS = 50
 
 #: The longest the lander is carried on from its last reported position by
 #: dead reckoning, in seconds: past this, the link has gone quiet.

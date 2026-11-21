@@ -19,8 +19,13 @@ use crate::readings::{Readings, Sky, State};
 use crate::station::Station;
 use crate::{LanderScene, StationWindow};
 
-/// How often the window is brought up to what has come down.
-const REFRESH: Duration = Duration::from_millis(16);
+/// How often the window is brought up to what has come down: 20 times a
+/// second, a third as often as tcs-sim's own window. What it shows is a
+/// light time old, and between reports the lander is carried on by dead
+/// reckoning, so it moves smoothly enough; drawn less often, it leaves
+/// tcs-sim's window, the one flown, the time it needs where both draw on
+/// one thread, as in a browser.
+const REFRESH: Duration = Duration::from_millis(50);
 
 /// How often, at most, the sky is drawn again as its stars come.
 const SKY_EVERY: Duration = Duration::from_millis(500);

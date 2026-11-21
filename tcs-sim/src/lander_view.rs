@@ -684,6 +684,11 @@ const FASTEST_SPIN: f64 = 3.0;
 /// The step a fragment's flight is followed in, in seconds.
 const FRAGMENT_STEP: f64 = 0.01;
 
+/// How often, at most, the readouts' words change, in seconds: often
+/// enough to read, and seldom enough that their text is not laid out again
+/// every frame, which on a slow machine costs more than all the rest.
+const READOUTS_EVERY: f64 = 0.1;
+
 /// What the window last saw of the lander, and its explosion while it has
 /// crashed.
 #[derive(Debug, Default)]
@@ -695,6 +700,22 @@ pub struct Watch {
     crashed: bool,
     /// Its explosion, from the crash until it starts again.
     explosion: Option<Explosion>,
+    /// The readouts as last changed, and when: kept until
+    /// [`READOUTS_EVERY`] has passed, or the lander's state changes.
+    readouts: Option<Readouts>,
+}
+
+/// The readouts a frame shows, as they were last changed.
+#[derive(Debug, Clone)]
+struct Readouts {
+    /// When, in the window's seconds.
+    at: f64,
+    /// What the lander was doing then, in words.
+    state: &'static str,
+    /// The fraction of a full tank left.
+    fuel: f32,
+    /// The X and Y position, velocity and acceleration, as written.
+    values: [String; 6],
 }
 
 /// The lander as last seen flying.
@@ -1695,7 +1716,45 @@ impl Watch {
             frame.lander_green.clear();
             frame.lander_strobes.clear();
         }
+        self.hold_readouts(&mut frame, seconds);
         frame
+    }
+
+    /// Keeps a frame's readouts as they were last changed, until
+    /// [`READOUTS_EVERY`] has passed or what the lander is doing changes;
+    /// then takes them from the frame afresh.
+    ///
+    /// # Arguments
+    ///
+    /// * `frame`   - The frame, its readouts new.
+    /// * `seconds` - The window's time now.
+    fn hold_readouts(&mut self, frame: &mut Frame, seconds: f64) {
+        if let Some(kept) = &self.readouts {
+            if seconds - kept.at < READOUTS_EVERY && kept.state == frame.state {
+                frame.fuel = kept.fuel;
+                let [px, py, vx, vy, ax, ay] = kept.values.clone();
+                frame.position_x = px;
+                frame.position_y = py;
+                frame.velocity_x = vx;
+                frame.velocity_y = vy;
+                frame.acceleration_x = ax;
+                frame.acceleration_y = ay;
+                return;
+            }
+        }
+        self.readouts = Some(Readouts {
+            at: seconds,
+            state: frame.state,
+            fuel: frame.fuel,
+            values: [
+                frame.position_x.clone(),
+                frame.position_y.clone(),
+                frame.velocity_x.clone(),
+                frame.velocity_y.clone(),
+                frame.acceleration_x.clone(),
+                frame.acceleration_y.clone(),
+            ],
+        });
     }
 }
 

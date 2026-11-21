@@ -1077,8 +1077,9 @@ both. From the top:
   plus comes back and both axes read nought. The joystick's X, from minus one
   to one, and Y, from nought to one, are what its ``x`` and ``y`` give out,
   for the vehicle to read through the simulated payloads joined to them. When
-  the window opens, and each time the lander is restarted after a crash
-  with autorestart off and nobody flying it, the joystick beckons: its square flashes orange
+  the window opens, and each time the lander starts again -- after a
+  crash, from the pad, or by Restart, and even while Autoland flies it --
+  unless a hand is on the joystick then, the joystick beckons: its square flashes orange
   inside a flashing ring, and "Click or tap, and drag, to control" is written
   above and to its right, with an arrow pointing down to the square. Taking
   hold of the square, or pressing Pause or Autoland, ends it.

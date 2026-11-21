@@ -1258,9 +1258,9 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     // The autopilot, while it flies the lander: see `Autopilot`.
     let pilot: Rc<RefCell<Option<Autopilot>>> = Rc::default();
     // Whether the joystick beckons: at first, and again each time the
-    // lander starts again after a crash with nobody flying it -- neither the
-    // autopilot nor a hand on the joystick -- until the
-    // joystick is taken hold of or a button pressed. See `Joystick34`.
+    // lander starts again, unless a hand is on the joystick then, even while
+    // the autopilot flies it -- until the joystick is taken hold of or a
+    // button pressed. See `Joystick34`.
     let beckoning = Rc::new(Cell::new(scene.joystick_3_4.is_some()));
     // Whether the joystick is held now, by the pointer: a lander that starts
     // again meanwhile is being flown, and the joystick does not beckon.
@@ -1400,13 +1400,15 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
                 let idle = pilot.borrow().is_none()
                     && !holding.get()
                     && scene.joystick_3_4.is_some();
-                match on_start(before, idle, out[AUTORESTART] > 0.5) {
-                    Started::Flown => {
-                        *pilot.borrow_mut() = Some(Autopilot::default());
-                        ui.global::<LanderScene>().set_autoland(true);
-                    }
-                    Started::Beckoning => beckoning.set(true),
-                    Started::Alone => {}
+                if flown(before, idle, out[AUTORESTART] > 0.5) {
+                    *pilot.borrow_mut() = Some(Autopilot::default());
+                    ui.global::<LanderScene>().set_autoland(true);
+                }
+                // Nobody has done anything since it started again, so the
+                // joystick beckons, whoever flies it, until someone takes
+                // hold of the joystick or presses a button.
+                if !holding.get() && scene.joystick_3_4.is_some() {
+                    beckoning.set(true);
                 }
             }
             let pane = ui.global::<LanderScene>();
@@ -1429,22 +1431,9 @@ enum Stopped {
     Flying,
 }
 
-/// What the window does as the lander starts again.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Started {
-    /// The autopilot flies it: a booth nobody is at flies itself.
-    Flown,
-    /// The joystick beckons, for someone to fly it.
-    Beckoning,
-    /// Nothing: someone, or the autopilot, is flying it already.
-    Alone,
-}
-
-/// What the window does as the lander starts again: with autorestart on,
-/// after a crash or from the pad, which is how autorestart starts it, the
-/// autopilot flies the next flight; after a crash with autorestart off,
-/// restarted by hand, the joystick beckons. Either only while nobody flies
-/// it.
+/// Says whether the autopilot flies the lander as it starts again: with
+/// autorestart on, after a crash or from the pad, which is how autorestart
+/// starts it, and only while nobody flies it.
 ///
 /// # Arguments
 ///
@@ -1455,13 +1444,9 @@ enum Started {
 ///
 /// # Returns
 ///
-/// What the window does.
-fn on_start(before: Stopped, idle: bool, autorestart: bool) -> Started {
-    match (before, idle, autorestart) {
-        (Stopped::Crashed | Stopped::Pad, true, true) => Started::Flown,
-        (Stopped::Crashed, true, false) => Started::Beckoning,
-        _ => Started::Alone,
-    }
+/// Whether the autopilot takes it.
+fn flown(before: Stopped, idle: bool, autorestart: bool) -> bool {
+    matches!(before, Stopped::Crashed | Stopped::Pad) && idle && autorestart
 }
 
 /// How far round the joystick a touch is the joystick's, in logical
@@ -1905,19 +1890,18 @@ pub(crate) mod tests {
     }
 
     /// With autorestart on, a lander starting again after a crash or from
-    /// the pad is flown by the autopilot; after a crash with autorestart
-    /// off the joystick beckons; and while someone flies it, or after a
-    /// restart in flight, nothing changes.
+    /// the pad is flown by the autopilot; with autorestart off, while
+    /// someone flies it, or after a restart in flight, it is not.
     #[test]
     fn autorestart_is_flown_by_the_autopilot() {
         use Stopped::{Crashed, Flying, Pad};
-        assert_eq!(on_start(Crashed, true, true), Started::Flown);
-        assert_eq!(on_start(Pad, true, true), Started::Flown);
-        assert_eq!(on_start(Crashed, true, false), Started::Beckoning);
-        assert_eq!(on_start(Pad, true, false), Started::Alone);
-        assert_eq!(on_start(Crashed, false, true), Started::Alone);
-        assert_eq!(on_start(Pad, false, true), Started::Alone);
-        assert_eq!(on_start(Flying, true, true), Started::Alone);
+        assert!(flown(Crashed, true, true));
+        assert!(flown(Pad, true, true));
+        assert!(!flown(Crashed, true, false));
+        assert!(!flown(Pad, true, false));
+        assert!(!flown(Crashed, false, true));
+        assert!(!flown(Pad, false, true));
+        assert!(!flown(Flying, true, true));
     }
 
     /// A paused world's joystick still moves when it is driven by hand, so

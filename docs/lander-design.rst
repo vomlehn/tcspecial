@@ -146,10 +146,11 @@ display's bottom line, which goes on indefinitely to the left and right.
 A landing does not end the flight. The landed lander stands still on the
 pad, with a smiling face drawn over it, burning fuel if its throttles are
 open, until thrust up greater than its weight lifts it off; then it flies
-on, the face gone, and may land again or crash. Only a crash ends a
-flight: after one, the lander stays down until Restart, or, with
-autorestart enabled, until a pause has run, and then starts again at the
-upper left with a full tank.
+on, the face gone, and may land again or crash. After a crash the lander
+stays down until Restart, or, with autorestart enabled, until a pause has
+run, and then starts again at the upper left with a full tank; with
+autorestart enabled, a landed lander that stays on the pad for its pad
+wait, 10 s, starts again the same way, Autoland flying it.
 
 The vehicles
 ============
@@ -244,18 +245,10 @@ second and shows:
   through lander-a's gateway to a simulated payload, ``autorestart``,
   joined to the lander's ``autorestart`` input. Both ground stations
   enable it as soon as the vehicles are connected: enabled, a lander that
-  has crashed starts again by itself after its pause; disabled, it stays
-  down until it is restarted. A landed lander is still flying, so
-  autorestart does nothing to it;
-* in the Yamcs station, Demo On and Demo Off, which send a command up
-  through lander-a's third gateway, ``gateway_demo``, to a simulated
-  payload, ``demo``, joined to the lander's ``demo`` input: 1 puts the
-  lander in demonstration mode, 0 takes it out. In demonstration mode the
-  lander always starts again by itself after a crash, whatever autorestart
-  says; tcs-sim's window says "Demonstration Mode" at the top of the
-  lander's display, in the middle, and of its buttons only Pause works.
-  The command has a gateway of its own for the reason the quench does: a
-  gateway passes what the ground sends to every payload it feeds.
+  has crashed starts again by itself after its pause, and one that has
+  landed after its pad wait unless it lifts off first, Autoland flying
+  each such flight; disabled, it stays down, or on the pad, until it is
+  restarted.
 
 The sky, sent down
 ------------------
@@ -366,10 +359,9 @@ In this order, each stage checked before the next:
      display's bottom line.
 
 8. **Flying on after a landing.** A landed lander stands on the pad until
-   thrust greater than its weight lifts it off, and only a crash ends a
-   flight, so autorestart follows crashes alone.
-
-9. **Demonstration mode.** The lander's ``demo`` input, commanded by the
-   Yamcs station's Demo On and Demo Off through ``lander-a``'s
-   ``gateway_demo``: autorestart always on while it is asserted, and
-   tcs-sim's window saying so and leaving only Pause working.
+   thrust greater than its weight lifts it off. With autorestart, it
+   starts again after its pad wait, 10 s, longer than a crash's pause, so
+   that whoever is at the joystick has time to lift off and land again,
+   Autoland staying off; a lift-off ends the wait, and the next landing
+   begins a new one. Every flight autorestart starts is flown by
+   Autoland, so that a booth nobody is at keeps flying.

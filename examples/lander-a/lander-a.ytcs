@@ -49,12 +49,6 @@ gateways:
           - autorestart.gateway
         world-in: [sky, to_accel_x, to_fuel, to_joystick_3_4_x, to_velocity_x,
           to_x]
-      - gateway: gateway_demo
-        address: "127.0.0.1:19602"
-        apid_base: "0x4C0"
-        ground_base: "127.0.0.1:19780"
-        moc-out:
-          - demo.gateway_demo
       - gateway: gateway_sky
         address: "127.0.0.1:19601"
         apid_base: "0x480"
@@ -124,10 +118,6 @@ payloads:
         address: "127.0.0.1:19807"
         protocol: "udp"
         moc-in: [gateway]
-      - payload: demo
-        address: "127.0.0.1:19810"
-        protocol: "udp"
-        moc-in: [gateway_demo]
       - payload: fuel
         address: "127.0.0.1:19804"
         protocol: "udp"

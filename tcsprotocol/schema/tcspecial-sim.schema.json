@@ -1097,6 +1097,12 @@
             "string"
           ],
           "description": "How long it stays down before it starts again, as a length of time: `3 s`."
+        },
+        "pad_wait": {
+          "type": [
+            "string"
+          ],
+          "description": "How long it stands on the pad after a landing before it starts again, with autorestart asserted, unless it lifts off first, as a length of time: `10 s`, the default."
         }
       },
       "required": [

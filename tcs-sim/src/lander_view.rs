@@ -49,10 +49,10 @@ pub const CRASHED: usize = 8;
 pub const ACCELERATION_X: usize = 9;
 pub const ACCELERATION_Y: usize = 10;
 
-/// The lander's demo input's place, among the same: past the outputs a
-/// ground station's window draws from, so read only where the world's own
-/// terminals are, in tcs-sim's.
-const DEMO: usize = 15;
+/// The lander's autorestart input's place, among the same: past the
+/// outputs a ground station's window draws from, so read only where the
+/// world's own terminals are, in tcs-sim's.
+const AUTORESTART: usize = 12;
 
 /// The joystick's inputs' places, in
 /// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
@@ -1264,12 +1264,8 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let weak = ui.as_weak();
         let beckon = Rc::clone(&beckoning);
         pane.on_autoland_clicked(move || {
-            let Some(ui) = weak.upgrade() else { return };
-            // In demonstration mode only Pause works.
-            if ui.global::<LanderScene>().get_demonstration() {
-                return;
-            }
             beckon.set(false);
+            let Some(ui) = weak.upgrade() else { return };
             let mut flying = flying.borrow_mut();
             if flying.take().is_some() {
                 // Let go of, as a pilot letting go would.
@@ -1350,9 +1346,10 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     {
         let weak = ui.as_weak();
         let scene = Rc::clone(&scene);
-        // Whether the lander lay crashed when last looked at, which a
-        // restart ends.
-        let was_crashed = Cell::new(false);
+        // How the lander was when last looked at, crashed, landed or
+        // flying, and the fuel it had, which only a restart raises.
+        let was = Cell::new(Stopped::Flying);
+        let had_fuel = Cell::new(f64::INFINITY);
         timer.start(slint::TimerMode::Repeated, REFRESH, move || {
             let Some(ui) = weak.upgrade() else { return };
             let seconds = opened.elapsed().as_secs_f64();
@@ -1360,27 +1357,86 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             fly(&ui, &scene, &pilot);
             let out =
                 scene.world.glance_component(scene.lander, Instant::now());
-            let crashed = out[CRASHED] > 0.5;
-            if was_crashed.replace(crashed)
-                && !crashed
-                && pilot.borrow().is_none()
-                && !holding.get()
-                && scene.joystick_3_4.is_some()
-            {
-                beckoning.set(true);
+            let now = if out[CRASHED] > 0.5 {
+                Stopped::Crashed
+            } else if out[LANDED] > 0.5 {
+                Stopped::Pad
+            } else {
+                Stopped::Flying
+            };
+            let before = was.replace(now);
+            let refuelled = out[FUEL] > had_fuel.replace(out[FUEL]) + 1e-9;
+            let after_crash = before == Stopped::Crashed && now != before;
+            if after_crash || refuelled {
+                // Started again. With autorestart on, after a crash or from
+                // the pad, the autopilot flies the next flight, so that a
+                // booth nobody is at flies itself; taking hold of the
+                // joystick hands it back.
+                let idle = pilot.borrow().is_none()
+                    && !holding.get()
+                    && scene.joystick_3_4.is_some();
+                match on_start(before, idle, out[AUTORESTART] > 0.5) {
+                    Started::Flown => {
+                        *pilot.borrow_mut() = Some(Autopilot::default());
+                        ui.global::<LanderScene>().set_autoland(true);
+                    }
+                    Started::Beckoning => beckoning.set(true),
+                    Started::Alone => {}
+                }
             }
             let pane = ui.global::<LanderScene>();
-            // In demonstration mode, while the lander's demo input is
-            // asserted, the pane says so and only Pause works.
-            let demonstration = out.get(DEMO).is_some_and(|d| *d > 0.5);
-            pane.set_demonstration(demonstration);
-            ui.set_demonstration(demonstration);
             pane.set_beckon(beckoning.get());
             pane.set_beckon_lit(beckoning.get() && beckon_lit(seconds));
             regions(&ui);
         });
     }
     timer
+}
+
+/// How the lander was before it started again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Stopped {
+    /// Crashed.
+    Crashed,
+    /// Landed, on the pad.
+    Pad,
+    /// Flying: started again by a restart in flight.
+    Flying,
+}
+
+/// What the window does as the lander starts again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Started {
+    /// The autopilot flies it: a booth nobody is at flies itself.
+    Flown,
+    /// The joystick beckons, for someone to fly it.
+    Beckoning,
+    /// Nothing: someone, or the autopilot, is flying it already.
+    Alone,
+}
+
+/// What the window does as the lander starts again: with autorestart on,
+/// after a crash or from the pad, which is how autorestart starts it, the
+/// autopilot flies the next flight; after a crash with autorestart off,
+/// restarted by hand, the joystick beckons. Either only while nobody flies
+/// it.
+///
+/// # Arguments
+///
+/// * `before`      - How it was before it started again.
+/// * `idle`        - Whether nobody flies it now, neither the autopilot nor
+///                   a hand on the joystick, and there is a joystick.
+/// * `autorestart` - Whether the lander's autorestart is on.
+///
+/// # Returns
+///
+/// What the window does.
+fn on_start(before: Stopped, idle: bool, autorestart: bool) -> Started {
+    match (before, idle, autorestart) {
+        (Stopped::Crashed | Stopped::Pad, true, true) => Started::Flown,
+        (Stopped::Crashed, true, false) => Started::Beckoning,
+        _ => Started::Alone,
+    }
 }
 
 /// How far round the joystick a touch is the joystick's, in logical
@@ -1438,7 +1494,11 @@ fn regions(ui: &MainWindow) {
 }
 
 /// Has the autopilot, while it flies the lander, hold the joystick where it
-/// wants it; and lets go, and stops it, once the lander has landed. While
+/// wants it; and lets go, and stops it, once the lander has landed, so that
+/// whoever is there can fly it off the pad and land again while the lander
+/// waits there; with autorestart on, the lander starts again once its pad
+/// wait has run, and the autopilot flies that flight: see [`on_start`].
+/// While
 /// the lander lies crashed it lets go and waits, and flies again from the
 /// start once the lander is restarted -- by Restart, or by itself with
 /// autorestart on -- so that Autoland pressed during a crash is not lost.
@@ -1462,8 +1522,8 @@ fn fly(ui: &MainWindow, scene: &Scene, pilot: &RefCell<Option<Autopilot>>) {
     }
     let out = scene.world.glance_component(scene.lander, Instant::now());
     if out[LANDED] > 0.5 {
-        *flying = None;
         hold_stick(ui, scene, stick, (0.0, 0.0));
+        *flying = None;
         ui.global::<LanderScene>().set_autoland(false);
         return;
     }
@@ -1802,6 +1862,29 @@ pub(crate) mod tests {
         );
     }
 
+    /// The autorestart input's place here is the type's.
+    #[test]
+    fn the_input_is_the_types() {
+        let terminals = tcsprotocol::node::physics::lander::TERMINALS;
+        assert_eq!(terminals[AUTORESTART].name, "autorestart");
+    }
+
+    /// With autorestart on, a lander starting again after a crash or from
+    /// the pad is flown by the autopilot; after a crash with autorestart
+    /// off the joystick beckons; and while someone flies it, or after a
+    /// restart in flight, nothing changes.
+    #[test]
+    fn autorestart_is_flown_by_the_autopilot() {
+        use Stopped::{Crashed, Flying, Pad};
+        assert_eq!(on_start(Crashed, true, true), Started::Flown);
+        assert_eq!(on_start(Pad, true, true), Started::Flown);
+        assert_eq!(on_start(Crashed, true, false), Started::Beckoning);
+        assert_eq!(on_start(Pad, true, false), Started::Alone);
+        assert_eq!(on_start(Crashed, false, true), Started::Alone);
+        assert_eq!(on_start(Pad, false, true), Started::Alone);
+        assert_eq!(on_start(Flying, true, true), Started::Alone);
+    }
+
     /// A paused world's joystick still moves when it is driven by hand, so
     /// that the pilot can set it while the world waits.
     #[test]
@@ -1861,17 +1944,9 @@ pub(crate) mod tests {
         assert_eq!(world.read(x, Instant::now()), 0.5);
     }
 
-    /// The demo input's place here is the type's.
-    #[test]
-    fn demo_is_the_types() {
-        let terminals = tcsprotocol::node::physics::lander::TERMINALS;
-        assert_eq!(terminals[DEMO].name, "demo");
-    }
-
     /// Draws the lander's pane, landed on a pad over a varied ground,
     /// into a picture, to be looked at: run by hand, with the picture's path
-    /// in `LANDER_SHOT`, and in demonstration mode where `LANDER_DEMO` is
-    /// set.
+    /// in `LANDER_SHOT`.
     #[test]
     #[ignore = "draws a picture to be looked at: LANDER_SHOT=<path>"]
     fn draw_the_window() {
@@ -1957,9 +2032,6 @@ pub(crate) mod tests {
         let (_, _, dot_x, dot_y) = axes(70.0, -40.0);
         pane.set_dot_x(dot_x);
         pane.set_dot_y(dot_y);
-        let demonstration = tcsos::env::var("LANDER_DEMO").is_ok();
-        pane.set_demonstration(demonstration);
-        window.set_demonstration(demonstration);
         window.show().expect("shown");
         window.window().set_size(slint::PhysicalSize::new(
             window.get_lander_width() as u32 + 16,
@@ -2062,6 +2134,7 @@ pub(crate) mod tests {
             landing_speed: 3.05,
             landing_drift: 1.22,
             pause: Duration::from_secs(3),
+            pad_wait: Duration::from_secs(10),
         };
         let mut lander = Lander::new(f.clone());
         let terminals = tcsprotocol::node::physics::lander::TERMINALS.len();
@@ -2170,6 +2243,7 @@ pub(crate) mod tests {
         let f = Resolved {
             gravity: 1.62,
             pause: Duration::from_secs(5),
+            pad_wait: Duration::from_secs(10),
             ..figures()
         };
         let flying = |speed: f64, fuel: f64| Flying {

@@ -57,12 +57,6 @@
                 <world-in>to_velocity_x</world-in>
                 <world-in>to_x</world-in>
             </gateway>
-            <gateway name="gateway_demo">
-                <address>127.0.0.1:19602</address>
-                <apid_base>0x4C0</apid_base>
-                <ground_base>127.0.0.1:19780</ground_base>
-                <moc-out>demo.gateway_demo</moc-out>
-            </gateway>
             <gateway name="gateway_sky">
                 <address>127.0.0.1:19601</address>
                 <apid_base>0x480</apid_base>
@@ -133,11 +127,6 @@
                 <address>127.0.0.1:19807</address>
                 <protocol>udp</protocol>
                 <moc-in>gateway</moc-in>
-            </payload>
-            <payload name="demo">
-                <address>127.0.0.1:19810</address>
-                <protocol>udp</protocol>
-                <moc-in>gateway_demo</moc-in>
             </payload>
             <payload name="fuel">
                 <address>127.0.0.1:19804</address>

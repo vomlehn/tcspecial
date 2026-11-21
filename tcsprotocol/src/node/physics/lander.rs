@@ -53,13 +53,12 @@
 //!
 //! Landed, it stands still on the pad, its engines burning fuel as its
 //! throttles say, until thrust up greater than its weight lifts it off and
-//! it flies on: a landing does not end a flight, only a crash does.
-//! Crashed, it stays where it is until it is restarted, by its `restart`
-//! input, or, with its `autorestart` input asserted, for `pause`; then it
-//! starts again where it started, with a full tank. Its `demo` input
-//! asserted, demonstration mode, does what `autorestart` does whatever
-//! `autorestart` says. A restart starts it again however it is, landed or
-//! flying too. The arithmetic is tcs-sim's
+//! it flies on; with its `autorestart` input asserted, once it has stood
+//! there for `pad_wait`, it starts again. Crashed, it stays where it is
+//! until it is restarted, by its `restart` input, or, with its
+//! `autorestart` input asserted, for `pause`; then it starts again where
+//! it started, with a full tank. A restart starts it
+//! again however it is, landed or flying too. The arithmetic is tcs-sim's
 //! `physics::lander`.
 //!
 //! # Sky
@@ -108,21 +107,16 @@ pub const TERMINALS: &[Terminal] = &[
     // sends, a count, so that each press differs from the last.
     Terminal::input("restart", Kind::Decision),
     // While asserted, a lander that has crashed starts again by itself once
-    // its pause has run; otherwise it stays down until it is restarted.
-    // Nothing driving it, it is not asserted: by default a crashed lander
-    // stays down. A landing is not the end of a flight, so it does nothing
-    // to a landed one.
+    // its pause has run, and one that has landed once it has stood on the
+    // pad for its pad wait, unless it lifts off first; otherwise it stays
+    // down, or on the pad, until it is restarted. Nothing driving it, it
+    // is not asserted.
     Terminal::input("autorestart", Kind::Decision),
     // Its sky's records: see the module's "Sky".
     Terminal::output("sky", Kind::Records),
     // Driven to the generation of its sky that the ground has whole: while
     // it is the sky's own, the sky is not sent.
     Terminal::input("sky_quench", Kind::Decision),
-    // While asserted, the lander is in demonstration mode: it starts again
-    // by itself after a crash, as though its autorestart were asserted
-    // whatever that is, and tcs-sim's window says so and leaves only its
-    // Pause button working. Nothing driving it, it is not asserted.
-    Terminal::input("demo", Kind::Decision),
 ];
 
 /// How many bytes one of the sky's records is.
@@ -227,6 +221,7 @@ pub const SETTINGS: &[&str] = &[
     "landing_speed",
     "landing_drift",
     "pause",
+    "pad_wait",
 ];
 
 /// The steepest a line of the ground may be, in degrees either way.
@@ -294,6 +289,20 @@ pub struct Lander {
     /// How long it stays down after a crash before it starts again, with
     /// autorestart asserted: `"3 s"`.
     pub pause: String,
+    /// How long it stands on the pad after a landing before it starts
+    /// again, with autorestart asserted, unless it lifts off first:
+    /// `"10 s"`, the default.
+    #[serde(default = "default_pad_wait")]
+    pub pad_wait: String,
+}
+
+/// The pad wait a lander that states none has.
+///
+/// # Returns
+///
+/// `"10 s"`.
+fn default_pad_wait() -> String {
+    "10 s".to_string()
 }
 
 /// A point, in metres: X to the right and Y up.
@@ -331,7 +340,10 @@ pub struct Resolved {
     pub landing_speed: f64,
     /// Metres a second.
     pub landing_drift: f64,
+    /// How long it stays down after a crash, with autorestart.
     pub pause: Duration,
+    /// How long it stands on the pad after a landing, with autorestart.
+    pub pad_wait: Duration,
 }
 
 impl Resolved {
@@ -477,6 +489,7 @@ impl Lander {
                 Some("m/s"),
             )?,
             pause: time_of("pause", &self.pause)?,
+            pad_wait: time_of("pad_wait", &self.pad_wait)?,
         };
         landscape_kept(&resolved)?;
         Ok(resolved)
@@ -665,6 +678,7 @@ mod tests {
             landing_speed: "3.05 m/s".to_string(),
             landing_drift: "1.22 m/s".to_string(),
             pause: "3 s".to_string(),
+            pad_wait: "10 s".to_string(),
         }
     }
 

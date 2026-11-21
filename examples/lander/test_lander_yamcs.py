@@ -356,12 +356,10 @@ class Shown(unittest.TestCase):
 
     def test_each_vehicle_takes_its_controls(self):
         """lander-a's gateway passes the ground's command to autorestart,
-        its gateway_sky to sky_quench and its gateway_demo to demo;
-        lander-b's to restart."""
+        and its gateway_sky to sky_quench; lander-b's to restart."""
         a, b = (lander_yamcs.Craft(name) for name in lander_yamcs.VEHICLES)
         self.assertEqual(a.commands,
                          {"autorestart": "/TcsYamcs/gateway",
-                          "demo": "/TcsYamcs/gateway_demo",
                           "sky_quench": "/TcsYamcs/gateway_sky"})
         self.assertEqual(b.commands, {"restart": "/TcsYamcs/gateway"})
 
@@ -385,27 +383,6 @@ class Shown(unittest.TestCase):
         autorestart.disable()
         autorestart.enable()
         self.assertEqual(sent, [0, 1])
-
-    def test_demo_sends_one_for_on_and_nought_for_off(self):
-        """Demo On puts the lander in demonstration mode, with 1; Demo Off
-        takes it out, with 0."""
-        sent = []
-
-        class Uplink:
-            """An uplink that keeps what it is asked to send."""
-
-            def send(self, byte):
-                """Keeps a byte.
-
-                Args:
-                    byte: It.
-                """
-                sent.append(byte)
-
-        demo = lander_yamcs.Demo(Uplink())
-        demo.on()
-        demo.off()
-        self.assertEqual(sent, [1, 0])
 
     def test_the_lander_is_reckoned_on_between_readings(self):
         """Between readings the lander is carried on by its velocity and

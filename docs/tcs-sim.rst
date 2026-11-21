@@ -417,6 +417,9 @@ Each component is one simple part, of one of these types:
                           land: "1.22 m/s"
      pause                how long it stays down after a crash before it
                           starts again, with autorestart: "3 s"
+     pad_wait             how long it stands on the pad after a landing
+                          before it starts again, with autorestart,
+                          unless it lifts off first: "10 s", the default
 
    joystick_3_4           a three-armed joystick: two axes set by hand from
                           tcs-sim's window
@@ -485,18 +488,13 @@ output, carrying a value in one unit, a decision, or records:
                                       than nought starts it again at once
                   autorestart   in    a decision: while asserted,
                                       crashed it starts again after its
-                                      pause; otherwise it stays down
-                                      until it is restarted
+                                      pause, and landed after its pad
+                                      wait; otherwise it stays down, or
+                                      on the pad, until it is restarted
                   sky           out   records: its stars, sent down
                   sky_quench    in    a whole number: while it is the
                                       sky's generation, the sky is not
                                       sent
-                  demo          in    a decision: while asserted, it is
-                                      in demonstration mode, starting
-                                      again after a crash whatever
-                                      autorestart says, and tcs-sim's
-                                      window says "Demonstration Mode"
-                                      and leaves only Pause working
    joystick_3_4   set_x         in    a ratio, driven by tcs-sim's window
                   set_y         in    a ratio, driven by tcs-sim's window
                   x, y          out   a ratio each, held within minus one
@@ -547,15 +545,11 @@ otherwise. Leaving the display is not coming down: it flies on out of
 sight, and has crashed only if it drops below the display's bottom line,
 which goes on indefinitely to either side. Landed, it stands still on
 the pad, burning fuel as its throttles say, until thrust up greater than
-its weight lifts it off and it flies on: only a crash ends a flight.
+its weight lifts it off and it flies on; with its ``autorestart``
+asserted, once it has stood there for ``pad_wait`` it starts again.
 Crashed, it stays still until it is restarted or, with its
 ``autorestart`` asserted, for ``pause``; then it starts again where it
-started, with a full tank. With its ``demo`` asserted it is in
-demonstration mode, which asserts autorestart whatever ``autorestart``
-says: tcs-sim's window then says "Demonstration Mode" at the top of the
-lander's display, in the middle, and of its buttons only the lander's
-Pause works -- not Autoland, a panel's Enable, Disable and Configuration,
-nor Quit All. A
+started, with a full tank. A
 joystick gives out what tcs-sim's window sets it to, each axis held within
 minus one and one.
 
@@ -1082,8 +1076,8 @@ both. From the top:
   plus comes back and both axes read nought. The joystick's X, from minus one
   to one, and Y, from nought to one, are what its ``x`` and ``y`` give out,
   for the vehicle to read through the simulated payloads joined to them. When
-  the window opens, and each time the lander starts again after a crash with
-  the autopilot not flying it, the joystick beckons: its square flashes orange
+  the window opens, and each time the lander is restarted after a crash
+  with autorestart off and nobody flying it, the joystick beckons: its square flashes orange
   inside a flashing ring, and "Click or tap, and drag, to control" is written
   above and to its right, with an arrow pointing down to the square. Taking
   hold of the square, or pressing Pause or Autoland, ends it.
@@ -1105,10 +1099,16 @@ At the foot of the pane are two buttons:
   landing is not certain: the fuel can run out. The joystick's lines show
   where it holds the stick; taking hold of the joystick hands it back to
   you, and a landing stops it; once landed, the lander can be flown off
-  the pad again by hand. A crash does not: it lets go while the lander lies
-  crashed, and flies the next flight once the lander starts again, by
-  Restart or by itself under autorestart. Greyed out where the world has
-  no joystick.
+  the pad again by hand, and landed again. A crash does not: it lets go
+  while the lander lies crashed, and flies the next flight once the lander
+  starts again, by Restart or by itself under autorestart.
+
+  With autorestart on, the autopilot flies every flight the lander starts
+  again by itself: after a crash, once the lander's pause has run, and
+  after a landing, once it has stood on the pad for its pad wait, 10 s,
+  with nobody lifting it off meanwhile. So a booth nobody is at keeps
+  flying itself, and anyone who takes the joystick takes over, Autoland
+  going off. Greyed out where the world has no joystick.
 
 Each of the lander's engines shows a plume while it fires -- the bottom
 engine's below its nozzle, a side thruster's out of the body's side, away

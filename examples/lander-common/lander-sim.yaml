@@ -59,6 +59,9 @@ world:
             landing_speed: "3.05 m/s"
             landing_drift: "1.22 m/s"
             pause: "5 s"
+            # How long it stands on the pad after a landing before it
+            # starts again, with autorestart, unless it lifts off first.
+            pad_wait: "10 s"
       - type joystick_3_4:
           - component: joystick_3_4
 
@@ -105,17 +108,6 @@ simulated_payloads:
       - payload: autorestart
         configuration: lander-a
         connects: lander.autorestart
-        enable: true
-        protocol: udp
-        simulate: true
-      # What the ground's Demo On and Demo Off reach, through lander-a's
-      # gateway_demo: 1 puts the lander in demonstration mode, in which it
-      # always starts again by itself after a crash, and tcs-sim's window
-      # says so and leaves only Pause working; 0, as it is until told, takes
-      # it out.
-      - payload: demo
-        configuration: lander-a
-        connects: lander.demo
         enable: true
         protocol: udp
         simulate: true

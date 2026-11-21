@@ -19,7 +19,7 @@
 
 /// The most terminals a component type has: the room each component's inputs
 /// are given, which is fixed so that holding them allocates nothing.
-pub const MOST_TERMINALS: usize = 16;
+pub const MOST_TERMINALS: usize = 15;
 
 /// A component of the world.
 ///

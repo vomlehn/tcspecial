@@ -73,6 +73,10 @@ component PayloadPanel inherits Rectangle {
     background: #f0f0f0;
     border-color: #808080;
     border-width: 1px;
+    // Drawn into a layer of its own and drawn again only when something in
+    // it changes: the window is drawn whole every frame while the lander
+    // moves, and laying out this text each time cost more than the rest.
+    cache-rendering-hint: true;
 
     VerticalLayout {
         padding: 2px;

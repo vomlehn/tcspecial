@@ -218,8 +218,10 @@ pane at the left of its payload panels:
   Autoland, which tries to land the lander by flying it through the
   joystick, a landing not being certain.
 
-The pad has a flashing light on top of each of its end marks, in both
-tcs-sim's window and the ground's.
+The pad has a flashing light on top of each of its end marks in
+tcs-sim's window, the lander's own view. The ground's window draws the pad
+without them, so that nothing flashing there draws the eye from what has
+come down.
 
 The ground's window
 -------------------

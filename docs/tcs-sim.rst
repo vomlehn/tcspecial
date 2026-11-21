@@ -1083,8 +1083,9 @@ At the foot of the pane are two buttons:
 ``Pause`` and ``Resume``
   Halt the simulated world, and set it going again from where it stood --
   the joystick takes nothing meanwhile: the
-  lander hangs where it is, its fuel and speeds unchanged, and the payloads
-  go on reporting it there. The time spent paused is left out of the
+  lander hangs where it is, its fuel and speeds unchanged, its flashing
+  lights, the pad's and the joystick's beckoning too, held as they were,
+  and the payloads go on reporting it there. The time spent paused is left out of the
   world's time.
 
 ``Autoland`` and ``Stop Autoland``

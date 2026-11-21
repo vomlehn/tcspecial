@@ -318,7 +318,8 @@ pub fn pad_lights(f: &Resolved) -> String {
 ///
 /// # Arguments
 ///
-/// * `seconds` - The time since the window opened, in seconds.
+/// * `seconds` - The window's time, in seconds; tcs-sim's stops while
+///               paused.
 ///
 /// # Returns
 ///
@@ -424,7 +425,8 @@ pub fn lander_lights(f: &Resolved, place: Point) -> (String, String) {
 ///
 /// # Arguments
 ///
-/// * `seconds` - The time since the window opened, in seconds.
+/// * `seconds` - The window's time, in seconds; tcs-sim's stops while
+///               paused.
 ///
 /// # Returns
 ///
@@ -703,6 +705,56 @@ pub struct Watch {
     /// The readouts as last changed, and when: kept until
     /// [`READOUTS_EVERY`] has passed, or the lander's state changes.
     readouts: Option<Readouts>,
+    /// The lander drawn once, at the middle of the display, for its
+    /// figures, which a window's do not change.
+    drawn: Option<Drawn>,
+}
+
+/// The lander's picture, drawn once at the middle of the display: the pane
+/// moves it to where the lander is.
+#[derive(Debug, Clone)]
+struct Drawn {
+    /// Its single lines.
+    lines: String,
+    /// Its shapes.
+    shapes: String,
+    /// Its green light.
+    green: String,
+    /// Its white strobes.
+    strobes: String,
+}
+
+/// The middle of the display, where the lander's picture is drawn.
+///
+/// # Arguments
+///
+/// * `f` - The lander's figures.
+///
+/// # Returns
+///
+/// The place, in metres.
+fn middle(f: &Resolved) -> Point {
+    (f.width / 2.0, f.height / 2.0)
+}
+
+/// Draws the lander once, at the middle of the display.
+///
+/// # Arguments
+///
+/// * `f` - The lander's figures.
+///
+/// # Returns
+///
+/// Its picture.
+fn drawn(f: &Resolved) -> Drawn {
+    let at = middle(f);
+    let (green, strobes) = lander_lights(f, at);
+    Drawn {
+        lines: lander(f, at, false),
+        shapes: lander(f, at, true),
+        green,
+        strobes,
+    }
 }
 
 /// The readouts a frame shows, as they were last changed.
@@ -1003,6 +1055,22 @@ fn plume(
         corner(tip, far, 1.0),
         corner(tip, far, -1.0),
     )
+}
+
+/// How many steps a plume's length is taken to, from nought to full.
+const PLUME_STEPS: f64 = 64.0;
+
+/// A throttle taken to the nearest of a plume's steps.
+///
+/// # Arguments
+///
+/// * `throttle` - The throttle, from minus one to one.
+///
+/// # Returns
+///
+/// The nearest step.
+fn plume_step(throttle: f64) -> f64 {
+    (throttle * PLUME_STEPS).round() / PLUME_STEPS
 }
 
 /// The plumes of the lander's engines, as its throttles say they are firing:
@@ -1381,7 +1449,12 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         });
     }
 
-    let opened = Instant::now();
+    // The window's own clock, which its flashing lights -- the pad's, the
+    // lander's strobes and the beckoning joystick's -- are timed by: it
+    // stands still while the world is paused, so that none of them changes
+    // then, and goes on from where it stood.
+    let blinking = Cell::new(0.0_f64);
+    let looked = Cell::new(Instant::now());
     show(&pane, &scene, 0.0);
     let timer = slint::Timer::default();
     {
@@ -1393,7 +1466,13 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let had_fuel = Cell::new(f64::INFINITY);
         timer.start(slint::TimerMode::Repeated, REFRESH, move || {
             let Some(ui) = weak.upgrade() else { return };
-            let seconds = opened.elapsed().as_secs_f64();
+            let now = Instant::now();
+            if !scene.world.paused() {
+                let gone = now.saturating_duration_since(looked.get());
+                blinking.set(blinking.get() + gone.as_secs_f64());
+            }
+            looked.set(now);
+            let seconds = blinking.get();
             show(&ui.global::<LanderScene>(), &scene, seconds);
             fly(&ui, &scene, &pilot);
             let out =
@@ -1477,7 +1556,8 @@ const BECKON_FOR: f64 = 0.5;
 ///
 /// # Arguments
 ///
-/// * `seconds` - The time since the window opened, in seconds.
+/// * `seconds` - The window's time, in seconds; tcs-sim's stops while
+///               paused.
 ///
 /// # Returns
 ///
@@ -1584,7 +1664,8 @@ fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
 ///
 /// * `pane`    - The lander's pane, in tcs-sim's window.
 /// * `scene`   - The world's lander.
-/// * `seconds` - The time since the window opened, in seconds.
+/// * `seconds` - The window's time, in seconds; tcs-sim's stops while
+///               paused.
 fn show(pane: &LanderScene<'_>, scene: &Scene, seconds: f64) {
     let now = Instant::now();
     let out = scene.world.glance_component(scene.lander, now);
@@ -1658,6 +1739,12 @@ pub struct Frame {
     pub pad_lit: bool,
     /// Whether the lander's strobes are lit.
     pub strobe_lit: bool,
+    /// How far the lander is from the middle of the display, across and
+    /// up, in metres: the pane moves its picture of the lander, drawn once
+    /// there, by this much, rather than draw it again each frame.
+    pub lander_dx: f32,
+    /// Up.
+    pub lander_dy: f32,
 }
 
 impl Watch {
@@ -1672,8 +1759,8 @@ impl Watch {
     ///                 [`THROTTLE_X`] to [`ACCELERATION_Y`].
     /// * `simulated` - The lander's time now, in seconds, which an
     ///                 explosion is followed by.
-    /// * `seconds`   - The time since the window opened, in seconds, which
-    ///                 the lights flash by.
+    /// * `seconds`   - The window's time, in seconds, which the lights
+    ///                 flash by; tcs-sim's stops while paused.
     ///
     /// # Returns
     ///
@@ -1685,7 +1772,8 @@ impl Watch {
         simulated: f64,
         seconds: f64,
     ) -> Frame {
-        let mut frame = painted(f, out);
+        let picture = self.drawn.get_or_insert_with(|| drawn(f));
+        let mut frame = painted_from(f, out, picture);
         frame.pad_lit = pad_lit(seconds);
         frame.strobe_lit = strobe_lit(seconds);
         let crashed = out[CRASHED] > 0.5;
@@ -1769,6 +1857,8 @@ fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
     pane.set_lander_shapes(frame.lander_shapes.as_str().into());
     pane.set_lander_green(frame.lander_green.as_str().into());
     pane.set_lander_strobes(frame.lander_strobes.as_str().into());
+    pane.set_lander_dx(frame.lander_dx);
+    pane.set_lander_dy(frame.lander_dy);
     pane.set_plume_glow(frame.plume_glow.as_str().into());
     pane.set_plume_core(frame.plume_core.as_str().into());
     pane.set_plume_strength(frame.plume_strength);
@@ -1804,16 +1894,43 @@ fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
 /// # Returns
 ///
 /// The frame.
+#[cfg(test)]
 fn painted(f: &Resolved, out: &[f64]) -> Frame {
+    painted_from(f, out, &drawn(f))
+}
+
+/// The lander as its outputs say it is, its picture already drawn.
+///
+/// # Arguments
+///
+/// * `f`       - The lander's figures.
+/// * `out`     - Its terminals' values, in its type's order.
+/// * `picture` - The lander, drawn once at the middle of the display.
+///
+/// # Returns
+///
+/// The frame.
+fn painted_from(f: &Resolved, out: &[f64], picture: &Drawn) -> Frame {
     let place = (out[X], out[Y]);
-    let (green, white) = lander_lights(f, place);
-    let ([glow, core, side_glow, side_core], main, side) = plumes(f, out);
+    let (mx, my) = middle(f);
+    // The plumes, drawn with the lander at the middle of the display and
+    // moved with it, each throttle taken to the nearest of its steps: so
+    // there are only so many plumes, and one held steady is the same
+    // picture frame after frame, which the renderer keeps.
+    let mut held = out.to_vec();
+    held[X] = mx;
+    held[Y] = my;
+    held[THROTTLE_X] = plume_step(out[THROTTLE_X]);
+    held[THROTTLE_Y] = plume_step(out[THROTTLE_Y]);
+    let ([glow, core, side_glow, side_core], main, side) = plumes(f, &held);
     let landed = out[LANDED] > 0.5;
     Frame {
-        lander_lines: lander(f, place, false),
-        lander_shapes: lander(f, place, true),
-        lander_green: green,
-        lander_strobes: white,
+        lander_lines: picture.lines.clone(),
+        lander_shapes: picture.shapes.clone(),
+        lander_green: picture.green.clone(),
+        lander_strobes: picture.strobes.clone(),
+        lander_dx: (place.0 - mx) as f32,
+        lander_dy: (place.1 - my) as f32,
         plume_glow: glow,
         plume_core: core,
         plume_strength: main,
@@ -2426,6 +2543,46 @@ pub(crate) mod tests {
         out[CRASHED] = 1.0;
         let ([glow, _, side, _], _, _) = plumes(&f, &out);
         assert!(glow.is_empty() && side.is_empty());
+    }
+
+    /// A frame's plumes, drawn with the lander at the middle of the display
+    /// and moved by its offset, are where they would be drawn at the
+    /// lander's place, for a throttle on one of their steps; and a throttle
+    /// between steps is taken to the nearest.
+    #[test]
+    fn the_plumes_move_with_the_lander() {
+        let f = figures();
+        let mut out = vec![0.0; 11];
+        out[X] = 231.0;
+        out[Y] = 377.0;
+        out[FUEL] = 1.0;
+        out[THROTTLE_X] = -0.25;
+        out[THROTTLE_Y] = 0.75;
+        let frame = painted(&f, &out);
+        let ([glow, _, side, _], _, _) = plumes(&f, &out);
+        assert!(!glow.is_empty() && !side.is_empty());
+        let numbers = |commands: &str| -> Vec<f64> {
+            commands
+                .split_whitespace()
+                .filter_map(|word| word.parse().ok())
+                .collect()
+        };
+        for (moved, there) in
+            [(&frame.plume_glow, &glow), (&frame.side_plume_glow, &side)]
+        {
+            let (moved, there) = (numbers(moved), numbers(there));
+            assert_eq!(moved.len(), there.len());
+            for (n, (m, t)) in moved.iter().zip(&there).enumerate() {
+                // Across, then down the picture, each a point's.
+                let by = if n % 2 == 0 {
+                    f64::from(frame.lander_dx)
+                } else {
+                    -f64::from(frame.lander_dy)
+                };
+                assert!((m + by - t).abs() < 0.02, "{m} {by} {t}");
+            }
+        }
+        assert_eq!(plume_step(0.5 + 0.3 / PLUME_STEPS), 0.5);
     }
 
     /// A light sits on top of each end mark of the pad, and the lights are

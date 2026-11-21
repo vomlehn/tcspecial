@@ -323,6 +323,11 @@ export global LanderScene {
     in-out property <string> lander-green;
     in-out property <string> lander-strobes;
     in-out property <bool> strobe-lit: false;
+    // The lander's picture and lights are drawn once, at the middle of the
+    // display; this is how far the lander is from there, across and up, in
+    // metres, which moves them: set by Rust.
+    in-out property <float> lander-dx: 0;
+    in-out property <float> lander-dy: 0;
     // The plumes of the bottom engine and of a side thruster: each a glow
     // and a core inside it, and how hard the engine fires, from nought to
     // one, which makes them brighter: set by Rust, empty when not firing.
@@ -443,97 +448,106 @@ export component LanderPicture inherits Rectangle {
         stroke: #000000;
         stroke-width: 1px;
     }
-    // The plumes, behind the lander so that its engines cover
-    // their roots: a pale orange glow and a warm off-white core,
-    // longer and brighter the harder each engine fires.
-    for plume in [
-        {
-            glow: LanderScene.plume-glow,
-            core: LanderScene.plume-core,
-            strength: LanderScene.plume-strength,
-        },
-        {
-            glow: LanderScene.side-plume-glow,
-            core: LanderScene.side-plume-core,
-            strength: LanderScene.side-plume-strength,
-        },
-    ]: Rectangle {
-        width: 100%;
-        height: 100%;
-        Path {
+    // The lander, drawn once at the middle of the display and moved
+    // to where it is, so that its picture is not made again each
+    // frame, and its plumes with it. White so that it shows against
+    // the sky, and edged with a very thin black line so that it shows
+    // against the ground. Its single lines first, each a black line a
+    // little wider than the white one over it; then its shapes over
+    // their ends, filled white, each with its own thin black line, so
+    // that where one part meets another shows.
+    Rectangle {
+        x: LanderScene.lander-dx / LanderScene.world-width * parent.width;
+        y: -LanderScene.lander-dy / LanderScene.world-height
+            * parent.height;
+        width: parent.width;
+        height: parent.height;
+        // The plumes, behind the lander so that its engines cover
+        // their roots: a pale orange glow and a warm off-white core,
+        // longer and brighter the harder each engine fires.
+        for plume in [
+            {
+                glow: LanderScene.plume-glow,
+                core: LanderScene.plume-core,
+                strength: LanderScene.plume-strength,
+            },
+            {
+                glow: LanderScene.side-plume-glow,
+                core: LanderScene.side-plume-core,
+                strength: LanderScene.side-plume-strength,
+            },
+        ]: Rectangle {
             width: 100%;
             height: 100%;
-            viewbox-width: LanderScene.world-width;
-            viewbox-height: LanderScene.world-height;
-            commands: plume.glow;
-            fill: #F5C99A;
-            opacity: 0.2 + 0.4 * plume.strength;
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: plume.glow;
+                fill: #F5C99A;
+                opacity: 0.2 + 0.4 * plume.strength;
+            }
+            Path {
+                width: 100%;
+                height: 100%;
+                viewbox-width: LanderScene.world-width;
+                viewbox-height: LanderScene.world-height;
+                commands: plume.core;
+                fill: #FFF1D6;
+                opacity: 0.3 + 0.6 * plume.strength;
+            }
         }
         Path {
             width: 100%;
             height: 100%;
             viewbox-width: LanderScene.world-width;
             viewbox-height: LanderScene.world-height;
-            commands: plume.core;
-            fill: #FFF1D6;
-            opacity: 0.3 + 0.6 * plume.strength;
+            commands: LanderScene.lander-lines;
+            stroke: #000000;
+            stroke-width: 2.5px;
         }
-    }
-    // The lander, white so that it shows against the sky, and edged
-    // with a very thin black line so that it shows against the
-    // ground. Its single lines first, each a black line a little
-    // wider than the white one over it; then its shapes over their
-    // ends, filled white, each with its own thin black line, so that
-    // where one part meets another shows.
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-width: LanderScene.world-width;
-        viewbox-height: LanderScene.world-height;
-        commands: LanderScene.lander-lines;
-        stroke: #000000;
-        stroke-width: 2.5px;
-    }
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-width: LanderScene.world-width;
-        viewbox-height: LanderScene.world-height;
-        commands: LanderScene.lander-lines;
-        stroke: #ffffff;
-        stroke-width: 1.5px;
-    }
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-width: LanderScene.world-width;
-        viewbox-height: LanderScene.world-height;
-        commands: LanderScene.lander-shapes;
-        fill: #ffffff;
-        stroke: #000000;
-        stroke-width: 0.75px;
-    }
-    // Its lights over it: the green steady, the white flashing --
-    // bright in a flash and dim between.
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-width: LanderScene.world-width;
-        viewbox-height: LanderScene.world-height;
-        commands: LanderScene.lander-green;
-        fill: #009E73;
-    }
-    Path {
-        width: 100%;
-        height: 100%;
-        viewbox-width: LanderScene.world-width;
-        viewbox-height: LanderScene.world-height;
-        commands: LanderScene.lander-strobes;
-        fill: LanderScene.strobe-lit ? #ffffff : #9ca3af;
-        // A black ring, so that a white light shows on the white
-        // lander as well as against the sky.
-        stroke: #000000;
-        stroke-width: 1px;
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: LanderScene.world-width;
+            viewbox-height: LanderScene.world-height;
+            commands: LanderScene.lander-lines;
+            stroke: #ffffff;
+            stroke-width: 1.5px;
+        }
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: LanderScene.world-width;
+            viewbox-height: LanderScene.world-height;
+            commands: LanderScene.lander-shapes;
+            fill: #ffffff;
+            stroke: #000000;
+            stroke-width: 0.75px;
+        }
+        // Its lights over it: the green steady, the white flashing --
+        // bright in a flash and dim between.
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: LanderScene.world-width;
+            viewbox-height: LanderScene.world-height;
+            commands: LanderScene.lander-green;
+            fill: #009E73;
+        }
+        Path {
+            width: 100%;
+            height: 100%;
+            viewbox-width: LanderScene.world-width;
+            viewbox-height: LanderScene.world-height;
+            commands: LanderScene.lander-strobes;
+            fill: LanderScene.strobe-lit ? #ffffff : #9ca3af;
+            // A black ring, so that a white light shows on the white
+            // lander as well as against the sky.
+            stroke: #000000;
+            stroke-width: 1px;
+        }
     }
     // The fireball: a vermillion cloud, an orange flame and a
     // yellow core, fading as it burns out.
@@ -661,33 +675,38 @@ export component LanderPane inherits Rectangle {
             spacing: 8px;
             alignment: start;
             // The X and Y values, under a line naming the axes, level with
-            // the joystick's middle.
-            VerticalLayout {
-                spacing: 2px;
-                alignment: center;
-                Values {
-                    name: "";
-                    unit: "";
-                    first: "X";
-                    second: "Y";
-                }
-                Values {
-                    name: "Position";
-                    unit: "m";
-                    first: LanderScene.position-x;
-                    second: LanderScene.position-y;
-                }
-                Values {
-                    name: "Velocity";
-                    unit: "m/s";
-                    first: LanderScene.velocity-x;
-                    second: LanderScene.velocity-y;
-                }
-                Values {
-                    name: "Acceleration";
-                    unit: "m/s²";
-                    first: LanderScene.acceleration-x;
-                    second: LanderScene.acceleration-y;
+            // the joystick's middle: drawn into a layer of their own, and
+            // drawn again only when they change, at most ten times a
+            // second, rather than laid out afresh every frame.
+            Rectangle {
+                cache-rendering-hint: true;
+                VerticalLayout {
+                    spacing: 2px;
+                    alignment: center;
+                    Values {
+                        name: "";
+                        unit: "";
+                        first: "X";
+                        second: "Y";
+                    }
+                    Values {
+                        name: "Position";
+                        unit: "m";
+                        first: LanderScene.position-x;
+                        second: LanderScene.position-y;
+                    }
+                    Values {
+                        name: "Velocity";
+                        unit: "m/s";
+                        first: LanderScene.velocity-x;
+                        second: LanderScene.velocity-y;
+                    }
+                    Values {
+                        name: "Acceleration";
+                        unit: "m/s²";
+                        first: LanderScene.acceleration-x;
+                        second: LanderScene.acceleration-y;
+                    }
                 }
             }
 

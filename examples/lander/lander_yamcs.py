@@ -172,13 +172,9 @@ STAR_LAYOUT = ">HHHBBII"
 SKY_WIDTH = 600.0
 
 #: How tall each end mark of the pad is, as a fraction of the display's
-#: height, and the radius of the light on top of it, in metres: as tcs-sim's
-#: lander pane draws them.
+#: height: as tcs-sim's lander pane draws them. The pad has no lights
+#: here: they are tcs-sim's, the lander's own view.
 PAD_MARK = 1 / 50
-PAD_LIGHT = 6.0
-
-#: How long the pad's lights take to flash on and off again, in seconds.
-PAD_FLASH = 1.0
 
 #: The radius of each of the lander's lights, in pixels; and how long its
 #: white lights take to flash again, and how long each flash lasts, in
@@ -1368,15 +1364,6 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
         for start, end in pad_lines:
             scene.create_line(*start, *end, fill=colour,
                               width=width * zoom)
-    # A light on top of each mark, flashing: bright while lit and dim
-    # between, so that they are seen even then.
-    lights = []
-    for x in (px0, px1):
-        cx, cy = at(x, py0 + mark + PAD_LIGHT)
-        r = PAD_LIGHT * scale
-        lights.append(scene.create_oval(cx - r, cy - r, cx + r, cy + r,
-                                        fill="#E69F00", outline="#000000",
-                                        width=zoom))
     state = scene.create_text(8 * zoom, 6 * zoom, anchor="nw",
                               text="Flying",
                               fill="#ffffff",
@@ -1524,10 +1511,6 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
                 drawn.append(scene.create_oval(cx - r, cy - r, cx + r,
                                                cy + r, fill=fill,
                                                outline=edge, width=zoom))
-        since = time.monotonic() - opened
-        lit = since % PAD_FLASH < PAD_FLASH / 2
-        for light in lights:
-            scene.itemconfigure(light, fill="#E69F00" if lit else "#5c4000")
         sx = readings.number("to_joystick_3_4_x") or 0.0
         sy = readings.number("to_joystick_3_4_y") or 0.0
         # At rest, the plus; held, a line across the level rectangles and

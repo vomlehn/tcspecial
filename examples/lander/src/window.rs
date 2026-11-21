@@ -7,9 +7,9 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 use tcs_sim::lander_view::{
-    dot_of, ground_picture, pad, pad_lights, sky_of, Frame, Watch,
-    ACCELERATION_X, ACCELERATION_Y, CRASHED, FUEL, LANDED, THROTTLE_X,
-    THROTTLE_Y, VELOCITY_X, VELOCITY_Y, X, Y,
+    dot_of, ground_picture, pad, sky_of, Frame, Watch, ACCELERATION_X,
+    ACCELERATION_Y, CRASHED, FUEL, LANDED, THROTTLE_X, THROTTLE_Y, VELOCITY_X,
+    VELOCITY_Y, X, Y,
 };
 use tcs_ui::windows::Closed;
 use tcsos::time::{Duration, Instant};
@@ -81,7 +81,9 @@ pub fn show(
     scene.set_world_height(figures.height as f32);
     scene.set_ground(slint::Image::from_rgba8(ground_picture(&figures)));
     scene.set_pad(pad(&figures).into());
-    scene.set_pad_lights(pad_lights(&figures).into());
+    // No lights on the pad here: they are tcs-sim's, the lander's own
+    // view, and flashing on the ground's they would draw the eye from what
+    // has come down.
     scene.set_sky(slint::Image::from_rgba8(sky_of(&figures, [])));
     let said = ui.global::<crate::Said>();
     said.set_note(note.into());
@@ -168,7 +170,6 @@ fn tick(ui: &StationWindow, view: &View) {
         // Nowhere yet: nothing drawn, and the lander not said to be flying.
         frame = Frame {
             state: "Waiting for the lander",
-            pad_lit: frame.pad_lit,
             fuel: frame.fuel,
             ..Frame::default()
         };
@@ -229,6 +230,8 @@ fn set_frame(scene: &LanderScene<'_>, frame: &Frame) {
     scene.set_lander_shapes(frame.lander_shapes.as_str().into());
     scene.set_lander_green(frame.lander_green.as_str().into());
     scene.set_lander_strobes(frame.lander_strobes.as_str().into());
+    scene.set_lander_dx(frame.lander_dx);
+    scene.set_lander_dy(frame.lander_dy);
     scene.set_plume_glow(frame.plume_glow.as_str().into());
     scene.set_plume_core(frame.plume_core.as_str().into());
     scene.set_plume_strength(frame.plume_strength);
@@ -249,6 +252,5 @@ fn set_frame(scene: &LanderScene<'_>, frame: &Frame) {
     scene.set_velocity_y(frame.velocity_y.as_str().into());
     scene.set_acceleration_x(frame.acceleration_x.as_str().into());
     scene.set_acceleration_y(frame.acceleration_y.as_str().into());
-    scene.set_pad_lit(frame.pad_lit);
     scene.set_strobe_lit(frame.strobe_lit);
 }

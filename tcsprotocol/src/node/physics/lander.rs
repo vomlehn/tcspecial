@@ -53,12 +53,11 @@
 //!
 //! Landed, it stands still on the pad, its engines burning fuel as its
 //! throttles say, until thrust up greater than its weight lifts it off and
-//! it flies on; with its `autorestart` input asserted, once it has stood
-//! there for `pad_wait`, it starts again. Crashed, it stays where it is
-//! until it is restarted, by its `restart` input, or, with its
-//! `autorestart` input asserted, for `pause`; then it starts again where
-//! it started, with a full tank. A restart starts it
-//! again however it is, landed or flying too. The arithmetic is tcs-sim's
+//! it flies on, or, once it has stood there for `pad_wait`, it starts
+//! again. Crashed, it stays where it is for `pause`, or until it is
+//! restarted by its `restart` input; then it starts again where it
+//! started, with a full tank. A restart starts it again however it is,
+//! landed or flying too. The arithmetic is tcs-sim's
 //! `physics::lander`.
 //!
 //! # Sky
@@ -106,12 +105,6 @@ pub const TERMINALS: &[Terminal] = &[
     // is driven to a new value other than nought: what the ground's Restart
     // sends, a count, so that each press differs from the last.
     Terminal::input("restart", Kind::Decision),
-    // While asserted, a lander that has crashed starts again by itself once
-    // its pause has run, and one that has landed once it has stood on the
-    // pad for its pad wait, unless it lifts off first; otherwise it stays
-    // down, or on the pad, until it is restarted. Nothing driving it, it
-    // is not asserted.
-    Terminal::input("autorestart", Kind::Decision),
     // Its sky's records: see the module's "Sky".
     Terminal::output("sky", Kind::Records),
     // Driven to the generation of its sky that the ground has whole: while
@@ -286,12 +279,12 @@ pub struct Lander {
     /// The fastest it may be going sideways as it touches the pad and still
     /// be landed: `"1.22 m/s"`, the Apollo lunar module's.
     pub landing_drift: String,
-    /// How long it stays down after a crash before it starts again, with
-    /// autorestart asserted: `"3 s"`.
+    /// How long it stays down after a crash before it starts again by
+    /// itself: `"3 s"`.
     pub pause: String,
     /// How long it stands on the pad after a landing before it starts
-    /// again, with autorestart asserted, unless it lifts off first:
-    /// `"10 s"`, the default.
+    /// again by itself, unless it lifts off first: `"10 s"`, the
+    /// default.
     #[serde(default = "default_pad_wait")]
     pub pad_wait: String,
 }
@@ -340,9 +333,9 @@ pub struct Resolved {
     pub landing_speed: f64,
     /// Metres a second.
     pub landing_drift: f64,
-    /// How long it stays down after a crash, with autorestart.
+    /// How long it stays down after a crash.
     pub pause: Duration,
-    /// How long it stands on the pad after a landing, with autorestart.
+    /// How long it stands on the pad after a landing.
     pub pad_wait: Duration,
 }
 

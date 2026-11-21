@@ -813,11 +813,10 @@ dropping below the display's bottom line off either side, is a crash. The
 lander has no thrust down, so its joystick has no arm below its middle. A
 landing does not end the flight: the lander stands on the pad, a smiling
 face drawn over it, until thrust greater than its weight lifts it off
-again, or, with autorestart enabled, until it has stood there 10 s and
-starts again. After a crash the lander stays down until Restart, or, with
-autorestart enabled, starts again with a full tank after a pause. Each
-flight autorestart starts, tcs-sim's Autoland flies, until someone takes
-the joystick.
+again, or until it has stood there 10 s and starts again. After a crash
+the lander stays down until Restart, or starts again by itself with a full
+tank after a pause. Each flight that starts by itself, tcs-sim's Autoland
+flies, until someone takes the joystick.
 
 `lander/lander_yamcs.py` is the ground station. It makes a landscape at
 random from a seed -- `--seed N`, or one it chooses and says -- and writes
@@ -835,12 +834,7 @@ lander-a's `gateway_sky`; a packet lost, as UDP may lose one, just leaves
 fewer stars until a later pass. Its Restart button sends a
 command up to lander-b, whose gateway passes it to the payload that starts
 the lander again: it arrives 1.3 s later, and is seen 1.3 s after that.
-Disable Autorestart and Enable Autorestart send one up to lander-a, whose
-gateway passes it to the payload that sets the lander's autorestart. The
-station enables it as soon as the vehicles are connected, so after a crash
-the lander starts again by itself after its pause, and after a landing
-once it has stood on the pad 10 s; disabled, it stays down, or on the pad,
-until Restart. Closing
+Closing
 tcs-sim's window,
 or the MOC's, stops everything. Yamcs's web interface is at
 <http://localhost:19090>.

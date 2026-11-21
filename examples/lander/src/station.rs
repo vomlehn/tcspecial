@@ -281,7 +281,7 @@ impl Station {
     ///
     /// # Arguments
     ///
-    /// * `payload` - The payload: `restart`, `autorestart` or `sky_quench`.
+    /// * `payload` - The payload: `restart` or `sky_quench`.
     /// * `data`    - What it carries.
     pub fn send(&self, payload: &str, data: &[u8]) {
         let _ = self.going.send(Going {

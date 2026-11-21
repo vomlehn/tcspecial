@@ -45,8 +45,6 @@ gateways:
         address: "127.0.0.1:19600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:19700"
-        moc-out:
-          - autorestart.gateway
         world-in: [sky, to_accel_x, to_fuel, to_joystick_3_4_x, to_velocity_x,
           to_x]
       - gateway: gateway_sky
@@ -114,10 +112,6 @@ payloads:
         world-out-type: "i16"
         world-out:
           - to_accel_x.accel_x
-      - payload: autorestart
-        address: "127.0.0.1:19807"
-        protocol: "udp"
-        moc-in: [gateway]
       - payload: fuel
         address: "127.0.0.1:19804"
         protocol: "udp"

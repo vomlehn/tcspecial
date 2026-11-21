@@ -754,10 +754,10 @@ lander                 a craft flown in two dimensions over a
   landing_drift        the fastest sideways it may touch the pad and
                        land: &quot;1.22 m/s&quot;
   pause                how long it stays down after a crash before it
-                       starts again, with autorestart: &quot;3 s&quot;
+                       starts again by itself: &quot;3 s&quot;
   pad_wait             how long it stands on the pad after a landing
-                       before it starts again, with autorestart,
-                       unless it lifts off first: &quot;10 s&quot;, the default
+                       before it starts again by itself, unless it
+                       lifts off first: &quot;10 s&quot;, the default
 
 joystick_3_4           a three-armed joystick: two axes set by hand from
                        tcs-sim's window
@@ -821,11 +821,6 @@ lander         throttle_x    in    a ratio, held within minus one and one
                                    gravity, up more than nought
                restart       in    a whole number: each new one other
                                    than nought starts it again at once
-               autorestart   in    a decision: while asserted,
-                                   crashed it starts again after its
-                                   pause, and landed after its pad
-                                   wait; otherwise it stays down, or
-                                   on the pad, until it is restarted
                sky           out   records: its stars, sent down
                sky_quench    in    a whole number: while it is the
                                    sky's generation, the sky is not
@@ -878,10 +873,9 @@ otherwise. Leaving the display is not coming down: it flies on out of
 sight, and has crashed only if it drops below the display's bottom line,
 which goes on indefinitely to either side. Landed, it stands still on
 the pad, burning fuel as its throttles say, until thrust up greater than
-its weight lifts it off and it flies on; with its <tt class="docutils literal">autorestart</tt>
-asserted, once it has stood there for <tt class="docutils literal">pad_wait</tt> it starts again.
-Crashed, it stays still until it is restarted or, with its
-<tt class="docutils literal">autorestart</tt> asserted, for <tt class="docutils literal">pause</tt>; then it starts again where it
+its weight lifts it off and it flies on, or, once it has stood there
+for <tt class="docutils literal">pad_wait</tt>, it starts again. Crashed, it stays still for
+<tt class="docutils literal">pause</tt>, or until it is restarted; then it starts again where it
 started, with a full tank. A
 joystick gives out what tcs-sim's window sets it to, each axis held within
 minus one and one.</p>
@@ -1381,9 +1375,8 @@ where it holds the stick; taking hold of the joystick hands it back to
 you, and a landing stops it; once landed, the lander can be flown off
 the pad again by hand, and landed again. A crash does not: it lets go
 while the lander lies crashed, and flies the next flight once the lander
-starts again, by Restart or by itself under autorestart.</p>
-<p class="last">With autorestart on, the autopilot flies every flight the lander starts
-again by itself: after a crash, once the lander's pause has run, and
+starts again, by Restart or by itself.</p>
+<p class="last">The autopilot flies every flight the lander starts again by itself: after a crash, once the lander's pause has run, and
 after a landing, once it has stood on the pad for its pad wait, 10 s,
 with nobody lifting it off meanwhile. So a booth nobody is at keeps
 flying itself, and anyone who takes the joystick takes over, Autoland

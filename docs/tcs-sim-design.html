@@ -1056,10 +1056,9 @@ two looks, and the interval it is found in is halved until it is within
 where it looks again. At that moment it has landed if all of it is over
 the pad, it meets nothing but the pad, and it is going no faster than
 <tt class="docutils literal">landing_speed</tt> down and <tt class="docutils literal">landing_drift</tt> sideways; landed, it is set
-down on the pad. Anything else is a crash. With autorestart, crashed, it
-stays still for <tt class="docutils literal">pause</tt>, and landed, unless it lifts off, for
-<tt class="docutils literal">pad_wait</tt>, and then starts again where it started, at rest, with a
-full tank.</dd>
+down on the pad. Anything else is a crash. Crashed, it stays still for
+<tt class="docutils literal">pause</tt>, and landed, unless it lifts off, for <tt class="docutils literal">pad_wait</tt>, and then
+starts again where it started, at rest, with a full tank.</dd>
 <dt>Requirement</dt>
 <dd>A <tt class="docutils literal">joystick_3_4</tt>, the three-armed joystick, takes <tt class="docutils literal">set_x</tt> and
 <tt class="docutils literal">set_y</tt>, which nothing in the model

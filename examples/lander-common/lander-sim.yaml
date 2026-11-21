@@ -60,7 +60,7 @@ world:
             landing_drift: "1.22 m/s"
             pause: "5 s"
             # How long it stands on the pad after a landing before it
-            # starts again, with autorestart, unless it lifts off first.
+            # starts again, unless it lifts off first.
             pad_wait: "10 s"
       - type joystick_3_4:
           - component: joystick_3_4
@@ -98,16 +98,6 @@ simulated_payloads:
       - payload: thruster_x
         configuration: lander-a
         connects: lander.throttle_x
-        enable: true
-        protocol: udp
-        simulate: true
-      # What the ground's autorestart buttons reach, through lander-a's
-      # gateway: 1 lets the lander start again by itself after a crash, 0,
-      # as it is until told, keeps it down until it is restarted. A landing
-      # does not end a flight, so neither touches a landed lander.
-      - payload: autorestart
-        configuration: lander-a
-        connects: lander.autorestart
         enable: true
         protocol: udp
         simulate: true

@@ -24,10 +24,9 @@ This program puts the pieces together:
 * it starts Yamcs, tcs-sim with both configurations, and both tcspecials,
   each killed when this program exits, however it exits;
 * it has Yamcs send each vehicle a CONNECT carrying its configuration's
-  checksum until the vehicle answers with it, through the delay, and then
-  turns the lander's autorestart on, so that the lander starts again by
-  itself after each crash, and after each landing it stays on the pad for,
-  tcs-sim's Autoland flying it;
+  checksum until the vehicle answers with it, through the delay; the
+  lander starts again by itself after each crash, and after each landing
+  it stays on the pad for, tcs-sim's Autoland flying it;
 * it shows what arrives in a window -- the landscape and the lander where it
   was said to be, the values, the fuel, where the joystick was held, and
   whether it has landed or crashed -- or, with ``--seconds``, prints it for
@@ -660,8 +659,8 @@ class Craft:
         self.digest, self.why_no_digest = configuration.digest(self.path)
         #: The command the ground sends up through the gateway, by the
         #: payload the gateway passes it to, where the gateway binds aboard
-        #: to take it and passes it on by moc-out: lander-a's to autorestart,
-        #: lander-b's to restart.
+        #: to take it and passes it on by moc-out: lander-a's gateway_sky's
+        #: to sky_quench, lander-b's gateway's to restart.
         self.commands = {}
         for uplink in generated.uplinks(self.config):
             if uplink.vehicle is None:
@@ -1183,40 +1182,6 @@ class Restarter:
         return self._uplink.send(self._count)
 
 
-class Autorestart:
-    """Has Yamcs tell the lander whether to start again by itself after a
-    crash, up through the vehicle whose gateway passes it to the payload
-    that sets the lander's autorestart. Until it is told, it does not: it
-    stays down until it is restarted. The program enables it as soon as the
-    vehicles are connected, so that a lander nobody flies starts again by
-    itself after each crash. A landing does not end a flight, so this says
-    nothing to a landed lander.
-
-    Args:
-        uplink: The :class:`Uplink` to the autorestart payload's vehicle.
-    """
-
-    def __init__(self, uplink):
-        self._uplink = uplink
-
-    def disable(self):
-        """Keeps the lander down after a crash, until it is restarted.
-
-        Returns:
-            The command's arguments.
-        """
-        return self._uplink.send(0)
-
-    def enable(self):
-        """Lets the lander start again by itself after a crash, once its
-        pause has run, and after a landing, once its pad wait has.
-
-        Returns:
-            The command's arguments.
-        """
-        return self._uplink.send(1)
-
-
 def room_of(path):
     """The width tcs-sim's window left for this program's, as it wrote it.
 
@@ -1286,7 +1251,7 @@ def watch_and_print(readings, seconds, every, stopped):
 
 
 def run_the_window(readings, lander, seed, delay, stopped, restarter,
-                   autorestart, room=None):
+                   room=None):
     """The window, and the loop that reads Yamcs for it.
 
     At the top left of the display, as no wider than ``room``, where it is
@@ -1302,8 +1267,6 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
                      this window is closed then too, which ends the run.
         restarter:   The :class:`Restarter` its Restart button sends by, or
                      ``None``, for no button, where no vehicle takes one.
-        autorestart: The :class:`Autorestart` its two autorestart buttons
-                     send by, or ``None``, for none.
         room:        The width it may take, in logical pixels, or ``None``
                      for its own.
 
@@ -1466,11 +1429,6 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
     if restarter is not None:
         ttk.Button(buttons, text="Restart",
                    command=restarter.restart).pack(side="left")
-    if autorestart is not None:
-        for text, command in (("Disable Autorestart", autorestart.disable),
-                              ("Enable Autorestart", autorestart.enable)):
-            ttk.Button(buttons, text=text, command=command).pack(
-                side="left", padx=(between // 2, 0))
 
     # The joystick, as it was sent down, as tcs-sim's draws it: the square,
     # its dead zone, and rectangles extending from its left, right and top,
@@ -1729,16 +1687,9 @@ def main(argv):
         readings = Readings(list(zip(yamcses, crafts)), sky)
         restarter = (Restarter(uplinks["restart"]) if "restart" in uplinks
                      else None)
-        autorestart = (Autorestart(uplinks["autorestart"])
-                       if "autorestart" in uplinks else None)
-        # On from the start, so that a lander nobody flies starts again by
-        # itself after each crash; the window's buttons change it after.
-        if autorestart is not None:
-            autorestart.enable()
         if options.seconds is None:
             return run_the_window(readings, lander, seed, options.delay,
-                                  stopped, restarter, autorestart,
-                                  room_of(room_file))
+                                  stopped, restarter, room_of(room_file))
         return watch_and_print(readings, options.seconds, options.every,
                                stopped)
     except (RuntimeError, ValueError, OSError) as why:

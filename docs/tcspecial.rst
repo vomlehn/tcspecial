@@ -2764,11 +2764,8 @@ Yamcs, 1.3 s later.
 
 The MOC's window also commands the lander. Its Restart button sends a
 command up through ``lander-b``'s gateway to the payload ``restart``,
-which starts the lander again; Disable Autorestart and Enable Autorestart
-send one up through ``lander-a``'s to the payload ``autorestart``. A
-landed lander stands on the pad until thrust greater than its weight
-lifts it off again. Until autorestart is enabled, a crashed lander stays
-down, and a landed one on the pad, until Restart; enabled, it starts
+which starts the lander again. A landed lander stands on the pad until
+thrust greater than its weight lifts it off again. The lander starts
 again by itself, with a full tank, after a pause following a crash, or
 after 10 s on the pad following a landing, and tcs-sim's Autoland flies
 it.
@@ -2781,8 +2778,9 @@ as they arrive, a packet lost leaving it thinner until a later pass. Once
 the ground has every star it sends a quench up through ``lander-a``'s
 second gateway, ``gateway_sky``, to the payload ``sky_quench``, and the
 stars stop. The quench has a gateway of its own because a gateway passes
-what the ground sends to every payload it feeds, and ``autorestart``
-would take a quench for an order. The design gives the stars' records in
+what the ground sends to every payload it feeds, and ``autorestart``,
+which ``lander-a``'s first gateway once fed, would have taken a quench
+for an order. The design gives the stars' records in
 "The sky, sent down".
 
 Closing either window stops everything:
@@ -2797,9 +2795,8 @@ or, installed, ``tcsx lander``.
    :alt: lander-a, the X axis: payloads reading the lander's X position,
          velocity and acceleration, its fuel and the joystick's X, each
          made a value and sent to the Yamcs gateway, with the stars of the
-         sky; the joystick's X also drives the X thruster. The gateway
-         passes what the ground sends to the autorestart payload, and a
-         second gateway, gateway_sky, passes the quench to sky_quench.
+         sky; the joystick's X also drives the X thruster. A second
+         gateway, gateway_sky, passes the quench to sky_quench.
    :width: 100%
 
    ``lander-a``, the X axis.

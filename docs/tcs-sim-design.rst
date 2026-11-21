@@ -665,10 +665,9 @@ Requirement
     where it looks again. At that moment it has landed if all of it is over
     the pad, it meets nothing but the pad, and it is going no faster than
     ``landing_speed`` down and ``landing_drift`` sideways; landed, it is set
-    down on the pad. Anything else is a crash. With autorestart, crashed, it
-    stays still for ``pause``, and landed, unless it lifts off, for
-    ``pad_wait``, and then starts again where it started, at rest, with a
-    full tank.
+    down on the pad. Anything else is a crash. Crashed, it stays still for
+    ``pause``, and landed, unless it lifts off, for ``pad_wait``, and then
+    starts again where it started, at rest, with a full tank.
 
 Requirement
     A ``joystick_3_4``, the three-armed joystick, takes ``set_x`` and

@@ -21,9 +21,7 @@
 //!   its gateways, and sends up what the window's buttons ask for and the
 //!   quench the sky asks for once it is whole ([`station`]), all of it held
 //!   `--delay` seconds each way, 1.3 by default, the time light takes
-//!   between the Moon and the Earth; and it turns the lander's autorestart
-//!   on as soon as it can, so that a lander nobody flies starts again by
-//!   itself after each crash;
+//!   between the Moon and the Earth;
 //! * it shows what has come down in a window: the landscape and the lander
 //!   where it was said to be, drawn as tcs-sim draws it, the values, the
 //!   fuel, where the joystick was held, and whether it has landed or

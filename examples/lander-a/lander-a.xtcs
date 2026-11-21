@@ -49,7 +49,6 @@
                 <address>127.0.0.1:19600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:19700</ground_base>
-                <moc-out>autorestart.gateway</moc-out>
                 <world-in>sky</world-in>
                 <world-in>to_accel_x</world-in>
                 <world-in>to_fuel</world-in>
@@ -122,11 +121,6 @@
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_accel_x.accel_x</world-out>
-            </payload>
-            <payload name="autorestart">
-                <address>127.0.0.1:19807</address>
-                <protocol>udp</protocol>
-                <moc-in>gateway</moc-in>
             </payload>
             <payload name="fuel">
                 <address>127.0.0.1:19804</address>

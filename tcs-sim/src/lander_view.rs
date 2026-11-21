@@ -49,11 +49,6 @@ pub const CRASHED: usize = 8;
 pub const ACCELERATION_X: usize = 9;
 pub const ACCELERATION_Y: usize = 10;
 
-/// The lander's autorestart input's place, among the same: past the
-/// outputs a ground station's window draws from, so read only where the
-/// world's own terminals are, in tcs-sim's.
-const AUTORESTART: usize = 12;
-
 /// The joystick's inputs' places, in
 /// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
 const SET_X: usize = 0;
@@ -1393,14 +1388,14 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             let refuelled = out[FUEL] > had_fuel.replace(out[FUEL]) + 1e-9;
             let after_crash = before == Stopped::Crashed && now != before;
             if after_crash || refuelled {
-                // Started again. With autorestart on, after a crash or from
-                // the pad, the autopilot flies the next flight, so that a
-                // booth nobody is at flies itself; taking hold of the
-                // joystick hands it back.
+                // Started again. After a crash or from the pad, which is how
+                // the lander starts again by itself, the autopilot flies the
+                // next flight, so that a booth nobody is at flies itself;
+                // taking hold of the joystick hands it back.
                 let idle = pilot.borrow().is_none()
                     && !holding.get()
                     && scene.joystick_3_4.is_some();
-                if flown(before, idle, out[AUTORESTART] > 0.5) {
+                if flown(before, idle) {
                     *pilot.borrow_mut() = Some(Autopilot::default());
                     ui.global::<LanderScene>().set_autoland(true);
                 }
@@ -1431,22 +1426,21 @@ enum Stopped {
     Flying,
 }
 
-/// Says whether the autopilot flies the lander as it starts again: with
-/// autorestart on, after a crash or from the pad, which is how autorestart
-/// starts it, and only while nobody flies it.
+/// Says whether the autopilot flies the lander as it starts again: after a
+/// crash or from the pad, which is how the lander starts again by itself,
+/// and only while nobody flies it.
 ///
 /// # Arguments
 ///
-/// * `before`      - How it was before it started again.
-/// * `idle`        - Whether nobody flies it now, neither the autopilot nor
-///                   a hand on the joystick, and there is a joystick.
-/// * `autorestart` - Whether the lander's autorestart is on.
+/// * `before` - How it was before it started again.
+/// * `idle`   - Whether nobody flies it now, neither the autopilot nor a
+///              hand on the joystick, and there is a joystick.
 ///
 /// # Returns
 ///
 /// Whether the autopilot takes it.
-fn flown(before: Stopped, idle: bool, autorestart: bool) -> bool {
-    matches!(before, Stopped::Crashed | Stopped::Pad) && idle && autorestart
+fn flown(before: Stopped, idle: bool) -> bool {
+    matches!(before, Stopped::Crashed | Stopped::Pad) && idle
 }
 
 /// How far round the joystick a touch is the joystick's, in logical
@@ -1506,12 +1500,11 @@ fn regions(ui: &MainWindow) {
 /// Has the autopilot, while it flies the lander, hold the joystick where it
 /// wants it; and lets go, and stops it, once the lander has landed, so that
 /// whoever is there can fly it off the pad and land again while the lander
-/// waits there; with autorestart on, the lander starts again once its pad
-/// wait has run, and the autopilot flies that flight: see [`on_start`].
-/// While
-/// the lander lies crashed it lets go and waits, and flies again from the
-/// start once the lander is restarted -- by Restart, or by itself with
-/// autorestart on -- so that Autoland pressed during a crash is not lost.
+/// waits there; the lander starts again once its pad wait has run, and the
+/// autopilot flies that flight: see [`flown`]. While the lander lies
+/// crashed it lets go and waits, and flies again from the start once the
+/// lander starts again -- by Restart, or by itself after its pause -- so
+/// that Autoland pressed during a crash is not lost.
 /// Nothing while the world is paused.
 ///
 /// # Arguments
@@ -1882,26 +1875,17 @@ pub(crate) mod tests {
         assert_eq!(said(CRASHED_SAID, true), CRASHED_SAID);
     }
 
-    /// The autorestart input's place here is the type's.
+    /// A lander starting again after a crash or from the pad is flown by
+    /// the autopilot; while someone flies it, or after a restart in flight,
+    /// it is not.
     #[test]
-    fn the_input_is_the_types() {
-        let terminals = tcsprotocol::node::physics::lander::TERMINALS;
-        assert_eq!(terminals[AUTORESTART].name, "autorestart");
-    }
-
-    /// With autorestart on, a lander starting again after a crash or from
-    /// the pad is flown by the autopilot; with autorestart off, while
-    /// someone flies it, or after a restart in flight, it is not.
-    #[test]
-    fn autorestart_is_flown_by_the_autopilot() {
+    fn a_restart_by_itself_is_flown_by_the_autopilot() {
         use Stopped::{Crashed, Flying, Pad};
-        assert!(flown(Crashed, true, true));
-        assert!(flown(Pad, true, true));
-        assert!(!flown(Crashed, true, false));
-        assert!(!flown(Pad, true, false));
-        assert!(!flown(Crashed, false, true));
-        assert!(!flown(Pad, false, true));
-        assert!(!flown(Flying, true, true));
+        assert!(flown(Crashed, true));
+        assert!(flown(Pad, true));
+        assert!(!flown(Crashed, false));
+        assert!(!flown(Pad, false));
+        assert!(!flown(Flying, true));
     }
 
     /// A paused world's joystick still moves when it is driven by hand, so

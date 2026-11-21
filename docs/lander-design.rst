@@ -147,10 +147,10 @@ A landing does not end the flight. The landed lander stands still on the
 pad, with a smiling face drawn over it, burning fuel if its throttles are
 open, until thrust up greater than its weight lifts it off; then it flies
 on, the face gone, and may land again or crash. After a crash the lander
-stays down until Restart, or, with autorestart enabled, until a pause has
-run, and then starts again at the upper left with a full tank; with
-autorestart enabled, a landed lander that stays on the pad for its pad
-wait, 10 s, starts again the same way, Autoland flying it.
+stays down until Restart or until a pause has run, and then starts again
+at the upper left with a full tank; a landed lander that stays on the pad
+for its pad wait, 10 s, starts again the same way. Autoland flies each
+flight that starts by itself.
 
 The vehicles
 ============
@@ -240,15 +240,11 @@ second and shows:
 * a Restart button, which sends a command up through lander-b's gateway to
   a simulated payload, ``restart``, joined to the lander's ``restart``
   input: each press a new count, the lander starting again at each, a light
-  time after the press;
-* Disable Autorestart and Enable Autorestart, which send a command up
-  through lander-a's gateway to a simulated payload, ``autorestart``,
-  joined to the lander's ``autorestart`` input. Both ground stations
-  enable it as soon as the vehicles are connected: enabled, a lander that
-  has crashed starts again by itself after its pause, and one that has
-  landed after its pad wait unless it lifts off first, Autoland flying
-  each such flight; disabled, it stays down, or on the pad, until it is
-  restarted.
+  time after the press.
+
+The lander always starts again by itself: after a crash once its pause
+has run, and after a landing once its pad wait has, unless it lifts off
+first. Nothing on the ground turns that off.
 
 The sky, sent down
 ------------------
@@ -282,8 +278,8 @@ While that input holds the sky's generation, nothing is sent. A quench
 lost on the way is answered again by the next packet, so the sending
 stops a round trip after the sky is whole. The quench has a gateway of
 its own because a gateway passes what the ground sends to every payload
-it feeds, and lander-a's first feeds ``autorestart``, which would read a
-quench as an order. A sky made again would have a new generation, sent
+it feeds, and lander-a's first gateway once fed ``autorestart``, which
+would have read a quench as an order. A sky made again would have a new generation, sent
 afresh and gathered afresh; tcs-sim makes its sky once a run, as
 generation 1.
 
@@ -359,9 +355,13 @@ In this order, each stage checked before the next:
      display's bottom line.
 
 8. **Flying on after a landing.** A landed lander stands on the pad until
-   thrust greater than its weight lifts it off. With autorestart, it
-   starts again after its pad wait, 10 s, longer than a crash's pause, so
+   thrust greater than its weight lifts it off. With autorestart, then
+   switched by the ground, it starts again after its pad wait, 10 s, longer than a crash's pause, so
    that whoever is at the joystick has time to lift off and land again,
    Autoland staying off; a lift-off ends the wait, and the next landing
    begins a new one. Every flight autorestart starts is flown by
    Autoland, so that a booth nobody is at keeps flying.
+9. **Always starting again.** Disable and Enable Autorestart went, from
+   both ground stations, with the ``autorestart`` payload and gateway on
+   ``lander-a`` and the lander's ``autorestart`` input: the lander now
+   always starts again by itself, after its pause or its pad wait.

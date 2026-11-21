@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1110" height="944" viewBox="0 0 1110 944" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1110" height="790" viewBox="0 0 1110 790" role="img" aria-labelledby="title desc">
   <title id="title">The lander example: lander-a, the X axis</title>
-  <desc id="desc">lander-a, one of the lander example's two tcspecials, flying the X axis. Each payload at the left is a UDP socket tcs-sim simulates, joined to the lander or the joystick in tcs-sim's world; each reading is made a value by a to_value node and sent to the gateway, which takes it down through Yamcs. to_joystick_3_4_x also drives thruster_x, the dashed line, so the pilot's joystick is the thrust on the X axis. The gateway passes what the ground sends it to autorestart, the dashed line from it, which lets the lander start again by itself after a crash, or keeps it down until it is restarted. sky sends the lander's stars down, a few to a packet, round and round; gateway_sky passes the ground's quench to sky_quench, the dashed line from it, which stops them once the ground has every one.</desc>
+  <desc id="desc">lander-a, one of the lander example's two tcspecials, flying the X axis. Each payload at the left is a UDP socket tcs-sim simulates, joined to the lander or the joystick in tcs-sim's world; each reading is made a value by a to_value node and sent to the gateway, which takes it down through Yamcs. to_joystick_3_4_x also drives thruster_x, the dashed line, so the pilot's joystick is the thrust on the X axis. sky sends the lander's stars down, a few to a packet, round and round; gateway_sky passes the ground's quench to sky_quench, the dashed line from it, which stops them once the ground has every one.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -17,7 +17,7 @@
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#374151"/>
     </marker>
   </defs>
-  <rect x="0" y="0" width="1110" height="944" fill="#ffffff"/>
+  <rect x="0" y="0" width="1110" height="790" fill="#ffffff"/>
   <text class="heading" x="40" y="40">PAYLOADS, SIMULATED BY TCS-SIM</text>
   <text class="heading" x="420" y="40">VEHICLE: lander-a</text>
   <text class="heading" x="820" y="40">GATEWAY, TO YAMCS</text>
@@ -27,37 +27,33 @@
   <text class="kind" x="52" y="130">payload, network</text>
   <text class="detail" x="52" y="146">127.0.0.1:19803</text>
   <rect class="payload" x="40" y="176" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="198">autorestart</text>
+  <text class="name" x="52" y="198">fuel</text>
   <text class="kind" x="52" y="216">payload, network</text>
-  <text class="detail" x="52" y="232">127.0.0.1:19807</text>
+  <text class="detail" x="52" y="232">127.0.0.1:19804</text>
   <rect class="payload" x="40" y="262" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="284">fuel</text>
+  <text class="name" x="52" y="284">joystick_3_4_x</text>
   <text class="kind" x="52" y="302">payload, network</text>
-  <text class="detail" x="52" y="318">127.0.0.1:19804</text>
+  <text class="detail" x="52" y="318">127.0.0.1:19805</text>
   <rect class="payload" x="40" y="348" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="370">joystick_3_4_x</text>
+  <text class="name" x="52" y="370">sky</text>
   <text class="kind" x="52" y="388">payload, network</text>
-  <text class="detail" x="52" y="404">127.0.0.1:19805</text>
+  <text class="detail" x="52" y="404">127.0.0.1:19808</text>
   <rect class="payload" x="40" y="434" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="456">sky</text>
+  <text class="name" x="52" y="456">sky_quench</text>
   <text class="kind" x="52" y="474">payload, network</text>
-  <text class="detail" x="52" y="490">127.0.0.1:19808</text>
+  <text class="detail" x="52" y="490">127.0.0.1:19809</text>
   <rect class="payload" x="40" y="520" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="542">sky_quench</text>
+  <text class="name" x="52" y="542">thruster_x</text>
   <text class="kind" x="52" y="560">payload, network</text>
-  <text class="detail" x="52" y="576">127.0.0.1:19809</text>
+  <text class="detail" x="52" y="576">127.0.0.1:19806</text>
   <rect class="payload" x="40" y="606" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="628">thruster_x</text>
+  <text class="name" x="52" y="628">velocity_x</text>
   <text class="kind" x="52" y="646">payload, network</text>
-  <text class="detail" x="52" y="662">127.0.0.1:19806</text>
+  <text class="detail" x="52" y="662">127.0.0.1:19802</text>
   <rect class="payload" x="40" y="692" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="714">velocity_x</text>
+  <text class="name" x="52" y="714">x</text>
   <text class="kind" x="52" y="732">payload, network</text>
-  <text class="detail" x="52" y="748">127.0.0.1:19802</text>
-  <rect class="payload" x="40" y="778" width="250" height="64" rx="8"/>
-  <text class="name" x="52" y="800">x</text>
-  <text class="kind" x="52" y="818">payload, network</text>
-  <text class="detail" x="52" y="834">127.0.0.1:19801</text>
+  <text class="detail" x="52" y="748">127.0.0.1:19801</text>
   <rect class="vehicle" x="420" y="90" width="250" height="64" rx="8"/>
   <text class="name" x="432" y="112">to_accel_x</text>
   <text class="kind" x="432" y="130">compute</text>
@@ -89,15 +85,14 @@
   <line class="link" x1="670" y1="122" x2="820" y2="466" marker-end="url(#arrow)"/>
   <line class="link" x1="290" y1="122" x2="420" y2="122" marker-end="url(#arrow)"/>
   <line class="link" x1="670" y1="208" x2="820" y2="466" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="294" x2="420" y2="208" marker-end="url(#arrow)"/>
-  <line class="link" x1="420" y1="294" x2="290" y2="638" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
+  <line class="link" x1="290" y1="208" x2="420" y2="208" marker-end="url(#arrow)"/>
+  <line class="link" x1="420" y1="294" x2="290" y2="552" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
   <line class="link" x1="670" y1="294" x2="820" y2="466" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="380" x2="420" y2="294" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="294" x2="420" y2="294" marker-end="url(#arrow)"/>
   <line class="link" x1="670" y1="380" x2="820" y2="466" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="724" x2="420" y2="380" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="638" x2="420" y2="380" marker-end="url(#arrow)"/>
   <line class="link" x1="670" y1="466" x2="820" y2="466" marker-end="url(#arrow)"/>
-  <line class="link" x1="290" y1="810" x2="420" y2="466" marker-end="url(#arrow)"/>
-  <line class="link" x1="820" y1="466" x2="290" y2="208" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
-  <line class="link" x1="290" y1="466" x2="820" y2="466" marker-end="url(#arrow)"/>
-  <line class="link" x1="820" y1="638" x2="290" y2="552" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
+  <line class="link" x1="290" y1="724" x2="420" y2="466" marker-end="url(#arrow)"/>
+  <line class="link" x1="290" y1="380" x2="820" y2="466" marker-end="url(#arrow)"/>
+  <line class="link" x1="820" y1="638" x2="290" y2="466" marker-end="url(#arrow)" stroke-dasharray="7 5"/>
 </svg>

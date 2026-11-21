@@ -28,8 +28,6 @@ export global Said {
     in-out property <bool> heard: false;
     // Restart the lander, wherever it is.
     callback restart-clicked();
-    // Have the lander start again by itself after a crash, or not.
-    callback autorestart-clicked(bool);
 }
 
 export component StationWindow inherits Window {
@@ -148,14 +146,6 @@ export component StationWindow inherits Window {
             Button {
                 text: "Restart";
                 clicked => { Said.restart-clicked(); }
-            }
-            Button {
-                text: "Disable Autorestart";
-                clicked => { Said.autorestart-clicked(false); }
-            }
-            Button {
-                text: "Enable Autorestart";
-                clicked => { Said.autorestart-clicked(true); }
             }
         }
     }

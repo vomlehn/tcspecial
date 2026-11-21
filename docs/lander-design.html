@@ -517,10 +517,10 @@ display's bottom line, which goes on indefinitely to the left and right.</p>
 pad, with a smiling face drawn over it, burning fuel if its throttles are
 open, until thrust up greater than its weight lifts it off; then it flies
 on, the face gone, and may land again or crash. After a crash the lander
-stays down until Restart, or, with autorestart enabled, until a pause has
-run, and then starts again at the upper left with a full tank; with
-autorestart enabled, a landed lander that stays on the pad for its pad
-wait, 10 s, starts again the same way, Autoland flying it.</p>
+stays down until Restart or until a pause has run, and then starts again
+at the upper left with a full tank; a landed lander that stays on the pad
+for its pad wait, 10 s, starts again the same way. Autoland flies each
+flight that starts by itself.</p>
 </div>
 </div>
 <div class="section" id="the-vehicles">
@@ -604,16 +604,11 @@ sent down say so;</li>
 <li>a Restart button, which sends a command up through lander-b's gateway to
 a simulated payload, <tt class="docutils literal">restart</tt>, joined to the lander's <tt class="docutils literal">restart</tt>
 input: each press a new count, the lander starting again at each, a light
-time after the press;</li>
-<li>Disable Autorestart and Enable Autorestart, which send a command up
-through lander-a's gateway to a simulated payload, <tt class="docutils literal">autorestart</tt>,
-joined to the lander's <tt class="docutils literal">autorestart</tt> input. Both ground stations
-enable it as soon as the vehicles are connected: enabled, a lander that
-has crashed starts again by itself after its pause, and one that has
-landed after its pad wait unless it lifts off first, Autoland flying
-each such flight; disabled, it stays down, or on the pad, until it is
-restarted.</li>
+time after the press.</li>
 </ul>
+<p>The lander always starts again by itself: after a crash once its pause
+has run, and after a landing once its pad wait has, unless it lifts off
+first. Nothing on the ground turns that off.</p>
 </div>
 <div class="section" id="the-sky-sent-down">
 <h2><a class="toc-backref" href="#toc-entry-16">The sky, sent down</a></h2>
@@ -645,8 +640,8 @@ While that input holds the sky's generation, nothing is sent. A quench
 lost on the way is answered again by the next packet, so the sending
 stops a round trip after the sky is whole. The quench has a gateway of
 its own because a gateway passes what the ground sends to every payload
-it feeds, and lander-a's first feeds <tt class="docutils literal">autorestart</tt>, which would read a
-quench as an order. A sky made again would have a new generation, sent
+it feeds, and lander-a's first gateway once fed <tt class="docutils literal">autorestart</tt>, which
+would have read a quench as an order. A sky made again would have a new generation, sent
 afresh and gathered afresh; tcs-sim makes its sky once a run, as
 generation 1.</p>
 </div>
@@ -722,12 +717,16 @@ display's bottom line.</li>
 </ul>
 </li>
 <li><strong>Flying on after a landing.</strong> A landed lander stands on the pad until
-thrust greater than its weight lifts it off. With autorestart, it
-starts again after its pad wait, 10 s, longer than a crash's pause, so
+thrust greater than its weight lifts it off. With autorestart, then
+switched by the ground, it starts again after its pad wait, 10 s, longer than a crash's pause, so
 that whoever is at the joystick has time to lift off and land again,
 Autoland staying off; a lift-off ends the wait, and the next landing
 begins a new one. Every flight autorestart starts is flown by
 Autoland, so that a booth nobody is at keeps flying.</li>
+<li><strong>Always starting again.</strong> Disable and Enable Autorestart went, from
+both ground stations, with the <tt class="docutils literal">autorestart</tt> payload and gateway on
+<tt class="docutils literal"><span class="pre">lander-a</span></tt> and the lander's <tt class="docutils literal">autorestart</tt> input: the lander now
+always starts again by itself, after its pause or its pad wait.</li>
 </ol>
 </div>
 </div>

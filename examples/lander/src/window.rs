@@ -25,9 +25,6 @@ const REFRESH: Duration = Duration::from_millis(16);
 /// How often, at most, the sky is drawn again as its stars come.
 const SKY_EVERY: Duration = Duration::from_millis(500);
 
-/// The vehicle whose gateway passes autorestart on to the lander.
-const AUTORESTART_VIA: &str = "lander-a";
-
 /// The station's vehicles' names, in the order the window says them.
 const VEHICLES: [&str; 2] = ["lander-a", "lander-b"];
 
@@ -50,9 +47,6 @@ struct View {
     sky_drawn: Cell<Option<Instant>>,
     /// The last restart sent, which each counts on from.
     restarts: Cell<u8>,
-    /// Whether autorestart has been sent up, which the station does once,
-    /// as soon as the vehicle that passes it on is connected.
-    autorestarting: Cell<bool>,
 }
 
 /// Opens the window, on the thread windows are made on, and runs it until
@@ -96,7 +90,6 @@ pub fn show(
         opened: Instant::now(),
         sky_drawn: Cell::new(None),
         restarts: Cell::new(0),
-        autorestarting: Cell::new(false),
     });
     {
         let view = Rc::clone(&view);
@@ -107,12 +100,6 @@ pub fn show(
             let count = view.restarts.get() % 255 + 1;
             view.restarts.set(count);
             view.station.send("restart", &[count]);
-        });
-    }
-    {
-        let view = Rc::clone(&view);
-        said.on_autorestart_clicked(move |on| {
-            view.station.send("autorestart", &[u8::from(on)]);
         });
     }
     tick(&ui, &view);
@@ -194,18 +181,6 @@ fn tick(ui: &StationWindow, view: &View) {
     let said = ui.global::<crate::Said>();
     said.set_heard(readings.number("to_fuel").is_some());
     let linked = view.station.linked();
-    // Autorestart on from the start, so that a lander nobody flies starts
-    // again by itself after each crash: sent once the vehicle that passes
-    // it on is connected, which takes nothing up before.
-    if !view.autorestarting.get()
-        && linked
-            .said
-            .get(AUTORESTART_VIA)
-            .is_some_and(|w| w == "connected")
-    {
-        view.autorestarting.set(true);
-        view.station.send("autorestart", &[1]);
-    }
     let links: Vec<String> = VEHICLES
         .iter()
         .map(|name| {

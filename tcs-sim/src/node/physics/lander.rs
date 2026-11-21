@@ -60,9 +60,8 @@ const CRASHED: usize = 8;
 const ACCELERATION_X: usize = 9;
 const ACCELERATION_Y: usize = 10;
 const RESTART: usize = 11;
-const AUTORESTART: usize = 12;
-const SKY: usize = 13;
-const SKY_QUENCH: usize = 14;
+const SKY: usize = 12;
+const SKY_QUENCH: usize = 13;
 
 /// The generation of the lander's sky: made once, as it is started, and
 /// never made again in a run, so always the first.
@@ -124,7 +123,7 @@ enum Flight {
     Flying,
     /// Standing on the pad, landed since a moment: still, its engines
     /// burning as the throttles say, until thrust greater than its weight
-    /// lifts it off, or, with autorestart, its pad wait has run.
+    /// lifts it off, or its pad wait has run.
     Landed {
         /// When it landed, in simulated seconds.
         since: f64,
@@ -165,10 +164,6 @@ pub struct Lander {
     /// What its restart input was last held at: a new value other than
     /// nought starts it again.
     restart: f64,
-    /// Whether it starts again by itself once it has been crashed for its
-    /// pause, or landed for its pad wait: its autorestart input asserted.
-    /// Otherwise it stays down, or on the pad, until it is restarted.
-    autorestart: bool,
     /// Its sky, as the records its `sky` output sends.
     sky: Vec<[u8; tcsprotocol::node::physics::lander::STAR_RECORD]>,
     /// The generation of its sky the ground last said it has whole: while
@@ -263,7 +258,6 @@ impl Lander {
             flight: Flight::Flying,
             throttle: (0.0, 0.0),
             restart: 0.0,
-            autorestart: false,
             sky: super::sky::records(&figures, SKY_GENERATION),
             sky_quench: 0.0,
             figures,
@@ -524,7 +518,6 @@ impl Component for Lander {
             self.start_again();
         }
         self.restart = restart;
-        self.autorestart = inputs[AUTORESTART] > 0.5;
         self.sky_quench = inputs[SKY_QUENCH];
     }
 
@@ -581,18 +574,14 @@ impl Component for Lander {
 
     fn next_event(&self, now: f64) -> Option<f64> {
         match self.flight {
-            // Crashed with no autorestart, nothing happens until it is
-            // restarted or its autorestart is asserted.
-            Flight::Crashed { .. } if !self.autorestart => None,
             // On the pad, it lifts off now if its thrust is greater than its
-            // weight, and otherwise stands until its throttles change, or,
-            // with autorestart, until its pad wait has run.
+            // weight, and otherwise stands until its throttles change or its
+            // pad wait has run.
             Flight::Landed { since } => {
                 if self.lifts() {
                     Some(now)
                 } else {
-                    let wait = self.figures.pad_wait.as_secs_f64();
-                    self.autorestart.then_some(since + wait)
+                    Some(since + self.figures.pad_wait.as_secs_f64())
                 }
             }
             _ => Some(self.next(now).0),
@@ -602,9 +591,7 @@ impl Component for Lander {
     fn event(&mut self, at: f64) {
         match self.flight {
             Flight::Crashed { since }
-                if self.autorestart
-                    && at
-                        >= since + self.figures.pause.as_secs_f64() - 1e-9 =>
+                if at >= since + self.figures.pause.as_secs_f64() - 1e-9 =>
             {
                 self.start_again();
             }
@@ -612,8 +599,8 @@ impl Component for Lander {
             Flight::Landed { since } => {
                 if self.lifts() {
                     self.flight = Flight::Flying;
-                } else if self.autorestart
-                    && at >= since + self.figures.pad_wait.as_secs_f64() - 1e-9
+                } else if at
+                    >= since + self.figures.pad_wait.as_secs_f64() - 1e-9
                 {
                     self.start_again();
                 }
@@ -696,40 +683,29 @@ mod tests {
     /// The inputs.
     fn held(x: f64, y: f64, restart: f64) -> Vec<f64> {
         let mut inputs = vec![0.0; TERMINALS.len()];
-        inputs[AUTORESTART] = 0.0;
         inputs[THROTTLE_X] = x;
         inputs[THROTTLE_Y] = y;
         inputs[RESTART] = restart;
         inputs
     }
 
-    /// With no autorestart, the default, a lander that has crashed stays
-    /// down past its pause, and foresees nothing; given autorestart, it
-    /// starts again at once, its pause long run; and a restart starts it
-    /// again whether autorestart is given or not.
+    /// A lander that has crashed stays down for its pause, and then starts
+    /// again by itself; a restart starts it again at once, pause or not.
     #[test]
-    fn without_autorestart_it_stays_down() {
+    fn a_crash_starts_again_after_its_pause() {
         let mut l = Lander::new(figures());
         let mut inputs = held(0.0, 0.0, 0.0);
         l.hold(&inputs);
         l.at = (100.0, 60.0);
         l.flight = Flight::Crashed { since: 1.0 };
-        assert_eq!(l.next_event(2.0), None);
-        l.event(100.0);
+        assert_eq!(l.next_event(2.0), Some(4.0));
+        l.event(3.9);
         assert!(matches!(l.flight, Flight::Crashed { .. }));
-
-        // Given autorestart, long after the pause: it starts again at the
-        // next event, which is now.
-        inputs[AUTORESTART] = 1.0;
-        l.hold(&inputs);
-        let at = l.next_event(100.0).expect("it starts again");
-        assert!(at <= 100.0, "{at}");
-        l.event(100.0);
+        l.event(4.0);
         assert_eq!(l.flight, Flight::Flying);
+        assert_eq!(l.at, (500.0, 300.0));
 
-        // Without autorestart and crashed again, a restart still starts it.
-        inputs[AUTORESTART] = 0.0;
-        l.hold(&inputs);
+        // Crashed again, a restart starts it at once.
         l.flight = Flight::Crashed { since: 200.0 };
         inputs[RESTART] = 7.0;
         l.hold(&inputs);
@@ -845,7 +821,6 @@ mod tests {
         assert_eq!(names[ACCELERATION_X], "acceleration_x");
         assert_eq!(names[ACCELERATION_Y], "acceleration_y");
         assert_eq!(names[RESTART], "restart");
-        assert_eq!(names[AUTORESTART], "autorestart");
     }
 
     /// Thrust accelerates it at its force over its mass, more as the tank
@@ -884,31 +859,22 @@ mod tests {
         assert_eq!(l.flow(), 0.0);
     }
 
-    /// Falling slowly onto the pad it lands, and stands there, with no
-    /// autorestart, foreseeing nothing; given autorestart, it starts again
-    /// once it has stood there for its pad wait, and not before.
+    /// Falling slowly onto the pad it lands, and stands there for its pad
+    /// wait, and then starts again by itself, and not before.
     #[test]
     fn a_slow_touchdown_on_the_pad_lands() {
         let mut f = figures();
         f.start = (500.0, 62.0);
         let mut l = Lander::new(f);
-        let mut inputs = held(0.0, 0.0, 0.0);
-        l.hold(&inputs);
+        l.hold(&held(0.0, 0.0, 0.0));
         run(&mut l, 0.0, 2.0);
         assert_eq!(l.output(LANDED), 1.0);
         assert_eq!(l.output(CRASHED), 0.0);
         assert_eq!(l.at.1, 60.0);
-        assert_eq!(l.next_event(2.0), None);
-        run(&mut l, 2.0, 30.0);
-        assert!(matches!(l.flight, Flight::Landed { .. }));
-        assert_eq!(l.at, (500.0, 60.0));
         assert_eq!(l.output(FUEL), 1.0);
 
-        // Landed again at 40 s, given autorestart: on the pad until 50 s,
-        // then started again.
+        // Landed again at 40 s: on the pad until 50 s, then started again.
         l.flight = Flight::Landed { since: 40.0 };
-        inputs[AUTORESTART] = 1.0;
-        l.hold(&inputs);
         assert_eq!(l.next_event(41.0), Some(50.0));
         run(&mut l, 41.0, 49.9);
         assert_eq!(l.output(LANDED), 1.0);
@@ -917,16 +883,14 @@ mod tests {
         assert_eq!(l.at, (500.0, 62.0));
     }
 
-    /// Given autorestart, a lander that lifts off before its pad wait has
-    /// run flies on, and is not started again; landing again begins a new
-    /// wait.
+    /// A lander that lifts off before its pad wait has run flies on, and is
+    /// not started again; landing again begins a new wait.
     #[test]
     fn lifting_off_ends_the_pad_wait() {
         let mut l = Lander::new(figures());
         l.at = (500.0, 60.0);
         l.flight = Flight::Landed { since: 0.0 };
         let mut inputs = held(0.0, 1.0, 0.0);
-        inputs[AUTORESTART] = 1.0;
         l.hold(&inputs);
         assert_eq!(l.next_event(5.0), Some(5.0));
         l.event(5.0);
@@ -953,7 +917,8 @@ mod tests {
         l.flight = Flight::Landed { since: 0.0 };
         // Half of 24 kN is less than 8000 kg's weight, 12.96 kN.
         l.hold(&held(0.0, 0.5, 0.0));
-        assert_eq!(l.next_event(1.0), None);
+        // Not lifting, its next event is the end of its pad wait.
+        assert_eq!(l.next_event(1.0), Some(10.0));
         l.advance(1.0, 2.0);
         assert_eq!(l.flight, Flight::Landed { since: 0.0 });
         assert_eq!(l.at, (500.0, 60.0));

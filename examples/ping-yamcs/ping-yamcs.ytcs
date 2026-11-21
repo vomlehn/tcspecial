@@ -16,11 +16,11 @@ tcspecial:
     default_interval: "5 s"
     recv: "127.0.0.1:16510"
     reset_interval: "1 s"
-    send: "0.0.0.0:16500"
+    send: "127.0.0.2:16500"
   gateway: "yamcs"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/ping-yamcs"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   # Yamcs sends QUERY_THREADS, on this link, from a port the system
@@ -28,7 +28,7 @@ tcspecial:
   # of this host -- port 0 -- and each answer goes back to the port its
   # command came from.
   payload_command:
-    dest_base: "0.0.0.0:16300"
+    dest_base: "127.0.0.2:16300"
     source_base: "127.0.0.1:0"
   # A payload nothing in the drawing touches would report to dest_base plus
   # its device id, as telemetry of APID apid_base plus that device id. This
@@ -37,7 +37,7 @@ tcspecial:
   payload_telemetry:
     apid_base: "0x300"
     dest_base: "127.0.0.1:16410"
-    source_base: "0.0.0.0:16400"
+    source_base: "127.0.0.2:16400"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
@@ -49,7 +49,7 @@ tcspecial:
   # came from.
   tcs_cmd:
     apid: "0x101"
-    recv: "0.0.0.0:16200"
+    recv: "127.0.0.2:16200"
     send: "127.0.0.1:0"
 
 include:
@@ -65,7 +65,7 @@ gateways:
       # of the two, device id 1, so 16701 -- as telemetry of APID apid_base plus
       # that device id, 0x201.
       - gateway: gateway
-        address: "127.0.0.1:16600"
+        address: "127.0.0.2:16600"
         apid_base: "0x200"
         ground_base: "127.0.0.1:16700"
         moc-out:

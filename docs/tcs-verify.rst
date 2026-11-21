@@ -101,7 +101,7 @@ that::
 and before the problems::
 
    $ cargo run --bin tcs-verify -- --digest examples/thermostat/thermostat.ytcs
-   examples/thermostat/thermostat.ytcs: md5 37c3be05e62fe33a48d76d3bb31eeabc
+   examples/thermostat/thermostat.ytcs: md5 ca5faf1a3648ae1105c64ab4c51db669
 
 That is the digest tcspecial prints as it starts and puts in every beacon, and
 the MOC compares with its own: two ends whose digests agree have read one
@@ -227,24 +227,24 @@ compared with ``diff``. The summary of the thermostat example:
 
    Addresses and ports
      address         bound by  what
-     0.0.0.0:4000    vehicle   tcs_cmd.recv, where spacecraft commands are taken
-     127.0.0.1:4100  ground    tcs_cmd.send, where spacecraft commands come from
-     0.0.0.0:4200    vehicle   payload_command.dest_base, where node commands are taken
-     127.0.0.1:4300  ground    payload_command.source_base, where node commands come from
-     0.0.0.0:5550    vehicle   beacon.send, where beacons come from
-     127.0.0.1:5650  ground    beacon.recv, where beacons go
-     127.0.0.1:5100  ground    "gateway" ground_base plus device id 0: what "consensus_temp" sends
-     127.0.0.1:5102  ground    "gateway" ground_base plus device id 2: what "gpio-out-tmass1" sends
-     127.0.0.1:5103  ground    "gateway" ground_base plus device id 3: what "gpio-out-tmass2" sends
-     127.0.0.1:5108  ground    "gateway" ground_base plus device id 8: what "to_k1" sends
-     127.0.0.1:5109  ground    "gateway" ground_base plus device id 9: what "to_k2" sends
-     127.0.0.1:5110  ground    "gateway" ground_base plus device id 10: what "to_k3" sends
-     127.0.0.1:5000  vehicle   "gateway" address and port, where the ground sends to it
-     127.0.0.1:5204  tcs-sim    "gpio-out-tmass1" sim_address
-     127.0.0.1:5205  tcs-sim    "gpio-out-tmass2" sim_address
-     127.0.0.1:5201  tcs-sim    "temp_1" sim_address
-     127.0.0.1:5202  tcs-sim    "temp_2" sim_address
-     127.0.0.1:5203  tcs-sim    "temp_3" sim_address
+     127.0.0.4:4000  vehicle   tcs_cmd.recv, where spacecraft commands are taken
+     127.0.0.3:4100  ground    tcs_cmd.send, where spacecraft commands come from
+     127.0.0.4:4200  vehicle   payload_command.dest_base, where node commands are taken
+     127.0.0.3:4300  ground    payload_command.source_base, where node commands come from
+     127.0.0.4:5550  vehicle   beacon.send, where beacons come from
+     127.0.0.3:5650  ground    beacon.recv, where beacons go
+     127.0.0.3:5100  ground    "gateway" ground_base plus device id 0: what "consensus_temp" sends
+     127.0.0.3:5102  ground    "gateway" ground_base plus device id 2: what "gpio-out-tmass1" sends
+     127.0.0.3:5103  ground    "gateway" ground_base plus device id 3: what "gpio-out-tmass2" sends
+     127.0.0.3:5108  ground    "gateway" ground_base plus device id 8: what "to_k1" sends
+     127.0.0.3:5109  ground    "gateway" ground_base plus device id 9: what "to_k2" sends
+     127.0.0.3:5110  ground    "gateway" ground_base plus device id 10: what "to_k3" sends
+     127.0.0.4:5000  vehicle   "gateway" address and port, where the ground sends to it
+     127.0.0.4:5204  tcs-sim   "gpio-out-tmass1" sim_address
+     127.0.0.4:5205  tcs-sim   "gpio-out-tmass2" sim_address
+     127.0.0.4:5201  tcs-sim   "temp_1" sim_address
+     127.0.0.4:5202  tcs-sim   "temp_2" sim_address
+     127.0.0.4:5203  tcs-sim   "temp_3" sim_address
 
    Device ids
      id  node

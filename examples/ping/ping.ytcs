@@ -11,29 +11,29 @@ tcspecial:
   # anybody presses Ping.
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:7510"
+    recv: "127.0.0.29:7510"
     reset_interval: "1 s"
-    send: "0.0.0.0:7500"
+    send: "127.0.0.30:7500"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/ping"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:7300"
-    source_base: "127.0.0.1:7310"
+    dest_base: "127.0.0.30:7300"
+    source_base: "127.0.0.29:7310"
   payload_telemetry:
-    dest_base: "127.0.0.1:7410"
-    source_base: "0.0.0.0:7400"
+    dest_base: "127.0.0.29:7410"
+    source_base: "127.0.0.30:7400"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-ping.state"
   tcs_cmd:
-    recv: "0.0.0.0:7200"
-    send: "127.0.0.1:7210"
+    recv: "127.0.0.30:7200"
+    send: "127.0.0.29:7210"
 
 include:
   - subdiagram: ping-common
@@ -46,8 +46,8 @@ gateways:
       # node. The answer comes back to the ground at ground_base plus the ping
       # node's device id: ping is the second name of the two, device id 1, so 7701.
       - gateway: gateway
-        address: "127.0.0.1:7600"
-        ground_base: "127.0.0.1:7700"
+        address: "127.0.0.30:7600"
+        ground_base: "127.0.0.29:7700"
         moc-out:
           - ping.gateway
         world-in: [ping]

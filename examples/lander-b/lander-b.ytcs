@@ -19,7 +19,7 @@ tcspecial:
     default_interval: "5 s"
     recv: "127.0.0.1:20510"
     reset_interval: "1 s"
-    send: "0.0.0.0:20500"
+    send: "127.0.0.24:20500"
   gateway: "yamcs"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
@@ -27,22 +27,22 @@ tcspecial:
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:20300"
+    dest_base: "127.0.0.24:20300"
     source_base: "127.0.0.1:0"
   payload_telemetry:
     apid_base: "0x500"
     dest_base: "127.0.0.1:20410"
-    source_base: "0.0.0.0:20400"
+    source_base: "127.0.0.24:20400"
   state_file: "/tmp/tcspecial-lander-b.state"
   tcs_cmd:
     apid: "0x111"
-    recv: "0.0.0.0:20200"
+    recv: "127.0.0.24:20200"
     send: "127.0.0.1:0"
 
 gateways:
   - type gateway_yamcs:
       - gateway: gateway
-        address: "127.0.0.1:20600"
+        address: "127.0.0.24:20600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:20700"
         moc-out:
@@ -94,46 +94,46 @@ vehicle:
 payloads:
   - type network:
       - payload: accel_y
-        address: "127.0.0.1:20803"
+        address: "127.0.0.24:20803"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_accel_y.accel_y
       - payload: crashed
         read_size: "16"
-        address: "127.0.0.1:20807"
+        address: "127.0.0.24:20807"
         protocol: "udp"
         world-out:
           - gateway.crashed
       - payload: joystick_3_4_y
-        address: "127.0.0.1:20804"
+        address: "127.0.0.24:20804"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_joystick_3_4_y.joystick_3_4_y
       - payload: landed
         read_size: "16"
-        address: "127.0.0.1:20806"
+        address: "127.0.0.24:20806"
         protocol: "udp"
         world-out:
           - gateway.landed
       - payload: restart
-        address: "127.0.0.1:20808"
+        address: "127.0.0.24:20808"
         protocol: "udp"
         moc-in: [gateway]
       - payload: thruster_y
-        address: "127.0.0.1:20805"
+        address: "127.0.0.24:20805"
         moc-in-type: "ratio"
         protocol: "udp"
         moc-in: [to_joystick_3_4_y]
       - payload: velocity_y
-        address: "127.0.0.1:20802"
+        address: "127.0.0.24:20802"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_velocity_y.velocity_y
       - payload: y
-        address: "127.0.0.1:20801"
+        address: "127.0.0.24:20801"
         protocol: "udp"
         world-out-type: "i16"
         world-out:

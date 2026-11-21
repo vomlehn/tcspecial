@@ -6,41 +6,41 @@ description: "A payload that is a program, sending a line of text a word at a
 tcspecial:
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:5650"
+    recv: "127.0.0.31:5650"
     reset_interval: "1 s"
-    send: "0.0.0.0:5550"
+    send: "127.0.0.32:5550"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/simple-app"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:4200"
-    source_base: "127.0.0.1:4300"
+    dest_base: "127.0.0.32:4200"
+    source_base: "127.0.0.31:4300"
   payload_telemetry:
-    dest_base: "127.0.0.1:6100"
-    source_base: "0.0.0.0:6000"
+    dest_base: "127.0.0.31:6100"
+    source_base: "127.0.0.32:6000"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-simple-app.state"
   tcs_cmd:
-    recv: "0.0.0.0:4000"
-    send: "127.0.0.1:4100"
+    recv: "127.0.0.32:4000"
+    send: "127.0.0.31:4100"
 
 gateways:
   - type gateway_radio:
       # The ground's end of the vehicle's data. tcspecial sends what each node
       # drawn into it produces as UDP datagrams to ground_base's address, at its
       # port plus that node's device id: lorem is id 1, so its words go to
-      # 127.0.0.1:5101. Ground software gets them from this node with a function
+      # 127.0.0.31:5101. Ground software gets them from this node with a function
       # call, tcsmoc::gateway::GatewayReceiver::receive: run `lorem_gateway`
       # to be that ground. It states no address or port of its own, because
       # nothing comes back up.
       - gateway: gateway-1
-        ground_base: "127.0.0.1:5100"
+        ground_base: "127.0.0.31:5100"
         world-in: [lorem]
 
 payloads:

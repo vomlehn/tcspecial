@@ -128,8 +128,9 @@ struct Example {
 fn example(dir: &Path, commands: u16) -> Example {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/consolidator/consolidator.ytcs");
-    let mut text =
-        tcsos::fs::read_to_string(&example).expect("the example reads");
+    let mut text = common::on_one_host(
+        &tcsos::fs::read_to_string(&example).expect("the example reads"),
+    );
     // tcspecial writes its log into a directory that is there, and does not
     // make one.
     tcsos::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
@@ -143,15 +144,15 @@ fn example(dir: &Path, commands: u16) -> Example {
         (":5003\"", format!(":{battery}\"")),
         ("127.0.0.1:5100", format!("127.0.0.1:{base}")),
         ("127.0.0.1:5650", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:5550", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:4200", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:5550", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:4200", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:4300", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:6100", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:6000", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:4000", format!("127.0.0.1:{take_at}")),
+        ("127.0.0.1:6000", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:4000", format!("127.0.0.1:{take_at}")),
         ("127.0.0.1:4100", format!("127.0.0.1:{commands}")),
         (
-            "/tmp/telemetry",
+            "/tmp/telemetry/consolidator",
             dir.join("telemetry").display().to_string(),
         ),
         (

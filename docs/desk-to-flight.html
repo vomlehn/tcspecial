@@ -411,13 +411,15 @@ the one that was tested. Keeping it costs nothing in flight.</p>
 <div class="section" id="name-the-real-addresses">
 <h1><a class="toc-backref" href="#toc-entry-3">3. Name the real addresses</a></h1>
 <p><em>Do:</em> go through the <tt class="docutils literal">tcspecial</tt> section and every gateway node, and
-replace the loopback addresses a desk run uses -- <tt class="docutils literal">127.0.0.1</tt> for where the
-ground receives beacons, answers and telemetry -- with the vehicle's and the
-ground's own.</p>
+replace the loopback addresses a desk run uses -- an odd host in
+<tt class="docutils literal">127.0.0.0/8</tt> for where the ground receives beacons, answers and telemetry,
+and the even host after it for the vehicle's own end -- with the vehicle's and
+the ground's own.</p>
 <p><em>Why:</em> the examples run every program on one machine, so everything they
 send goes to loopback. Flown, those datagrams must reach the radio, the
-flight computer or the ground station. The addresses tcspecial binds,
-<tt class="docutils literal">0.0.0.0</tt> in the examples, may be narrowed to one interface.</p>
+flight computer or the ground station. The addresses tcspecial binds, the
+vehicle's host in the examples, become the interface facing each link, or
+<tt class="docutils literal">0.0.0.0</tt> for every interface.</p>
 <p><em>Check:</em> <tt class="docutils literal"><span class="pre">tcs-verify</span> <span class="pre">--summary</span></tt> lists every address and port the vehicle
 uses, and warns where two claim one.</p>
 </div>

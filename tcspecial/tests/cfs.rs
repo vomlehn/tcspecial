@@ -260,7 +260,9 @@ impl Peer {
 fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/cfs/cfs.ytcs");
-    let text = tcsos::fs::read_to_string(&path).expect("the example reads");
+    let text = common::on_one_host(
+        &tcsos::fs::read_to_string(&path).expect("the example reads"),
+    );
     let dir = tempfile::tempdir().expect("a directory");
     tcsos::fs::create_dir(dir.path().join("telemetry"))
         .expect("the log's directory");
@@ -269,12 +271,12 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     let thermometer = free();
     let mut text = text;
     for (was, now) in [
-        ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:8634", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:2234", format!("127.0.0.1:{}", port(&socket))),
         (":8601\"", format!(":{}\"", port(&heater))),
         (":8602\"", format!(":{thermometer}\"")),
         (
-            "/tmp/telemetry",
+            "/tmp/telemetry/cfs",
             dir.path().join("telemetry").display().to_string(),
         ),
         (

@@ -255,7 +255,7 @@ fn each_ping_is_answered_and_timed_and_the_beacon_is_heard() {
     // The beacon, read from the vehicle's own bytes.
     assert!(
         printed.contains(&format!(
-            "beacon: tcspecial v{0} md5 {digest}",
+            "tcspecial v{0} md5 {digest}",
             ConfigVersion::of_this_build(),
         )),
         "{printed}"

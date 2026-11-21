@@ -120,7 +120,9 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
 {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/fprime/fprime.ytcs");
-    let text = tcsos::fs::read_to_string(&example).expect("the example reads");
+    let text = common::on_one_host(
+        &tcsos::fs::read_to_string(&example).expect("the example reads"),
+    );
 
     // Where the example's own bridge hears the thermometer, which its
     // comments say: bridge_base, 9700, plus the thermometer's device id, 3,
@@ -160,15 +162,15 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
         (":9600\"", format!(":{uplink}\"")),
         ("127.0.0.1:9700", format!("127.0.0.1:{base}")),
         ("127.0.0.1:9510", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9500", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9300", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:9500", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:9300", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:9310", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:9410", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9400", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:9200", format!("127.0.0.1:{take_at}")),
+        ("127.0.0.1:9400", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:9200", format!("127.0.0.1:{take_at}")),
         ("127.0.0.1:9210", format!("127.0.0.1:{}", port(&commands))),
         (
-            "/tmp/telemetry",
+            "/tmp/telemetry/fprime",
             dir.path().join("telemetry").display().to_string(),
         ),
     ] {

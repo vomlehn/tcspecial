@@ -18,7 +18,7 @@
             <default_interval>5 s</default_interval>
             <recv>127.0.0.1:20510</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:20500</send>
+            <send>127.0.0.24:20500</send>
         </beacon>
         <gateway>yamcs</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
@@ -28,25 +28,25 @@
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:20300</dest_base>
+            <dest_base>127.0.0.24:20300</dest_base>
             <source_base>127.0.0.1:0</source_base>
         </payload_command>
         <payload_telemetry>
             <apid_base>0x500</apid_base>
             <dest_base>127.0.0.1:20410</dest_base>
-            <source_base>0.0.0.0:20400</source_base>
+            <source_base>127.0.0.24:20400</source_base>
         </payload_telemetry>
         <state_file>/tmp/tcspecial-lander-b.state</state_file>
         <tcs_cmd>
             <apid>0x111</apid>
-            <recv>0.0.0.0:20200</recv>
+            <recv>127.0.0.24:20200</recv>
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
         <type name="gateway_yamcs">
             <gateway name="gateway">
-                <address>127.0.0.1:20600</address>
+                <address>127.0.0.24:20600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:20700</ground_base>
                 <moc-out>restart.gateway</moc-out>
@@ -103,48 +103,48 @@
     <payloads>
         <type name="network">
             <payload name="accel_y">
-                <address>127.0.0.1:20803</address>
+                <address>127.0.0.24:20803</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_accel_y.accel_y</world-out>
             </payload>
             <payload name="crashed">
                 <read_size>16</read_size>
-                <address>127.0.0.1:20807</address>
+                <address>127.0.0.24:20807</address>
                 <protocol>udp</protocol>
                 <world-out>gateway.crashed</world-out>
             </payload>
             <payload name="joystick_3_4_y">
-                <address>127.0.0.1:20804</address>
+                <address>127.0.0.24:20804</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_joystick_3_4_y.joystick_3_4_y</world-out>
             </payload>
             <payload name="landed">
                 <read_size>16</read_size>
-                <address>127.0.0.1:20806</address>
+                <address>127.0.0.24:20806</address>
                 <protocol>udp</protocol>
                 <world-out>gateway.landed</world-out>
             </payload>
             <payload name="restart">
-                <address>127.0.0.1:20808</address>
+                <address>127.0.0.24:20808</address>
                 <protocol>udp</protocol>
                 <moc-in>gateway</moc-in>
             </payload>
             <payload name="thruster_y">
-                <address>127.0.0.1:20805</address>
+                <address>127.0.0.24:20805</address>
                 <moc-in-type>ratio</moc-in-type>
                 <protocol>udp</protocol>
                 <moc-in>to_joystick_3_4_y</moc-in>
             </payload>
             <payload name="velocity_y">
-                <address>127.0.0.1:20802</address>
+                <address>127.0.0.24:20802</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_velocity_y.velocity_y</world-out>
             </payload>
             <payload name="y">
-                <address>127.0.0.1:20801</address>
+                <address>127.0.0.24:20801</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_y.y</world-out>

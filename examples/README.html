@@ -308,6 +308,20 @@ payload and a Rust ground station. An example may hold a ground program
 without holding a payload: <code>beacon</code> does, its ground station
 watching something tcspecial sends on its own account, and so does
 <code>ping</code>, whose ground station is Python 3.</p>
+<p>Each example has a pair of loopback hosts of its own, which need
+nothing set up: its MOC software on an odd host, such as
+<code>127.0.0.27</code> for <code>minimal</code>, and its vehicle,
+tcspecial and tcs-sim, on the even host after it,
+<code>127.0.0.28</code>. Yamcs always sends from <code>127.0.0.1</code>,
+so every example commanded through Yamcs has that as its MOC host. Each
+example also logs in a directory of its own,
+<code>/tmp/telemetry/&lt;name&gt;</code>, which <code>tcsx</code> makes
+afresh before running it, so two examples can run at once – but two
+through Yamcs, whose web port is the same, or two that are one vehicle,
+as the two thermostats are: no two share a socket, a log directory or a
+state file, which a test holds them to. The table of pairs, and why, is
+“Each example’s own hosts” in the tcspecial manual,
+<code>docs/tcspecial.rst</code>.</p>
 <p>Two examples that are one example with another ground station share
 what they have in common from a directory of its own, which is not an
 example: <code>ping-common</code> holds the ping link and the window
@@ -520,13 +534,13 @@ commands it from tcsmoc.</td>
 <h2 id="minimal">minimal</h2>
 <p>The smallest configuration that does anything: one payload,
 <code>sensor</code>, a program on this host at
-<code>127.0.0.1:5001</code> that sends its readings over UDP. Nothing is
-drawn from it, so its readings go to the ground over the
+<code>127.0.0.28:5001</code> that sends its readings over UDP. Nothing
+is drawn from it, so its readings go to the ground over the
 <code>tcspecial</code> section’s <code>payload_telemetry</code>:
 tcspecial sends each one to <code>dest_base</code> plus the payload’s
-device id, <code>127.0.0.1:6100</code> for <code>sensor</code>, which is
-device 0. tcs-sim simulates <code>sensor</code>, sending a packet every
-second.</p>
+device id, <code>127.0.0.27:6100</code> for <code>sensor</code>, which
+is device 0. tcs-sim simulates <code>sensor</code>, sending a packet
+every second.</p>
 <pre><code>make run-simple</code></pre>
 <p>That runs tcs-moc on the example, which starts tcspecial and tcs-sim
 itself and shows a panel for <code>sensor</code>: when its last packet
@@ -1007,7 +1021,7 @@ type <code>i2c_tmass</code>, and <code>temp_3</code> a SPI peripheral,
 of type <code>spi_tmass</code>. The heaters’ switches are lines 4 and 5
 of <code>/dev/gpiochip1</code>. On a desk every one of them is a
 simulated device: each is reached over UDP at its
-<code>sim_address</code> – the sensors at 127.0.0.1:5201 to 5203, where
+<code>sim_address</code> – the sensors at 127.0.0.4:5201 to 5203, where
 tcs-sim answers with the zone’s temperature, and the switches at 5204
 and 5205, where tcs-sim takes what the vehicle drives them to – so the
 example needs no dummy device, no sudo and no hardware. Flown, the buses

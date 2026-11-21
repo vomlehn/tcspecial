@@ -7,35 +7,35 @@ description: "A lander's terminal descent: a radar altimeter's altitude
 tcspecial:
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:5650"
+    recv: "127.0.0.15:5650"
     reset_interval: "1 s"
-    send: "0.0.0.0:5550"
+    send: "127.0.0.16:5550"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/descent"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:4200"
-    source_base: "127.0.0.1:4300"
+    dest_base: "127.0.0.16:4200"
+    source_base: "127.0.0.15:4300"
   payload_telemetry:
-    dest_base: "127.0.0.1:6100"
-    source_base: "0.0.0.0:6000"
+    dest_base: "127.0.0.15:6100"
+    source_base: "127.0.0.16:6000"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-descent.state"
   tcs_cmd:
-    recv: "0.0.0.0:4000"
-    send: "127.0.0.1:4100"
+    recv: "127.0.0.16:4000"
+    send: "127.0.0.15:4100"
 
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: "127.0.0.1:5000"
-        ground_base: "127.0.0.1:5100"
+        address: "127.0.0.16:5000"
+        ground_base: "127.0.0.15:5100"
         world-in: [altitude, descent_rate, guidance, touchdown]
 
 vehicle:
@@ -86,20 +86,20 @@ payloads:
   - type network:
       # The Doppler velocimeter, five a second.
       - payload: doppler
-        address: "127.0.0.1:5402"
+        address: "127.0.0.16:5402"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - descent_rate.doppler
       # The engine's throttle, driven by what guidance answers.
       - payload: engine
-        address: "127.0.0.1:5404"
+        address: "127.0.0.16:5404"
         moc-in-type: "ratio"
         protocol: "udp"
         moc-in: [guidance]
       # The radar altimeter, which sends ten readings a second.
       - payload: radar
-        address: "127.0.0.1:5401"
+        address: "127.0.0.16:5401"
         protocol: "udp"
         world-out-type: "u16"
         world-out:
@@ -108,7 +108,7 @@ payloads:
       # lander is down: straight to the ground.
       - payload: touchdown
         read_size: "16"
-        address: "127.0.0.1:5403"
+        address: "127.0.0.16:5403"
         protocol: "udp"
         world-out:
           - gateway.touchdown

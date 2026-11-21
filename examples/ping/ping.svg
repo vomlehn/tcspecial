@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450" role="img" aria-labelledby="title desc">
   <title id="title">The ping example</title>
-  <desc id="desc">The ground station ping_gateway.py sends each ping, "ping #count time", up to the gateway node, which tcspecial binds at 127.0.0.1:7600. It leaves the gateway node by its gateway-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the gateway node, and so down to the ground at 127.0.0.1:7701: the gateway node's ground_base, 7700, plus the ping node's device id, 1. The ground station shows the ping sent, the answer received, and the round trip and its two halves. Beside it is the beacon panel, fed by the beacon tcspecial sends from 0.0.0.0:7500 to 127.0.0.1:7510.</desc>
+  <desc id="desc">The ground station ping_gateway.py sends each ping, "ping #count time", up to the gateway node, which tcspecial binds at 127.0.0.30:7600. It leaves the gateway node by its gateway-out link for the ping node, which answers it with the vehicle's time on the end and sends the answer by its payload-out link back to the gateway node, and so down to the ground at 127.0.0.29:7701: the gateway node's ground_base, 7700, plus the ping node's device id, 1. The ground station shows the ping sent, the answer received, and the round trip and its two halves. Beside it is the beacon panel, fed by the beacon tcspecial sends from 127.0.0.30:7500 to 127.0.0.29:7510.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -48,13 +48,13 @@
   <rect class="socket" x="340" y="120" width="220" height="150" rx="10"/>
   <text class="name" x="356" y="147">gateway</text>
   <text class="kind" x="356" y="168">gateway node, device id 0</text>
-  <text class="detail" x="356" y="190">binds 127.0.0.1:7600</text>
+  <text class="detail" x="356" y="190">binds 127.0.0.30:7600</text>
   <text class="detail" x="356" y="208">ground_base</text>
-  <text class="detail" x="356" y="224">  127.0.0.1:7700</text>
+  <text class="detail" x="356" y="224">  127.0.0.29:7700</text>
 
   <!-- The beacon, tcspecial's own -->
   <rect class="socket" x="340" y="74" width="220" height="36" rx="8"/>
-  <text class="label" x="356" y="97">beacon: 0.0.0.0:7500, every 5 s</text>
+  <text class="label" x="356" y="97">beacon: 127.0.0.30:7500, every 5 s</text>
 
   <!-- The ground station -->
   <rect class="ground" x="640" y="74" width="235" height="246" rx="10"/>
@@ -64,7 +64,7 @@
   <rect class="socket" x="656" y="134" width="203" height="40" rx="6"/>
   <text class="label" x="668" y="159">Beacon:</text>
   <circle class="indicator" cx="728" cy="155" r="7" fill="#22c55e"/>
-  <text class="detail" x="744" y="159">127.0.0.1:7510</text>
+  <text class="detail" x="744" y="159">127.0.0.29:7510</text>
   <!-- Its ping panel -->
   <rect class="socket" x="656" y="184" width="203" height="122" rx="6"/>
   <rect x="668" y="194" width="74" height="20" rx="3" fill="#e5e7eb" stroke="#6b7280"/>

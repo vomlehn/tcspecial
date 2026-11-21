@@ -716,7 +716,7 @@ tcs-sim chooses it and says which it chose, so a run worth repeating can be:
 .. code-block:: yaml
 
    tcs-sim:
-     ready: "127.0.0.1:7907"
+     ready: "127.0.0.4:7907"
      seed: 12345
 
 The thermostat example states all of these, with figures of the kind a
@@ -736,7 +736,7 @@ thermostat for each of several zones:
 .. code-block:: yaml
 
    tcs-sim:
-     ready: "127.0.0.1:7907"
+     ready: "127.0.0.4:7907"
      thermostat: thermostat
 
 tcs-sim then takes each node's ``setpoint`` and ``half_band`` from the

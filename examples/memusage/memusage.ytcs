@@ -17,7 +17,7 @@ tcspecial:
     default_interval: "5 s"
     recv: "127.0.0.1:18510"
     reset_interval: "1 s"
-    send: "0.0.0.0:18500"
+    send: "127.0.0.26:18500"
   gateway: "yamcs"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   max_consolidator_inputs: "32"
@@ -26,7 +26,7 @@ tcspecial:
   # of this host -- port 0 -- and each answer goes back to the port its
   # command came from.
   payload_command:
-    dest_base: "0.0.0.0:18300"
+    dest_base: "127.0.0.26:18300"
     source_base: "127.0.0.1:0"
   # A payload nothing in the drawing touches would report to dest_base plus
   # its device id, as telemetry of APID apid_base plus that device id. This
@@ -35,7 +35,7 @@ tcspecial:
   payload_telemetry:
     apid_base: "0x300"
     dest_base: "127.0.0.1:18410"
-    source_base: "0.0.0.0:18400"
+    source_base: "127.0.0.26:18400"
   # tcspecial keeps in this file its configuration stack and how many
   # starts of the top have ended before a matching CONNECT, so on a vehicle
   # it must be on storage that survives a power cycle.
@@ -46,7 +46,7 @@ tcspecial:
   # came from.
   tcs_cmd:
     apid: "0x101"
-    recv: "0.0.0.0:18200"
+    recv: "127.0.0.26:18200"
     send: "127.0.0.1:0"
 
 gateways:
@@ -57,7 +57,7 @@ gateways:
       # ground_base plus its device id -- gateway is 0, and ping1, ping2 and
       # ping3 are 1, 2 and 3 -- as telemetry of APID apid_base plus that id.
       - gateway: gateway
-        address: "127.0.0.1:18600"
+        address: "127.0.0.26:18600"
         apid_base: "0x200"
         ground_base: "127.0.0.1:18700"
         moc-out:

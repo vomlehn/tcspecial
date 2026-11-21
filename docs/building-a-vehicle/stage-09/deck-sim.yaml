@@ -11,7 +11,7 @@ description: Simulator settings for stage 9 of Building a Vehicle
 # whatever starts the run asks before it starts tcspecial. A port no
 # example and no other stage uses, so that two can be run at once.
 tcs-sim:
-  ready: "127.0.0.1:7928"
+  ready: "127.0.0.36:7928"
 
 # The physics of the deck: the regolith around the thermometer's probe,
 # which the probe's heater warms. The surroundings are the lunar ground's,

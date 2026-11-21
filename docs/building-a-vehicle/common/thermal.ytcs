@@ -83,7 +83,7 @@ payloads:
         group: "hull_readings"
         path: "/dev/i2c-1"
         read_size: "2"
-        sim_address: "127.0.0.1:5403"
+        sim_address: "127.0.0.36:5403"
         world-out-type: "i16"
         world-out:
           - hull_kelvin_1.hull_temp_1
@@ -94,7 +94,7 @@ payloads:
         group: "hull_readings"
         path: "/dev/i2c-1"
         read_size: "2"
-        sim_address: "127.0.0.1:5404"
+        sim_address: "127.0.0.36:5404"
         world-out-type: "i16"
         world-out:
           - hull_kelvin_2.hull_temp_2
@@ -104,7 +104,7 @@ payloads:
         group: "hull_readings"
         path: "/dev/i2c-1"
         read_size: "2"
-        sim_address: "127.0.0.1:5405"
+        sim_address: "127.0.0.36:5405"
         world-out-type: "i16"
         world-out:
           - hull_kelvin_3.hull_temp_3

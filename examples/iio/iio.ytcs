@@ -9,39 +9,39 @@ tcspecial:
   # while another is looked at.
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:3550"
+    recv: "127.0.0.21:3550"
     reset_interval: "1 s"
-    send: "0.0.0.0:3540"
+    send: "127.0.0.22:3540"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/iio"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:3340"
-    source_base: "127.0.0.1:3350"
+    dest_base: "127.0.0.22:3340"
+    source_base: "127.0.0.21:3350"
   payload_telemetry:
-    dest_base: "127.0.0.1:3450"
-    source_base: "0.0.0.0:3440"
+    dest_base: "127.0.0.21:3450"
+    source_base: "127.0.0.22:3440"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-iio.state"
   tcs_cmd:
-    recv: "0.0.0.0:3240"
-    send: "127.0.0.1:3250"
+    recv: "127.0.0.22:3240"
+    send: "127.0.0.21:3250"
 
 gateways:
   - type gateway_radio:
       # The ground's end of the link. Nothing goes up to an IIO sensor, which is
       # read and never written, so nothing leaves this node by moc-out; what
       # comes down arrives at ground_base plus the device id of the node that
-      # sent it: the sensor, device id 1, at 127.0.0.1:3741.
+      # sent it: the sensor, device id 1, at 127.0.0.21:3741.
       - gateway: moc
-        address: "127.0.0.1:3640"
-        ground_base: "127.0.0.1:3740"
+        address: "127.0.0.22:3640"
+        ground_base: "127.0.0.21:3740"
         world-in: [sensor]
 
 payloads:

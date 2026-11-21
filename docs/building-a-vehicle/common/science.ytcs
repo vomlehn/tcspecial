@@ -68,7 +68,7 @@ payloads:
       - payload: probe_heater
         lines: "4"
         path: "/dev/gpiochip1"
-        sim_address: "127.0.0.1:5402"
+        sim_address: "127.0.0.36:5402"
         state_interval: "1 s"
         moc-in: [probe_thermostat]
         world-out:
@@ -82,7 +82,7 @@ payloads:
       # has one place to receive the vehicle's data from.
       - payload: seismometer
         read_size: "16"
-        address: "127.0.0.1:5401"
+        address: "127.0.0.36:5401"
         group: "science_readings"
         protocol: "udp"
         world-out:

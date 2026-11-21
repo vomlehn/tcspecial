@@ -1905,7 +1905,7 @@ mod tests {
         let renamed = minimal
             .replace("payload: sensor", &format!("payload: {second}"))
             .replace("node: sensor", &format!("node: {second}"))
-            .replace("127.0.0.1:5001", "127.0.0.1:5002");
+            .replace("127.0.0.28:5001", "127.0.0.28:5002");
         tcsos::fs::write(&b, renamed).expect("written");
         let entry = |name: &str| {
             format!(

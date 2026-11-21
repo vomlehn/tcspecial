@@ -99,7 +99,7 @@ payloads:
       - payload: gpio-out-tmass1
         lines: "4"
         path: "/dev/gpiochip1"
-        sim_address: "127.0.0.1:5204"
+        sim_address: "127.0.0.4:5204"
         state_interval: "1 s"
         moc-in: [thermostat]
         world-out:
@@ -107,7 +107,7 @@ payloads:
       - payload: gpio-out-tmass2
         lines: "5"
         path: "/dev/gpiochip1"
-        sim_address: "127.0.0.1:5205"
+        sim_address: "127.0.0.4:5205"
         state_interval: "1 s"
         moc-in: [thermostat]
         world-out:
@@ -126,7 +126,7 @@ payloads:
         group: "zone_temps"
         path: "/dev/i2c-1"
         read_size: "2"
-        sim_address: "127.0.0.1:5201"
+        sim_address: "127.0.0.4:5201"
         world-out-type: "i16"
         world-out:
           - to_k1.temp_1
@@ -136,7 +136,7 @@ payloads:
         group: "zone_temps"
         path: "/dev/i2c-1"
         read_size: "2"
-        sim_address: "127.0.0.1:5202"
+        sim_address: "127.0.0.4:5202"
         world-out-type: "i16"
         world-out:
           - to_k2.temp_2
@@ -151,7 +151,7 @@ payloads:
         path: "/dev/spidev0.0"
         read_size: "3"
         spi_mode: "0"
-        sim_address: "127.0.0.1:5203"
+        sim_address: "127.0.0.4:5203"
         world-out-type: "u32"
         world-out:
           - to_k3.temp_3

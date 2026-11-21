@@ -7,7 +7,7 @@ description: Simulator settings for the payloads of gpio.ytcs
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
 tcs-sim:
-  ready: "127.0.0.1:7910"
+  ready: "127.0.0.20:7910"
 
 # tcs-sim moves the lines of the kernel's gpio-sim chip, which it finds and
 # does not make: bin/mk-kernel-dummies makes it, and gives its lines to the

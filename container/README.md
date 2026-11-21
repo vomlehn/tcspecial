@@ -182,8 +182,9 @@ bin/tcs-container-example ping-yamcs
 
 `can`, `gpio` and `iio` drive the kernel's dummy devices, which a rootless
 container cannot make, so they run only on the host. The logs the
-examples write are in the container's `/tmp/telemetry`, made afresh for
-each run. A run lasts until its window is closed or Ctrl+C, and one left
+examples write are in the container's `/tmp/telemetry`, each in a
+directory of its own, such as `/tmp/telemetry/battery`, made afresh for
+each run of it. A run lasts until its window is closed or Ctrl+C, and one left
 running, as by a terminal closed under it, is stopped by the next. `make
 container-example EXAMPLE=thermostat` does the same, with `HIDDEN=1` and
 `ARGS=` for the options.
@@ -197,7 +198,7 @@ output and its log afterwards:
 ```sh
 timeout 30 bin/tcs-container-example --hidden battery > battery.out 2>&1
 grep -c ERROR battery.out                       # 0: nothing went wrong
-bin/tcs-container-shell ls /tmp/telemetry       # the log it wrote
+bin/tcs-container-shell ls /tmp/telemetry/battery  # the log it wrote
 ```
 
 The next run stops what the timeout left running in the container.

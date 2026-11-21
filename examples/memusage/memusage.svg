@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" role="img" aria-labelledby="title desc">
   <title id="title">The memusage example</title>
-  <desc id="desc">memusage.py has Yamcs send QUERY_THREADS, as a CCSDS telecommand of APID 0x101, to tcspecial's node command link at 0.0.0.0:18300. tcspecial answers on the same link with the memory the whole process has, mapped, resident, locked and the limit on locking, and with each of its threads: the main, signals, commands and beacons threads, and one each for the gateway node, a gateway_yamcs node, and the ping nodes ping1, ping2 and ping3, each with the stack it was given and the most of it it has used. Yamcs decodes the answer, and memusage.py reads it from Yamcs and prints it. Yamcs runs one instance for each tcspecial memusage.py is given, so that several tcspecials on one vehicle are watched in one Yamcs. The query goes up as a solid line with an open arrowhead, labelled QUERY_THREADS; the answer comes down as a dashed line, labelled answer; the beacon as a dotted line, labelled beacon.</desc>
+  <desc id="desc">memusage.py has Yamcs send QUERY_THREADS, as a CCSDS telecommand of APID 0x101, to tcspecial's node command link at 127.0.0.26:18300. tcspecial answers on the same link with the memory the whole process has, mapped, resident, locked and the limit on locking, and with each of its threads: the main, signals, commands and beacons threads, and one each for the gateway node, a gateway_yamcs node, and the ping nodes ping1, ping2 and ping3, each with the stack it was given and the most of it it has used. Yamcs decodes the answer, and memusage.py reads it from Yamcs and prints it. Yamcs runs one instance for each tcspecial memusage.py is given, so that several tcspecials on one vehicle are watched in one Yamcs. The query goes up as a solid line with an open arrowhead, labelled QUERY_THREADS; the answer comes down as a dashed line, labelled answer; the beacon as a dotted line, labelled beacon.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -41,7 +41,7 @@
   <rect class="socket" x="55" y="80" width="230" height="96" rx="10"/>
   <text class="name" x="71" y="107">gateway</text>
   <text class="kind" x="71" y="128">gateway_yamcs, device id 0</text>
-  <text class="detail" x="71" y="148">binds 127.0.0.1:18600</text>
+  <text class="detail" x="71" y="148">binds 127.0.0.26:18600</text>
   <text class="detail" x="71" y="166">a thread of its own</text>
 
   <!-- The three ping nodes, each a thread of its own -->
@@ -59,7 +59,7 @@
   <rect class="socket" x="330" y="150" width="245" height="190" rx="10"/>
   <text class="name" x="346" y="177">commands thread</text>
   <text class="kind" x="346" y="198">node command link</text>
-  <text class="detail" x="346" y="216">0.0.0.0:18300</text>
+  <text class="detail" x="346" y="216">127.0.0.26:18300</text>
   <text class="label" x="346" y="242">answers QUERY_THREADS with:</text>
   <text class="detail" x="346" y="262">mapped, resident, locked,</text>
   <text class="detail" x="346" y="279">lock limit: the process</text>

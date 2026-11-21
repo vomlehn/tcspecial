@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="500" viewBox="0 0 900 500" role="img" aria-labelledby="title desc">
   <title id="title">The tees example</title>
-  <desc id="desc">The ground sends a command up to the gateway node moc, which tcspecial binds at 127.0.0.1:8600. It leaves moc by its gateway-out link for echo, a tee-gateway, which sends it on by its gateway-out to the heater, as it was going, and again by its payload-out back to moc, and so down at 127.0.0.1:8701: ground_base, 8700, plus echo's device id, 1. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to moc, arriving at 127.0.0.1:8704, and again by its gateway-out to dropped, a null-gateway, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
+  <desc id="desc">The ground sends a command up to the gateway node moc, which tcspecial binds at 127.0.0.34:8600. It leaves moc by its gateway-out link for echo, a tee-gateway, which sends it on by its gateway-out to the heater, as it was going, and again by its payload-out back to moc, and so down at 127.0.0.33:8701: ground_base, 8700, plus echo's device id, 1. The sensor's readings arrive at readings, a tee-payload, which sends each on by its payload-out to moc, arriving at 127.0.0.33:8704, and again by its gateway-out to dropped, a null-gateway, which drops it. The spare payload's data goes to unheard, a null-payload, which drops it.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -38,17 +38,17 @@
   <rect class="socket" x="20" y="80" width="170" height="70" rx="10"/>
   <text class="name" x="34" y="105">heater</text>
   <text class="kind" x="34" y="124">driven</text>
-  <text class="detail" x="34" y="141">127.0.0.1:8001</text>
+  <text class="detail" x="34" y="141">127.0.0.34:8001</text>
 
   <rect class="socket" x="20" y="190" width="170" height="70" rx="10"/>
   <text class="name" x="34" y="215">sensor</text>
   <text class="kind" x="34" y="234">read</text>
-  <text class="detail" x="34" y="251">127.0.0.1:8002</text>
+  <text class="detail" x="34" y="251">127.0.0.34:8002</text>
 
   <rect class="socket" x="20" y="300" width="170" height="70" rx="10"/>
   <text class="name" x="34" y="325">spare</text>
   <text class="kind" x="34" y="344">read</text>
-  <text class="detail" x="34" y="361">127.0.0.1:8003</text>
+  <text class="detail" x="34" y="361">127.0.0.34:8003</text>
 
   <!-- The vehicle's own nodes -->
   <rect class="vehicle" x="260" y="80" width="160" height="70" rx="10"/>

@@ -23,9 +23,9 @@
              quickly. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:5650</recv>
+            <recv>127.0.0.35:5650</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5550</send>
+            <send>127.0.0.36:5550</send>
         </beacon>
         <!-- The vehicle answers to an F´ flight computer. Its links are
              still the radio's, UDP in the radio's protocol, because the
@@ -35,7 +35,7 @@
         <gateway>fprime</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/building-a-vehicle</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
@@ -48,16 +48,16 @@
              it is not changed while tcspecial is running. At present only
              applications use the payload_command values. -->
         <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
-            <source_base>127.0.0.1:4300</source_base>
+            <dest_base>127.0.0.36:4200</dest_base>
+            <source_base>127.0.0.35:4300</source_base>
         </payload_command>
         <!-- tcspecial sends telemetry from the network interface
              source_base names, plus the payload's device id, and the MOC
              receives it on the network interface dest_base names, plus the
              payload's device id. -->
         <payload_telemetry>
-            <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
+            <dest_base>127.0.0.35:6100</dest_base>
+            <source_base>127.0.0.36:6000</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -70,8 +70,8 @@
              tcs_cmd.send, to tcspecial at tcs_cmd.recv, and tcspecial
              sends its responses back to tcs_cmd.send. -->
         <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
+            <recv>127.0.0.36:4000</recv>
+            <send>127.0.0.35:4100</send>
         </tcs_cmd>
     </tcspecial>
     <!-- Each path is the file's from this file's directory, without its
@@ -86,12 +86,12 @@
                  that sent it, as a gateway_radio's ground_base is counted
                  on, and the bridge gives it the F´ ID fprime_id_base plus
                  that same id: the camera, device id 0, arrives at
-                 127.0.0.1:5100 as 0x3000, and hull_temp, device id 5, at
-                 127.0.0.1:5105 as 0x3005. What the bridge sends up arrives
+                 127.0.0.35:5100 as 0x3000, and hull_temp, device id 5, at
+                 127.0.0.35:5105 as 0x3005. What the bridge sends up arrives
                  at address and port. -->
             <gateway name="gateway">
-                <address>127.0.0.1:5000</address>
-                <bridge_base>127.0.0.1:5100</bridge_base>
+                <address>127.0.0.36:5000</address>
+                <bridge_base>127.0.0.35:5100</bridge_base>
                 <fprime_id_base>0x3000</fprime_id_base>
                 <world-in>camera</world-in>
                 <world-in>hull_kelvin_1</world-in>

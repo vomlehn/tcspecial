@@ -47,14 +47,16 @@ the one that was tested. Keeping it costs nothing in flight.
 3. Name the real addresses
 ==========================
 *Do:* go through the ``tcspecial`` section and every gateway node, and
-replace the loopback addresses a desk run uses -- ``127.0.0.1`` for where the
-ground receives beacons, answers and telemetry -- with the vehicle's and the
-ground's own.
+replace the loopback addresses a desk run uses -- an odd host in
+``127.0.0.0/8`` for where the ground receives beacons, answers and telemetry,
+and the even host after it for the vehicle's own end -- with the vehicle's and
+the ground's own.
 
 *Why:* the examples run every program on one machine, so everything they
 send goes to loopback. Flown, those datagrams must reach the radio, the
-flight computer or the ground station. The addresses tcspecial binds,
-``0.0.0.0`` in the examples, may be narrowed to one interface.
+flight computer or the ground station. The addresses tcspecial binds, the
+vehicle's host in the examples, become the interface facing each link, or
+``0.0.0.0`` for every interface.
 
 *Check:* ``tcs-verify --summary`` lists every address and port the vehicle
 uses, and warns where two claim one.

@@ -22,7 +22,7 @@ tcspecial:
     default_interval: "5 s"
     recv: "127.0.0.1:5650"
     reset_interval: "1 s"
-    send: "0.0.0.0:5550"
+    send: "127.0.0.36:5550"
   # The ground is Yamcs, so every packet on every link to the ground carries a
   # CCSDS primary header, and each link says its APID: the beacon's here, the
   # commands' in tcs_cmd, and the readings' in payload_telemetry and the
@@ -30,7 +30,7 @@ tcspecial:
   gateway: "yamcs"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/building-a-vehicle"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   # Commands to a node are sent from source_base to tcspecial at dest_base: one
@@ -42,7 +42,7 @@ tcspecial:
   # tcspecial is running. At present only applications use the payload_command
   # values.
   payload_command:
-    dest_base: "0.0.0.0:4200"
+    dest_base: "127.0.0.36:4200"
     source_base: "127.0.0.1:4300"
   # tcspecial sends telemetry from the network interface source_base names,
   # plus the payload's device id, and the MOC receives it on the network
@@ -53,7 +53,7 @@ tcspecial:
   payload_telemetry:
     apid_base: "0x500"
     dest_base: "127.0.0.1:6100"
-    source_base: "0.0.0.0:6000"
+    source_base: "127.0.0.36:6000"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
@@ -66,7 +66,7 @@ tcspecial:
   # its command came from.
   tcs_cmd:
     apid: "0x111"
-    recv: "0.0.0.0:4000"
+    recv: "127.0.0.36:4000"
     send: "127.0.0.1:0"
 
 # Each path is the file's from this file's directory, without its extension;
@@ -88,7 +88,7 @@ gateways:
       # ground's setpoint command among it, goes as a telecommand of APID
       # apid_base.
       - gateway: gateway
-        address: "127.0.0.1:5000"
+        address: "127.0.0.36:5000"
         apid_base: "0x400"
         ground_base: "127.0.0.1:5100"
         world-in:

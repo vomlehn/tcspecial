@@ -4,7 +4,7 @@ description: Simulator settings for the sensors of consolidator.ytcs, each
   reporting at its own pace
 
 tcs-sim:
-  ready: "127.0.0.1:7932"
+  ready: "127.0.0.14:7932"
 
 # Each sensor sends from the start, enabled as though Enable had been
 # pressed in tcs-sim's window: the example is about what the consolidator

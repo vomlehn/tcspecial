@@ -22,8 +22,9 @@
 # others, such as a checkout's examples/ and its target/debug. An example
 # is run from a directory where examples/ names them -- a checkout's own
 # root, where it has one -- since each configuration names the programs it
-# runs at their paths from there. /tmp/telemetry, where the examples' logs go, is made afresh
-# first, so that what is in it afterwards is that run's alone.
+# runs at their paths from there. The example's own directory under
+# /tmp/telemetry, where its log goes, is made afresh first, so that what is
+# in it afterwards is that run's alone.
 #
 # The examples through Yamcs use the Yamcs release YAMCS_HOME names, or,
 # where it names none, the one their ground station fetches the first time
@@ -165,8 +166,17 @@ else
 	ln -s "$examples" "$top/examples"
 	cd "$top"
 fi
-rm -rf /tmp/telemetry
-mkdir /tmp/telemetry
+# Each example logs in a directory of its own under /tmp/telemetry, the
+# lander's two tcspecials one each, so that running one leaves another's
+# log alone; $logs is one word or two, and so is left unquoted.
+case $name in
+lander) logs="/tmp/telemetry/lander-a /tmp/telemetry/lander-b" ;;
+*) logs=/tmp/telemetry/$name ;;
+esac
+# shellcheck disable=SC2086
+rm -rf $logs
+# shellcheck disable=SC2086
+mkdir -p $logs
 
 # $memlock is one word or none, so it is left unquoted throughout.
 case $name in

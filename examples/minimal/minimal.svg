@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="400" viewBox="0 0 900 400" role="img" aria-labelledby="title desc">
   <title id="title">The minimal example</title>
-  <desc id="desc">One payload, sensor, a UDP socket at 127.0.0.1:5001. tcspecial reads it and sends each reading to the ground over the payload's telemetry link, which the tcspecial section's payload_telemetry describes: from 0.0.0.0:6000 to 127.0.0.1:6100, the bases plus the sensor's device id, 0.</desc>
+  <desc id="desc">One payload, sensor, a UDP socket at 127.0.0.28:5001. tcspecial reads it and sends each reading to the ground over the payload's telemetry link, which the tcspecial section's payload_telemetry describes: from 127.0.0.28:6000 to 127.0.0.27:6100, the bases plus the sensor's device id, 0.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -36,19 +36,19 @@
   <rect class="payload" x="45" y="118" width="190" height="80" rx="10"/>
   <text class="name" x="61" y="145">sensor</text>
   <text class="kind" x="61" y="166">network payload, UDP</text>
-  <text class="detail" x="61" y="185">127.0.0.1:5001</text>
+  <text class="detail" x="61" y="185">127.0.0.28:5001</text>
 
   <!-- sensor's telemetry link, aboard -->
   <rect class="socket" x="330" y="118" width="220" height="80" rx="10"/>
   <text class="name" x="346" y="145">sensor telemetry</text>
   <text class="kind" x="346" y="166">telemetry link, device id 0</text>
-  <text class="detail" x="346" y="185">sends from 0.0.0.0:6000</text>
+  <text class="detail" x="346" y="185">sends from 127.0.0.28:6000</text>
 
   <!-- the ground station -->
   <rect class="ground" x="660" y="118" width="215" height="80" rx="10"/>
   <text class="name" x="676" y="145">MOC</text>
   <text class="kind" x="676" y="166">MOC</text>
-  <text class="detail" x="676" y="185">receives on 127.0.0.1:6100</text>
+  <text class="detail" x="676" y="185">receives on 127.0.0.27:6100</text>
 
   <!-- Links -->
   <path class="groundward" d="M235,158 L326,158" marker-end="url(#arrow-blue)"/>

@@ -7,7 +7,7 @@ description: Simulator settings for the payloads of cfs.ytcs
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
 tcs-sim:
-  ready: "127.0.0.1:7908"
+  ready: "127.0.0.12:7908"
 
 simulated_payloads:
   - type network:

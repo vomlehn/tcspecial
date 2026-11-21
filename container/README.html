@@ -420,9 +420,10 @@ login shells’ <code>YAMCS_HOME</code> says so:</p>
 <p><code>can</code>, <code>gpio</code> and <code>iio</code> drive the
 kernel’s dummy devices, which a rootless container cannot make, so they
 run only on the host. The logs the examples write are in the container’s
-<code>/tmp/telemetry</code>, made afresh for each run. A run lasts until
-its window is closed or Ctrl+C, and one left running, as by a terminal
-closed under it, is stopped by the next.
+<code>/tmp/telemetry</code>, each in a directory of its own, such as
+<code>/tmp/telemetry/battery</code>, made afresh for each run of it. A
+run lasts until its window is closed or Ctrl+C, and one left running, as
+by a terminal closed under it, is stopped by the next.
 <code>make container-example EXAMPLE=thermostat</code> does the same,
 with <code>HIDDEN=1</code> and <code>ARGS=</code> for the options.</p>
 <p><code>--hidden</code> is for testing: it draws the example’s window
@@ -432,7 +433,7 @@ has no window to close, so it is given a time to last, and what it did
 is read from its output and its log afterwards:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">timeout</span> 30 bin/tcs-container-example <span class="at">--hidden</span> battery <span class="op">&gt;</span> battery.out <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span></span>
 <span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-c</span> ERROR battery.out                       <span class="co"># 0: nothing went wrong</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-shell</span> ls /tmp/telemetry       <span class="co"># the log it wrote</span></span></code></pre></div>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-shell</span> ls /tmp/telemetry/battery  <span class="co"># the log it wrote</span></span></code></pre></div>
 <p>The next run stops what the timeout left running in the
 container.</p>
 <h1 id="editing-configurations">Editing configurations</h1>

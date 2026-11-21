@@ -31,7 +31,7 @@ SBN_ConfTbl_t SBN_ConfTbl = {.ProtocolModules = {{/* [0] */
                                       .SpacecraftID = 0x42,
                                       .NetNum       = 0,
                                       .ProtocolName = "UDP",
-                                      .Address      = "127.0.0.1:8634",
+                                      .Address      = "127.0.0.12:8634",
                                       .TaskFlags    = SBN_TASK_POLL},
                                  },
                              .PeerCnt = 2};

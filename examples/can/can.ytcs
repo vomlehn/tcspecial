@@ -9,29 +9,29 @@ tcspecial:
   # while another is looked at.
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:3510"
+    recv: "127.0.0.9:3510"
     reset_interval: "1 s"
-    send: "0.0.0.0:3500"
+    send: "127.0.0.10:3500"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/can"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:3300"
-    source_base: "127.0.0.1:3310"
+    dest_base: "127.0.0.10:3300"
+    source_base: "127.0.0.9:3310"
   payload_telemetry:
-    dest_base: "127.0.0.1:3410"
-    source_base: "0.0.0.0:3400"
+    dest_base: "127.0.0.9:3410"
+    source_base: "127.0.0.10:3400"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-can.state"
   tcs_cmd:
-    recv: "0.0.0.0:3200"
-    send: "127.0.0.1:3210"
+    recv: "127.0.0.10:3200"
+    send: "127.0.0.9:3210"
 
 gateways:
   - type gateway_radio:
@@ -39,10 +39,10 @@ gateways:
       # to address:port, which this node binds aboard, and leaves it by
       # moc-out for the motor's commands. What comes down arrives at
       # ground_base plus the device id of the node that sent it: the motor's
-      # status, device id 2, at 127.0.0.1:3702.
+      # status, device id 2, at 127.0.0.9:3702.
       - gateway: moc
-        address: "127.0.0.1:3600"
-        ground_base: "127.0.0.1:3700"
+        address: "127.0.0.10:3600"
+        ground_base: "127.0.0.9:3700"
         moc-out:
           - motor_command.moc
         world-in: [motor_status]

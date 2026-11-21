@@ -520,9 +520,10 @@ mod tests {
             .iter_mut()
             .find(|n| n.name == "heater")
             .expect("the cfs example has a heater");
-        heater
-            .attributes
-            .insert("address".to_string(), crate::Scalar::of("127.0.0.1:8634"));
+        heater.attributes.insert(
+            "address".to_string(),
+            crate::Scalar::of("127.0.0.12:8634"),
+        );
         let found = clashes(&graph);
         assert_eq!(found.len(), 1, "{found:?}");
         assert_eq!(found[0].node.as_deref(), Some("heater"));

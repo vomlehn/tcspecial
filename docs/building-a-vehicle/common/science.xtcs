@@ -80,7 +80,7 @@
             <payload name="probe_heater">
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
-                <sim_address>127.0.0.1:5402</sim_address>
+                <sim_address>127.0.0.36:5402</sim_address>
                 <state_interval>1 s</state_interval>
                 <moc-in>probe_thermostat</moc-in>
                 <world-out>gateway.probe_heater</world-out>
@@ -96,7 +96,7 @@
                  place to receive the vehicle's data from. -->
             <payload name="seismometer">
                 <read_size>16</read_size>
-                <address>127.0.0.1:5401</address>
+                <address>127.0.0.36:5401</address>
                 <group>science_readings</group>
                 <protocol>udp</protocol>
                 <world-out>gateway.seismometer</world-out>

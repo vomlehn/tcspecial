@@ -9,7 +9,7 @@ description: Simulator settings for stage 1 of Building a Vehicle
 # whatever starts the run asks before it starts tcspecial. A port no
 # example and no other stage uses, so that two can be run at once.
 tcs-sim:
-  ready: "127.0.0.1:7920"
+  ready: "127.0.0.36:7920"
 
 simulated_payloads:
   - type network:

@@ -30,7 +30,7 @@
         <gateway>cfs</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/cfs</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
@@ -55,7 +55,7 @@
              event. -->
         <sbn>
             <ident>3b339a5e0f686cef822a5d6ea95004222ab7af33</ident>
-            <local>0.0.0.0:8634</local>
+            <local>127.0.0.12:8634</local>
             <max_message>32768</max_message>
             <peer>127.0.0.1:2234</peer>
             <peer_processor_id>1</peer_processor_id>
@@ -93,14 +93,14 @@
             <!-- A heater, driven by what the flight computer sends: the far
                  end of a UDP socket. -->
             <payload name="heater">
-                <address>127.0.0.1:8601</address>
+                <address>127.0.0.12:8601</address>
                 <protocol>udp</protocol>
                 <moc-in>fsw</moc-in>
             </payload>
             <!-- A thermometer whose readings go to the flight computer. -->
             <payload name="thermometer">
                 <read_size>16</read_size>
-                <address>127.0.0.1:8602</address>
+                <address>127.0.0.12:8602</address>
                 <protocol>udp</protocol>
                 <world-out>fsw.thermometer</world-out>
             </payload>

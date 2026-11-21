@@ -67,7 +67,7 @@ vehicle:
       # beside tcspecial's own executable, to be sent to the ground when it can
       # be.
       - compute: science_log
-        directory: "/tmp/telemetry"
+        directory: "/tmp/telemetry/building-a-vehicle"
         format: "variable_ts_rc"
         segment_bytes: "65536"
         world-in: [regolith_kelvin, seismometer]
@@ -83,7 +83,7 @@ payloads:
       - payload: probe_heater
         lines: "4"
         path: "/dev/gpiochip1"
-        sim_address: "127.0.0.1:5402"
+        sim_address: "127.0.0.36:5402"
         state_interval: "1 s"
         moc-in: [probe_thermostat]
         world-out:
@@ -97,7 +97,7 @@ payloads:
       # has one place to receive the vehicle's data from.
       - payload: seismometer
         read_size: "16"
-        address: "127.0.0.1:5401"
+        address: "127.0.0.36:5401"
         group: "science_readings"
         protocol: "udp"
         world-out:

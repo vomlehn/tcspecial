@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1300" height="900" viewBox="0 0 1300 900" role="img" aria-labelledby="title desc">
   <title id="title">The descent example</title>
-  <desc id="desc">A lander's terminal descent. radar, a radar altimeter at the far end of a UDP socket at 127.0.0.1:5401, sends the altitude ten times a second, which altitude makes a value in metres. doppler, a Doppler velocimeter at 127.0.0.1:5402, sends the velocity five times a second, which descent_rate makes a value in metres a second. guidance, a program, flies a descent from the altitude alone and answers a throttle, a ratio, which goes by its gateway-out link to engine, at 127.0.0.1:5404, the engine's throttle. touchdown, a switch on a landing leg at 127.0.0.1:5403, says 1 when the lander is on the ground. Every value, and the switch, goes to the gateway node on the ground. tcs-sim simulates the four payloads, joined to a physics model of an engine and the body it brakes. tcspecial sends what altitude, descent_rate, guidance and touchdown produce as UDP datagrams to the gateway node's ground_base, 127.0.0.1:5100, plus each source's device id.</desc>
+  <desc id="desc">A lander's terminal descent. radar, a radar altimeter at the far end of a UDP socket at 127.0.0.16:5401, sends the altitude ten times a second, which altitude makes a value in metres. doppler, a Doppler velocimeter at 127.0.0.16:5402, sends the velocity five times a second, which descent_rate makes a value in metres a second. guidance, a program, flies a descent from the altitude alone and answers a throttle, a ratio, which goes by its gateway-out link to engine, at 127.0.0.16:5404, the engine's throttle. touchdown, a switch on a landing leg at 127.0.0.16:5403, says 1 when the lander is on the ground. Every value, and the switch, goes to the gateway node on the ground. tcs-sim simulates the four payloads, joined to a physics model of an engine and the body it brakes. tcspecial sends what altitude, descent_rate, guidance and touchdown produce as UDP datagrams to the gateway node's ground_base, 127.0.0.15:5100, plus each source's device id.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -49,22 +49,22 @@
   <rect class="payload" x="60" y="100" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="124">radar</text>
   <text class="kind" x="74" y="144">network, udp</text>
-  <text class="detail" x="74" y="162">127.0.0.1:5401</text>
+  <text class="detail" x="74" y="162">127.0.0.16:5401</text>
 
   <rect class="payload" x="60" y="220" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="244">doppler</text>
   <text class="kind" x="74" y="264">network, udp</text>
-  <text class="detail" x="74" y="282">127.0.0.1:5402</text>
+  <text class="detail" x="74" y="282">127.0.0.16:5402</text>
 
   <rect class="payload" x="60" y="340" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="364">touchdown</text>
   <text class="kind" x="74" y="384">network, udp</text>
-  <text class="detail" x="74" y="402">127.0.0.1:5403</text>
+  <text class="detail" x="74" y="402">127.0.0.16:5403</text>
 
   <rect class="payload" x="60" y="500" width="170" height="74" rx="10"/>
   <text class="name" x="74" y="524">engine</text>
   <text class="kind" x="74" y="544">network, udp</text>
-  <text class="detail" x="74" y="562">127.0.0.1:5404</text>
+  <text class="detail" x="74" y="562">127.0.0.16:5404</text>
 
   <!-- Conversions -->
   <rect class="vehicle" x="300" y="100" width="170" height="74" rx="10"/>
@@ -91,8 +91,8 @@
   <rect class="gateway" x="1030" y="96" width="230" height="96" rx="10"/>
   <text class="name" x="1044" y="120">gateway</text>
   <text class="kind" x="1044" y="140">receives what tcspecial sends</text>
-  <text class="detail" x="1044" y="158">ground_base 127.0.0.1:5100</text>
-  <text class="detail" x="1044" y="176">commands to 127.0.0.1:5000</text>
+  <text class="detail" x="1044" y="158">ground_base 127.0.0.15:5100</text>
+  <text class="detail" x="1044" y="176">commands to 127.0.0.16:5000</text>
 
   <!-- The ground software -->
   <rect class="ground" x="1030" y="430" width="230" height="80" rx="10"/>

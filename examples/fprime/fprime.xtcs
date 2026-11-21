@@ -15,24 +15,24 @@
              as tcspecial can tell. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:9510</recv>
+            <recv>127.0.0.17:9510</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:9500</send>
+            <send>127.0.0.18:9500</send>
         </beacon>
         <gateway>fprime</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/fprime</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:9300</dest_base>
-            <source_base>127.0.0.1:9310</source_base>
+            <dest_base>127.0.0.18:9300</dest_base>
+            <source_base>127.0.0.17:9310</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:9410</dest_base>
-            <source_base>0.0.0.0:9400</source_base>
+            <dest_base>127.0.0.17:9410</dest_base>
+            <source_base>127.0.0.18:9400</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -40,8 +40,8 @@
              on storage that survives a power cycle. -->
         <state_file>/tmp/tcspecial-fprime.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:9200</recv>
-            <send>127.0.0.1:9210</send>
+            <recv>127.0.0.18:9200</recv>
+            <send>127.0.0.17:9210</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
@@ -52,12 +52,12 @@
                  comes down arrives at bridge_base plus the device id of the
                  node that sent it, and the bridge gives it the F´ ID
                  fprime_id_base plus that same id: heater_wanted, device id
-                 2, arrives at 127.0.0.1:9702 as 0x3002, the thermometer,
-                 device id 3, at 127.0.0.1:9703 as 0x3003, and
-                 zone_temp, device id 4, at 127.0.0.1:9704 as 0x3004. -->
+                 2, arrives at 127.0.0.17:9702 as 0x3002, the thermometer,
+                 device id 3, at 127.0.0.17:9703 as 0x3003, and
+                 zone_temp, device id 4, at 127.0.0.17:9704 as 0x3004. -->
             <gateway name="fsw">
-                <address>127.0.0.1:9600</address>
-                <bridge_base>127.0.0.1:9700</bridge_base>
+                <address>127.0.0.18:9600</address>
+                <bridge_base>127.0.0.17:9700</bridge_base>
                 <fprime_id_base>0x3000</fprime_id_base>
                 <moc-out>heater.fsw</moc-out>
                 <world-in>heater_wanted</world-in>
@@ -71,7 +71,7 @@
             <!-- A heater, driven by what the flight computer sends - 1 for
                  on, 0 for off - the far end of a UDP socket. -->
             <payload name="heater">
-                <address>127.0.0.1:9001</address>
+                <address>127.0.0.18:9001</address>
                 <protocol>udp</protocol>
                 <moc-in>fsw</moc-in>
             </payload>
@@ -79,7 +79,7 @@
                  of a degree, whose readings go to the flight computer as
                  they are, and to zone_temp to be made a temperature. -->
             <payload name="thermometer">
-                <address>127.0.0.1:9002</address>
+                <address>127.0.0.18:9002</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>fsw.thermometer</world-out>

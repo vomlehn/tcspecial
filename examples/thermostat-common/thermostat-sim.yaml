@@ -4,7 +4,7 @@ description: Simulator settings for the payloads of thermostat.ytcs and
   thermostat-yamcs.ytcs
 
 tcs-sim:
-  ready: 127.0.0.1:7907
+  ready: 127.0.0.4:7907
 
 world:
   ambient_temp: "288.15 K"

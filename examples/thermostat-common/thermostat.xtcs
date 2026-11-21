@@ -110,7 +110,7 @@
             <payload name="gpio-out-tmass1">
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
-                <sim_address>127.0.0.1:5204</sim_address>
+                <sim_address>127.0.0.4:5204</sim_address>
                 <state_interval>1 s</state_interval>
                 <moc-in>thermostat</moc-in>
                 <world-out>gateway.gpio-out-tmass1</world-out>
@@ -118,7 +118,7 @@
             <payload name="gpio-out-tmass2">
                 <lines>5</lines>
                 <path>/dev/gpiochip1</path>
-                <sim_address>127.0.0.1:5205</sim_address>
+                <sim_address>127.0.0.4:5205</sim_address>
                 <state_interval>1 s</state_interval>
                 <moc-in>thermostat</moc-in>
                 <world-out>gateway.gpio-out-tmass2</world-out>
@@ -138,7 +138,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5201</sim_address>
+                <sim_address>127.0.0.4:5201</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_k1.temp_1</world-out>
             </payload>
@@ -148,7 +148,7 @@
                 <group>zone_temps</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5202</sim_address>
+                <sim_address>127.0.0.4:5202</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_k2.temp_2</world-out>
             </payload>
@@ -163,7 +163,7 @@
                 <max_speed>1000000</max_speed>
                 <path>/dev/spidev0.0</path>
                 <read_size>3</read_size>
-                <sim_address>127.0.0.1:5203</sim_address>
+                <sim_address>127.0.0.4:5203</sim_address>
                 <spi_mode>0</spi_mode>
                 <world-out-type>u32</world-out-type>
                 <world-out>to_k3.temp_3</world-out>

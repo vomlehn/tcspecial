@@ -57,16 +57,18 @@ impl Drop for Flying {
 fn example(dir: &Path) -> (std::path::PathBuf, u16) {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/cfs/cfs.ytcs");
-    let mut text = tcsos::fs::read_to_string(&path).expect("the example reads");
+    let mut text = common::on_one_host(
+        &tcsos::fs::read_to_string(&path).expect("the example reads"),
+    );
     tcsos::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
     let thermometer = free();
     for (was, now) in [
-        ("0.0.0.0:8634", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:8634", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:2234", format!("127.0.0.1:{}", free())),
         (":8601\"", format!(":{}\"", free())),
         (":8602\"", format!(":{thermometer}\"")),
         (
-            "/tmp/telemetry",
+            "/tmp/telemetry/cfs",
             dir.join("telemetry").display().to_string(),
         ),
         (

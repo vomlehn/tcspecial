@@ -641,7 +641,7 @@ fn the_summary_lists_the_gateway_ports_by_source() {
         assert!(
             lines
                 .iter()
-                .any(|line| line.contains(&format!("127.0.0.1:{port}"))
+                .any(|line| line.contains(&format!("127.0.0.3:{port}"))
                     && line.contains(&format!("what \"{source}\" sends"))),
             "{source} at {port}: {lines:?}"
         );
@@ -766,4 +766,125 @@ fn a_payload_on_the_command_port_fails_the_run() {
     let file = with_payloads_at(dir.path(), &[("one", 7001)]);
     let (lines, status) = run(&[file.to_str().expect("path")]);
     assert_eq!(status, 0, "{lines:?}");
+}
+
+/// Every example's configuration but the files they include, and the
+/// vehicle each is part of: an example on its own, or the stages of
+/// Building a Vehicle, the two landers or the two thermostats, which are
+/// each one vehicle run one at a time.
+///
+/// # Returns
+///
+/// Each configuration's path and the name of the vehicle it is.
+fn every_example() -> Vec<(PathBuf, String)> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let mut found = vec![(root.join("example.ytcs"), "example".to_string())];
+    let mut add = |dir: PathBuf| {
+        let entries = tcsos::fs::read_dir(&dir).expect("the directory reads");
+        for entry in entries {
+            let path = entry.expect("an entry").path();
+            let name = path.to_string_lossy().to_string();
+            if path.extension().is_some_and(|e| e == "ytcs")
+                && !name.contains("-common/")
+                && !name.contains("/common/")
+            {
+                let vehicle = if name.contains("building-a-vehicle") {
+                    "building-a-vehicle"
+                } else if name.contains("/lander-") {
+                    "lander"
+                } else if name.contains("/thermostat") {
+                    "thermostat"
+                } else {
+                    &name
+                };
+                found.push((path, vehicle.to_string()));
+            }
+        }
+    };
+    for parent in ["examples", "docs/building-a-vehicle"] {
+        let dirs = tcsos::fs::read_dir(root.join(parent)).expect("it reads");
+        for dir in dirs {
+            let dir = dir.expect("an entry").path();
+            if tcsos::fs::metadata(&dir).is_ok_and(|m| m.is_dir()) {
+                add(dir);
+            }
+        }
+    }
+    found
+}
+
+/// No two examples bind one socket, so that any two may run at once: each
+/// has its own pair of loopback hosts, the MOC on the odd one and the
+/// vehicle on the even one after it, and binds nothing at `0.0.0.0`, which
+/// would hold its port on every host. A port reached as a base plus a device
+/// id counts, as `--summary` lists it. Examples that are one vehicle -- the
+/// stages of Building a Vehicle, the two landers, the two thermostats --
+/// share theirs, and run one at a time.
+#[test]
+fn no_two_examples_bind_one_socket() {
+    let mut taken: Vec<(String, u16, String, String)> = Vec::new();
+    for (path, vehicle) in every_example() {
+        let shown = path.to_string_lossy().to_string();
+        let (lines, status) = run(&["--summary", &shown]);
+        assert_eq!(status, 0, "{shown}: {lines:?}");
+        let start = lines
+            .iter()
+            .position(|l| l == "Addresses and ports")
+            .unwrap_or_else(|| panic!("{shown}: no addresses"));
+        let mut here = Vec::new();
+        for line in lines[start + 2..].iter().take_while(|l| !l.is_empty()) {
+            let at = line.split_whitespace().next().expect("an address");
+            let (host, port) = at.rsplit_once(':').expect("host:port");
+            let port: u16 = port.parse().expect("a port");
+            assert_ne!(host, "0.0.0.0", "{shown} binds {at}");
+            if port == 0 {
+                continue;
+            }
+            for (h, p, other, by) in &taken {
+                assert!(
+                    *p != port || *h != host || *other == vehicle,
+                    "{shown} and {by} both bind {at}"
+                );
+            }
+            here.push((host.to_string(), port, vehicle.clone(), shown.clone()));
+        }
+        taken.extend(here);
+    }
+}
+
+/// No two examples that are not one vehicle hold anything one would take
+/// from the other -- a socket, a log directory, a state file -- so that any
+/// two may run at once, each logging in a directory of its own under
+/// `/tmp/telemetry`. What tcs-conflict says of two configurations is what is
+/// asked. A device under `/dev` is left out: the examples are written for
+/// one board, a desk simulates every device they name, and two of them are
+/// never flown on one board.
+#[test]
+fn no_two_examples_hold_one_thing() {
+    use tcsprotocol::graph::check::Severity;
+    use tcsprotocol::graph::conflict::{between, holdings};
+    let held: Vec<(String, String, Vec<_>)> = every_example()
+        .into_iter()
+        .map(|(path, vehicle)| {
+            let graph = tcsprotocol::graph::Graph::load(&path)
+                .unwrap_or_else(|e| panic!("{}: {e:?}", path.display()));
+            let shown = path.to_string_lossy().to_string();
+            (shown, vehicle, holdings(&graph, None))
+        })
+        .collect();
+    for (i, (one, one_vehicle, one_holds)) in held.iter().enumerate() {
+        for (two, two_vehicle, two_holds) in &held[i + 1..] {
+            if one_vehicle == two_vehicle {
+                continue;
+            }
+            for conflict in between(one_holds, two_holds) {
+                assert!(
+                    !matches!(conflict.severity, Severity::Error)
+                        || conflict.why.contains("/dev/"),
+                    "{one} and {two}: {}",
+                    conflict.why
+                );
+            }
+        }
+    }
 }

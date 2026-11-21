@@ -63,13 +63,13 @@ class ConfigurationTest(unittest.TestCase):
     def test_the_shipped_example_says_where_everything_is(self):
         config = configuration.load(PING)
         link = config.beacon_link()
-        self.assertEqual(link.send, HostPort("0.0.0.0", 7500))
-        self.assertEqual(link.recv, HostPort("127.0.0.1", 7510))
-        self.assertEqual(config.uplink("gateway"), HostPort("127.0.0.1", 7600))
+        self.assertEqual(link.send, HostPort("127.0.0.30", 7500))
+        self.assertEqual(link.recv, HostPort("127.0.0.29", 7510))
+        self.assertEqual(config.uplink("gateway"), HostPort("127.0.0.30", 7600))
         # ping is the second of the two names, device id 1.
         self.assertEqual(config.device_id("ping"), 1)
         self.assertEqual(config.downlink("gateway", "ping"),
-                         HostPort("127.0.0.1", 7701))
+                         HostPort("127.0.0.29", 7701))
 
     def test_the_beacon_interval_is_read_as_the_rust_reads_one(self):
         self.assertEqual(configuration.load(PING).beacon_interval(),

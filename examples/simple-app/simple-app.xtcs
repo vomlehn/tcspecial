@@ -6,24 +6,24 @@
     <tcspecial>
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:5650</recv>
+            <recv>127.0.0.31:5650</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5550</send>
+            <send>127.0.0.32:5550</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/simple-app</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
-            <source_base>127.0.0.1:4300</source_base>
+            <dest_base>127.0.0.32:4200</dest_base>
+            <source_base>127.0.0.31:4300</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
+            <dest_base>127.0.0.31:6100</dest_base>
+            <source_base>127.0.0.32:6000</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -31,8 +31,8 @@
              on storage that survives a power cycle. -->
         <state_file>/tmp/tcspecial-simple-app.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
+            <recv>127.0.0.32:4000</recv>
+            <send>127.0.0.31:4100</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
@@ -41,13 +41,13 @@
             <!-- sends what each node drawn into it produces as UDP -->
             <!-- datagrams to ground_base's address, at its port plus -->
             <!-- that node's device id: lorem is id 1, so its words go -->
-            <!-- to 127.0.0.1:5101. Ground software gets them from this node -->
+            <!-- to 127.0.0.31:5101. Ground software gets them from this node -->
             <!-- with a function call, -->
             <!-- tcsmoc::gateway::GatewayReceiver::receive: run -->
             <!-- `lorem_gateway` to be that ground. It states no address or -->
             <!-- port of its own, because nothing comes back up. -->
             <gateway name="gateway-1">
-                <ground_base>127.0.0.1:5100</ground_base>
+                <ground_base>127.0.0.31:5100</ground_base>
                 <world-in>lorem</world-in>
             </gateway>
         </type>

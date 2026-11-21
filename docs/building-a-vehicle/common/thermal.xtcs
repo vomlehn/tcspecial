@@ -96,7 +96,7 @@
                 <group>hull_readings</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5403</sim_address>
+                <sim_address>127.0.0.36:5403</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>hull_kelvin_1.hull_temp_1</world-out>
             </payload>
@@ -107,7 +107,7 @@
                 <group>hull_readings</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5404</sim_address>
+                <sim_address>127.0.0.36:5404</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>hull_kelvin_2.hull_temp_2</world-out>
             </payload>
@@ -117,7 +117,7 @@
                 <group>hull_readings</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5405</sim_address>
+                <sim_address>127.0.0.36:5405</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>hull_kelvin_3.hull_temp_3</world-out>
             </payload>

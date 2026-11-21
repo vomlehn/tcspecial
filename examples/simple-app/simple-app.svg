@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1020" height="470" viewBox="0 0 1020 470" role="img" aria-labelledby="title desc">
   <title id="title">The simple-app example</title>
-  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. tcspecial sends each word it produces as a UDP datagram to the gateway node on the ground, gateway-1, at its ground_base, 127.0.0.1:5100, plus lorem's device id, 1: port 5101. The ground program lorem_gateway gets the words from gateway-1 with a function call, tcsmoc's GatewayReceiver::receive, and prints the line.</desc>
+  <desc id="desc">One payload that is a program, lorem, an app_pl node that tcspecial starts as the Python 3 program examples/simple-app/lorem_pl.py with the argument 1. tcspecial sends each word it produces as a UDP datagram to the gateway node on the ground, gateway-1, at its ground_base, 127.0.0.31:5100, plus lorem's device id, 1: port 5101. The ground program lorem_gateway gets the words from gateway-1 with a function call, tcsmoc's GatewayReceiver::receive, and prints the line.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -51,7 +51,7 @@
   <rect class="socket" x="310" y="110" width="240" height="80" rx="10"/>
   <text class="name" x="326" y="136">lorem to gateway-1</text>
   <text class="kind" x="326" y="157">sends each datum as UDP</text>
-  <text class="detail" x="326" y="176">to 127.0.0.1:5101</text>
+  <text class="detail" x="326" y="176">to 127.0.0.31:5101</text>
 
   <text class="note" x="298" y="226">5101 is gateway-1's ground_base port,</text>
   <text class="note" x="298" y="242">5100, plus lorem's device id, 1.</text>
@@ -60,7 +60,7 @@
   <rect class="gateway" x="670" y="110" width="280" height="80" rx="10"/>
   <text class="name" x="686" y="136">gateway-1</text>
   <text class="kind" x="686" y="157">receives what tcspecial sends</text>
-  <text class="detail" x="686" y="176">ground_base 127.0.0.1:5100</text>
+  <text class="detail" x="686" y="176">ground_base 127.0.0.31:5100</text>
 
   <!-- The ground program -->
   <rect class="ground" x="670" y="262" width="280" height="80" rx="10"/>

@@ -90,8 +90,9 @@ help:
 # Running an example: tcsx, examples/tcsx, runs it from these examples and
 # the programs of this tree's debug build, as it does an installed one from
 # what tcspecial-examples installs, so how each example is run is said
-# once, there. tcsx makes /tmp/telemetry, where the examples log, afresh
-# for each run, so that what is in it afterwards is that run's alone.
+# once, there. tcsx makes the example's own directory under /tmp/telemetry,
+# where it logs, afresh for each run, so that what is in it afterwards is
+# that run's alone.
 #
 # $(1) is the example, $(2) the programs built for it first, and $(3) what
 # tcsx gives its ground station. tcspecial gives each filled log segment to

@@ -7,35 +7,35 @@ description: "A spacecraft's power bus: a solar array and a battery, a
 tcspecial:
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:5650"
+    recv: "127.0.0.5:5650"
     reset_interval: "1 s"
-    send: "0.0.0.0:5550"
+    send: "127.0.0.6:5550"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/battery"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:4200"
-    source_base: "127.0.0.1:4300"
+    dest_base: "127.0.0.6:4200"
+    source_base: "127.0.0.5:4300"
   payload_telemetry:
-    dest_base: "127.0.0.1:6100"
-    source_base: "0.0.0.0:6000"
+    dest_base: "127.0.0.5:6100"
+    source_base: "127.0.0.6:6000"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-battery.state"
   tcs_cmd:
-    recv: "0.0.0.0:4000"
-    send: "127.0.0.1:4100"
+    recv: "127.0.0.6:4000"
+    send: "127.0.0.5:4100"
 
 gateways:
   - type gateway_radio:
       - gateway: gateway
-        address: "127.0.0.1:5000"
-        ground_base: "127.0.0.1:5100"
+        address: "127.0.0.6:5000"
+        ground_base: "127.0.0.5:5100"
         world-in: [battery_amps, bus_volts, charge, shedding]
 
 vehicle:
@@ -104,14 +104,14 @@ payloads:
       # The science instrument's power switch, driven by what shedding decides
       # -- 1 to shed it, 0 to restore it.
       - payload: science
-        address: "127.0.0.1:5302"
+        address: "127.0.0.6:5302"
         moc-in-type: "u8"
         protocol: "udp"
         moc-in: [shedding]
       # The shunt in the battery's lead, which sends its current twice a
       # second of its own accord.
       - payload: shunt
-        address: "127.0.0.1:5301"
+        address: "127.0.0.6:5301"
         protocol: "udp"
         world-out-type: "i16"
         world-out:

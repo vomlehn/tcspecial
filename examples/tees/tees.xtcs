@@ -9,24 +9,24 @@
              at. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:8510</recv>
+            <recv>127.0.0.33:8510</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:8500</send>
+            <send>127.0.0.34:8500</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/tees</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:8300</dest_base>
-            <source_base>127.0.0.1:8310</source_base>
+            <dest_base>127.0.0.34:8300</dest_base>
+            <source_base>127.0.0.33:8310</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:8410</dest_base>
-            <source_base>0.0.0.0:8400</source_base>
+            <dest_base>127.0.0.33:8410</dest_base>
+            <source_base>127.0.0.34:8400</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -34,8 +34,8 @@
              on storage that survives a power cycle. -->
         <state_file>/tmp/tcspecial-tees.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:8200</recv>
-            <send>127.0.0.1:8210</send>
+            <recv>127.0.0.34:8200</recv>
+            <send>127.0.0.33:8210</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
@@ -46,8 +46,8 @@
                  comes down arrives at ground_base plus the device id of the
                  node that sent it. -->
             <gateway name="moc">
-                <address>127.0.0.1:8600</address>
-                <ground_base>127.0.0.1:8700</ground_base>
+                <address>127.0.0.34:8600</address>
+                <ground_base>127.0.0.33:8700</ground_base>
                 <moc-out>echo.moc</moc-out>
                 <world-in>echo</world-in>
                 <world-in>readings</world-in>
@@ -59,7 +59,7 @@
             <!-- A heater, driven by what the ground sends: the far end of a UDP
                  socket. -->
             <payload name="heater">
-                <address>127.0.0.1:8001</address>
+                <address>127.0.0.34:8001</address>
                 <protocol>udp</protocol>
                 <moc-in>echo</moc-in>
             </payload>
@@ -67,14 +67,14 @@
             <!-- aboard. -->
             <payload name="sensor">
                 <read_size>16</read_size>
-                <address>127.0.0.1:8002</address>
+                <address>127.0.0.34:8002</address>
                 <protocol>udp</protocol>
                 <world-out>readings.sensor</world-out>
             </payload>
             <!-- A payload whose data nobody wants yet. -->
             <payload name="spare">
                 <read_size>16</read_size>
-                <address>127.0.0.1:8003</address>
+                <address>127.0.0.34:8003</address>
                 <protocol>udp</protocol>
                 <world-out>unheard.spare</world-out>
             </payload>

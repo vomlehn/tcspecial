@@ -19,7 +19,7 @@ tcspecial:
     default_interval: "5 s"
     recv: "127.0.0.1:19510"
     reset_interval: "1 s"
-    send: "0.0.0.0:19500"
+    send: "127.0.0.24:19500"
   gateway: "yamcs"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
@@ -27,28 +27,28 @@ tcspecial:
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:19300"
+    dest_base: "127.0.0.24:19300"
     source_base: "127.0.0.1:0"
   payload_telemetry:
     apid_base: "0x500"
     dest_base: "127.0.0.1:19410"
-    source_base: "0.0.0.0:19400"
+    source_base: "127.0.0.24:19400"
   state_file: "/tmp/tcspecial-lander-a.state"
   tcs_cmd:
     apid: "0x111"
-    recv: "0.0.0.0:19200"
+    recv: "127.0.0.24:19200"
     send: "127.0.0.1:0"
 
 gateways:
   - type gateway_yamcs:
       - gateway: gateway
-        address: "127.0.0.1:19600"
+        address: "127.0.0.24:19600"
         apid_base: "0x400"
         ground_base: "127.0.0.1:19700"
         world-in: [sky, to_accel_x, to_fuel, to_joystick_3_4_x, to_velocity_x,
           to_x]
       - gateway: gateway_sky
-        address: "127.0.0.1:19601"
+        address: "127.0.0.24:19601"
         apid_base: "0x480"
         ground_base: "127.0.0.1:19750"
         moc-out:
@@ -107,46 +107,46 @@ vehicle:
 payloads:
   - type network:
       - payload: accel_x
-        address: "127.0.0.1:19803"
+        address: "127.0.0.24:19803"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_accel_x.accel_x
       - payload: fuel
-        address: "127.0.0.1:19804"
+        address: "127.0.0.24:19804"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_fuel.fuel
       - payload: joystick_3_4_x
-        address: "127.0.0.1:19805"
+        address: "127.0.0.24:19805"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_joystick_3_4_x.joystick_3_4_x
       - payload: sky
         read_size: "64"
-        address: "127.0.0.1:19808"
+        address: "127.0.0.24:19808"
         protocol: "udp"
         world-out:
           - gateway.sky
       - payload: sky_quench
-        address: "127.0.0.1:19809"
+        address: "127.0.0.24:19809"
         protocol: "udp"
         moc-in: [gateway_sky]
       - payload: thruster_x
-        address: "127.0.0.1:19806"
+        address: "127.0.0.24:19806"
         moc-in-type: "ratio"
         protocol: "udp"
         moc-in: [to_joystick_3_4_x]
       - payload: velocity_x
-        address: "127.0.0.1:19802"
+        address: "127.0.0.24:19802"
         protocol: "udp"
         world-out-type: "i16"
         world-out:
           - to_velocity_x.velocity_x
       - payload: x
-        address: "127.0.0.1:19801"
+        address: "127.0.0.24:19801"
         protocol: "udp"
         world-out-type: "i16"
         world-out:

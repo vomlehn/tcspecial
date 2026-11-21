@@ -15,6 +15,6 @@ description: Simulator settings for simple-app.ytcs, whose payload is a program
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.
 tcs-sim:
-  ready: "127.0.0.1:7905"
+  ready: "127.0.0.32:7905"
 
 simulated_payloads: []

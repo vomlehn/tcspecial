@@ -40,8 +40,8 @@ const NODE_ANSWERS: u16 = 0x4210;
 /// Where the example's payloads are: the heater, which tcspecial sends to
 /// and the test listens as, and the thermometer, which tcspecial listens on
 /// and the test sends readings to.
-const HEATER: &str = "127.0.0.1:8601";
-const THERMOMETER_AT: &str = "127.0.0.1:8602";
+const HEATER: &str = "127.0.0.12:8601";
+const THERMOMETER_AT: &str = "127.0.0.12:8602";
 
 /// CI_LAB's uplink, processor 1's port, and where TO_LAB sends: their
 /// defaults (`CI_LAB_BASE_UDP_PORT`, `TO_LAB_TLM_PORT`).

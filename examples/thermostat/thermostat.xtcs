@@ -5,24 +5,24 @@
     <tcspecial>
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:5650</recv>
+            <recv>127.0.0.3:5650</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5550</send>
+            <send>127.0.0.4:5550</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/thermostat</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
-            <source_base>127.0.0.1:4300</source_base>
+            <dest_base>127.0.0.4:4200</dest_base>
+            <source_base>127.0.0.3:4300</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
+            <dest_base>127.0.0.3:6100</dest_base>
+            <source_base>127.0.0.4:6000</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -30,16 +30,16 @@
              on storage that survives a power cycle. -->
         <state_file>/tmp/tcspecial-thermostat.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
+            <recv>127.0.0.4:4000</recv>
+            <send>127.0.0.3:4100</send>
         </tcs_cmd>
     </tcspecial>
     <include name="thermostat-common" path="../thermostat-common/thermostat"/>
     <gateways>
         <type name="gateway_radio">
             <gateway name="gateway">
-                <address>127.0.0.1:5000</address>
-                <ground_base>127.0.0.1:5100</ground_base>
+                <address>127.0.0.4:5000</address>
+                <ground_base>127.0.0.3:5100</ground_base>
                 <world-in>consensus_temp</world-in>
                 <world-in>gpio-out-tmass1</world-in>
                 <world-in>gpio-out-tmass2</world-in>

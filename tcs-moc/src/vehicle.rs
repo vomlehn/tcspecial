@@ -4720,14 +4720,14 @@ vehicle:
 
         // tcs_cmd.send and tcs_cmd.recv: this end sends from the first and
         // the vehicle takes them on the second.
-        assert_eq!(from, "127.0.0.1:4100");
-        assert_eq!(to, "0.0.0.0:4000");
+        assert_eq!(from, "127.0.0.31:4100");
+        assert_eq!(to, "127.0.0.32:4000");
 
         // And one link for every node, not one per node: the base itself,
         // with nothing added to it, because the id is in the message.
         let Commanded { from, to } = commanded;
-        assert_eq!(from.to_string(), "127.0.0.1:4300");
-        assert_eq!(to.to_string(), "0.0.0.0:4200");
+        assert_eq!(from.to_string(), "127.0.0.31:4300");
+        assert_eq!(to.to_string(), "127.0.0.32:4200");
     }
 
     /// A panel offers what the configuration says may be set on its node, and

@@ -26,7 +26,7 @@
             <default_interval>5 s</default_interval>
             <recv>127.0.0.1:5650</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5550</send>
+            <send>127.0.0.36:5550</send>
         </beacon>
         <!-- The ground is Yamcs, so every packet on every link to the
              ground carries a CCSDS primary header, and each link says its
@@ -35,7 +35,7 @@
         <gateway>yamcs</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/building-a-vehicle</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
@@ -48,7 +48,7 @@
              it is not changed while tcspecial is running. At present only
              applications use the payload_command values. -->
         <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
+            <dest_base>127.0.0.36:4200</dest_base>
             <source_base>127.0.0.1:4300</source_base>
         </payload_command>
         <!-- tcspecial sends telemetry from the network interface
@@ -61,7 +61,7 @@
         <payload_telemetry>
             <apid_base>0x500</apid_base>
             <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
+            <source_base>127.0.0.36:6000</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -77,7 +77,7 @@
              from. -->
         <tcs_cmd>
             <apid>0x111</apid>
-            <recv>0.0.0.0:4000</recv>
+            <recv>127.0.0.36:4000</recv>
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
@@ -97,7 +97,7 @@
                  command among it, goes as a telecommand of APID
                  apid_base. -->
             <gateway name="gateway">
-                <address>127.0.0.1:5000</address>
+                <address>127.0.0.36:5000</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:5100</ground_base>
                 <world-in>camera</world-in>

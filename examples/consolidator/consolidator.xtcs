@@ -23,29 +23,29 @@
              held. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:5650</recv>
+            <recv>127.0.0.13:5650</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5550</send>
+            <send>127.0.0.14:5550</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/consolidator</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
-            <source_base>127.0.0.1:4300</source_base>
+            <dest_base>127.0.0.14:4200</dest_base>
+            <source_base>127.0.0.13:4300</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
+            <dest_base>127.0.0.13:6100</dest_base>
+            <source_base>127.0.0.14:6000</source_base>
         </payload_telemetry>
         <state_file>/tmp/tcspecial-consolidator.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
+            <recv>127.0.0.14:4000</recv>
+            <send>127.0.0.13:4100</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
@@ -54,7 +54,7 @@
                  id: housekeeping, device id 2, at 5102. Its inputs reach
                  the ground only in its datum. -->
             <gateway name="gateway">
-                <ground_base>127.0.0.1:5100</ground_base>
+                <ground_base>127.0.0.13:5100</ground_base>
                 <world-in>housekeeping</world-in>
             </gateway>
         </type>
@@ -63,21 +63,21 @@
         <type name="network">
             <!-- A sun sensor's angle, a whole number of two bytes. -->
             <payload name="sun">
-                <address>127.0.0.1:5001</address>
+                <address>127.0.0.14:5001</address>
                 <protocol>udp</protocol>
                 <world-out-type>u16</world-out-type>
                 <world-out>housekeeping.sun</world-out>
             </payload>
             <!-- The reaction wheel's speed, signed: it turns either way. -->
             <payload name="wheel">
-                <address>127.0.0.1:5002</address>
+                <address>127.0.0.14:5002</address>
                 <protocol>udp</protocol>
                 <world-out-type>i32</world-out-type>
                 <world-out>housekeeping.wheel</world-out>
             </payload>
             <!-- The battery's charge, a byte. -->
             <payload name="battery">
-                <address>127.0.0.1:5003</address>
+                <address>127.0.0.14:5003</address>
                 <protocol>udp</protocol>
                 <world-out-type>u8</world-out-type>
                 <world-out>housekeeping.battery</world-out>

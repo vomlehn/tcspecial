@@ -631,7 +631,7 @@ mod tests {
             })
         );
         let uplink = Uplink::open(&graph, "gateway").expect("it binds aboard");
-        assert_eq!(uplink.to().to_string(), "127.0.0.1:7600");
+        assert_eq!(uplink.to().to_string(), "127.0.0.30:7600");
 
         // And a configuration whose gateway node binds nothing has no way up.
         let beacon = Graph::load(root.join("examples/beacon/beacon.ytcs"))

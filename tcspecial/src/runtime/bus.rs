@@ -1246,7 +1246,7 @@ mod tests {
         let peer_port = socket.local_addr().expect("its address").port();
         let text = tcsos::fs::read_to_string(example)
             .expect("the example reads")
-            .replace("0.0.0.0:8634", &format!("127.0.0.1:{ours}"))
+            .replace("127.0.0.12:8634", &format!("127.0.0.1:{ours}"))
             .replace("127.0.0.1:2234", &format!("127.0.0.1:{peer_port}"));
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("cfs.ytcs");

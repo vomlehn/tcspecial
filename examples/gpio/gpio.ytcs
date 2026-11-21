@@ -9,29 +9,29 @@ tcspecial:
   # while another is looked at.
   beacon:
     default_interval: "5 s"
-    recv: "127.0.0.1:3530"
+    recv: "127.0.0.19:3530"
     reset_interval: "1 s"
-    send: "0.0.0.0:3520"
+    send: "127.0.0.20:3520"
   gateway: "radio"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/gpio"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   payload_command:
-    dest_base: "0.0.0.0:3320"
-    source_base: "127.0.0.1:3330"
+    dest_base: "127.0.0.20:3320"
+    source_base: "127.0.0.19:3330"
   payload_telemetry:
-    dest_base: "127.0.0.1:3430"
-    source_base: "0.0.0.0:3420"
+    dest_base: "127.0.0.19:3430"
+    source_base: "127.0.0.20:3420"
   # tcspecial keeps in this file which configuration the next start is to run,
   # the last one the ground confirmed, and how many starts of it have ended
   # before a matching CONNECT, so on a vehicle it must be on storage that
   # survives a power cycle.
   state_file: "/tmp/tcspecial-gpio.state"
   tcs_cmd:
-    recv: "0.0.0.0:3220"
-    send: "127.0.0.1:3230"
+    recv: "127.0.0.20:3220"
+    send: "127.0.0.19:3230"
 
 gateways:
   - type gateway_radio:
@@ -39,10 +39,10 @@ gateways:
       # to address:port, which this node binds aboard, and leaves it by
       # moc-out for the lamp. What comes down arrives at ground_base plus
       # the device id of the node that sent it: the switch, device id 2, at
-      # 127.0.0.1:3722.
+      # 127.0.0.19:3722.
       - gateway: moc
-        address: "127.0.0.1:3620"
-        ground_base: "127.0.0.1:3720"
+        address: "127.0.0.20:3620"
+        ground_base: "127.0.0.19:3720"
         moc-out:
           - lamp.moc
         world-in: [switch]

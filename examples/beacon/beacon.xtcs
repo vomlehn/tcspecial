@@ -13,24 +13,24 @@
              another example is looked at. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:5750</recv>
+            <recv>127.0.0.7:5750</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5650</send>
+            <send>127.0.0.8:5650</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/beacon</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:4400</dest_base>
-            <source_base>127.0.0.1:4500</source_base>
+            <dest_base>127.0.0.8:4400</dest_base>
+            <source_base>127.0.0.7:4500</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:6300</dest_base>
-            <source_base>0.0.0.0:6200</source_base>
+            <dest_base>127.0.0.7:6300</dest_base>
+            <source_base>127.0.0.8:6200</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -38,8 +38,8 @@
              on storage that survives a power cycle. -->
         <state_file>/tmp/tcspecial-beacon.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:4600</recv>
-            <send>127.0.0.1:4700</send>
+            <recv>127.0.0.8:4600</recv>
+            <send>127.0.0.7:4700</send>
         </tcs_cmd>
     </tcspecial>
     <payloads>
@@ -51,7 +51,7 @@
                  readings go to the ground over payload_telemetry, as any
                  payload's do when nothing aboard touches them. -->
             <payload name="sensor">
-                <address>127.0.0.1:5101</address>
+                <address>127.0.0.8:5101</address>
                 <protocol>udp</protocol>
             </payload>
         </type>

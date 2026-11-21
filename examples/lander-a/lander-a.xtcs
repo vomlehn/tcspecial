@@ -18,7 +18,7 @@
             <default_interval>5 s</default_interval>
             <recv>127.0.0.1:19510</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:19500</send>
+            <send>127.0.0.24:19500</send>
         </beacon>
         <gateway>yamcs</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
@@ -28,25 +28,25 @@
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:19300</dest_base>
+            <dest_base>127.0.0.24:19300</dest_base>
             <source_base>127.0.0.1:0</source_base>
         </payload_command>
         <payload_telemetry>
             <apid_base>0x500</apid_base>
             <dest_base>127.0.0.1:19410</dest_base>
-            <source_base>0.0.0.0:19400</source_base>
+            <source_base>127.0.0.24:19400</source_base>
         </payload_telemetry>
         <state_file>/tmp/tcspecial-lander-a.state</state_file>
         <tcs_cmd>
             <apid>0x111</apid>
-            <recv>0.0.0.0:19200</recv>
+            <recv>127.0.0.24:19200</recv>
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
         <type name="gateway_yamcs">
             <gateway name="gateway">
-                <address>127.0.0.1:19600</address>
+                <address>127.0.0.24:19600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:19700</ground_base>
                 <world-in>sky</world-in>
@@ -57,7 +57,7 @@
                 <world-in>to_x</world-in>
             </gateway>
             <gateway name="gateway_sky">
-                <address>127.0.0.1:19601</address>
+                <address>127.0.0.24:19601</address>
                 <apid_base>0x480</apid_base>
                 <ground_base>127.0.0.1:19750</ground_base>
                 <moc-out>sky_quench.gateway_sky</moc-out>
@@ -117,48 +117,48 @@
     <payloads>
         <type name="network">
             <payload name="accel_x">
-                <address>127.0.0.1:19803</address>
+                <address>127.0.0.24:19803</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_accel_x.accel_x</world-out>
             </payload>
             <payload name="fuel">
-                <address>127.0.0.1:19804</address>
+                <address>127.0.0.24:19804</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_fuel.fuel</world-out>
             </payload>
             <payload name="joystick_3_4_x">
-                <address>127.0.0.1:19805</address>
+                <address>127.0.0.24:19805</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_joystick_3_4_x.joystick_3_4_x</world-out>
             </payload>
             <payload name="sky">
                 <read_size>64</read_size>
-                <address>127.0.0.1:19808</address>
+                <address>127.0.0.24:19808</address>
                 <protocol>udp</protocol>
                 <world-out>gateway.sky</world-out>
             </payload>
             <payload name="sky_quench">
-                <address>127.0.0.1:19809</address>
+                <address>127.0.0.24:19809</address>
                 <protocol>udp</protocol>
                 <moc-in>gateway_sky</moc-in>
             </payload>
             <payload name="thruster_x">
-                <address>127.0.0.1:19806</address>
+                <address>127.0.0.24:19806</address>
                 <moc-in-type>ratio</moc-in-type>
                 <protocol>udp</protocol>
                 <moc-in>to_joystick_3_4_x</moc-in>
             </payload>
             <payload name="velocity_x">
-                <address>127.0.0.1:19802</address>
+                <address>127.0.0.24:19802</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_velocity_x.velocity_x</world-out>
             </payload>
             <payload name="x">
-                <address>127.0.0.1:19801</address>
+                <address>127.0.0.24:19801</address>
                 <protocol>udp</protocol>
                 <world-out-type>i16</world-out-type>
                 <world-out>to_x.x</world-out>

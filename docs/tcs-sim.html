@@ -1030,7 +1030,7 @@ the same way. The seed is a setting of the <tt class="docutils literal"><span cl
 tcs-sim chooses it and says which it chose, so a run worth repeating can be:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7907&quot;</span><span class="whitespace">
+  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.4:7907&quot;</span><span class="whitespace">
   </span><span class="name tag">seed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">12345</span>
 </pre>
 <p>The thermostat example states all of these, with figures of the kind a
@@ -1046,7 +1046,7 @@ in the simulator alone, with no tcspecial running. Name the node in the
 thermostat for each of several zones:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">
-  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.1:7907&quot;</span><span class="whitespace">
+  </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.4:7907&quot;</span><span class="whitespace">
   </span><span class="name tag">thermostat</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat</span>
 </pre>
 <p>tcs-sim then takes each node's <tt class="docutils literal">setpoint</tt> and <tt class="docutils literal">half_band</tt> from the

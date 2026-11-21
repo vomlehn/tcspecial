@@ -21,12 +21,12 @@
             <default_interval>5 s</default_interval>
             <recv>127.0.0.1:17510</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:17500</send>
+            <send>127.0.0.4:17500</send>
         </beacon>
         <gateway>yamcs</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/thermostat-yamcs</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
@@ -35,7 +35,7 @@
              taken from any port of this host, port 0, and each answer goes
              back to the port its command came from. -->
         <payload_command>
-            <dest_base>0.0.0.0:17300</dest_base>
+            <dest_base>127.0.0.4:17300</dest_base>
             <source_base>127.0.0.1:0</source_base>
         </payload_command>
         <!-- A payload nothing in the drawing touches would report to
@@ -46,7 +46,7 @@
         <payload_telemetry>
             <apid_base>0x500</apid_base>
             <dest_base>127.0.0.1:17410</dest_base>
-            <source_base>0.0.0.0:17400</source_base>
+            <source_base>127.0.0.4:17400</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -59,7 +59,7 @@
              to the port its command came from. -->
         <tcs_cmd>
             <apid>0x111</apid>
-            <recv>0.0.0.0:17200</recv>
+            <recv>127.0.0.4:17200</recv>
             <send>127.0.0.1:0</send>
         </tcs_cmd>
     </tcspecial>
@@ -74,7 +74,7 @@
                  What Yamcs sends up to address:port goes as a telecommand
                  of APID apid_base. -->
             <gateway name="gateway">
-                <address>127.0.0.1:17600</address>
+                <address>127.0.0.4:17600</address>
                 <apid_base>0x400</apid_base>
                 <ground_base>127.0.0.1:17700</ground_base>
                 <world-in>consensus_temp</world-in>

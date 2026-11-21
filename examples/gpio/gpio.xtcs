@@ -9,24 +9,24 @@
              this one can be left running while another is looked at. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:3530</recv>
+            <recv>127.0.0.19:3530</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:3520</send>
+            <send>127.0.0.20:3520</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/gpio</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
         <payload_command>
-            <dest_base>0.0.0.0:3320</dest_base>
-            <source_base>127.0.0.1:3330</source_base>
+            <dest_base>127.0.0.20:3320</dest_base>
+            <source_base>127.0.0.19:3330</source_base>
         </payload_command>
         <payload_telemetry>
-            <dest_base>127.0.0.1:3430</dest_base>
-            <source_base>0.0.0.0:3420</source_base>
+            <dest_base>127.0.0.19:3430</dest_base>
+            <source_base>127.0.0.20:3420</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -34,8 +34,8 @@
              on storage that survives a power cycle. -->
         <state_file>/tmp/tcspecial-gpio.state</state_file>
         <tcs_cmd>
-            <recv>0.0.0.0:3220</recv>
-            <send>127.0.0.1:3230</send>
+            <recv>127.0.0.20:3220</recv>
+            <send>127.0.0.19:3230</send>
         </tcs_cmd>
     </tcspecial>
     <gateways>
@@ -45,10 +45,10 @@
                  aboard, and leaves it by moc-out for the lamp. What
                  comes down arrives at ground_base plus the device id of the
                  node that sent it: the switch, device id 2, at
-                 127.0.0.1:3722. -->
+                 127.0.0.19:3722. -->
             <gateway name="moc">
-                <address>127.0.0.1:3620</address>
-                <ground_base>127.0.0.1:3720</ground_base>
+                <address>127.0.0.20:3620</address>
+                <ground_base>127.0.0.19:3720</ground_base>
                 <moc-out>lamp.moc</moc-out>
                 <world-in>switch</world-in>
             </gateway>

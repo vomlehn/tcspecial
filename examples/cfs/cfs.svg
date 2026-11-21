@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450" role="img" aria-labelledby="title desc">
   <title id="title">The cfs example</title>
-  <desc id="desc">The vehicle answers to a cFS flight computer rather than to the ground, as one more peer of its Software Bus Network. The thermometer's readings go by its payload-out link to fsw, a gateway_cfs node, and are published on the software bus as message ID 0x4242: fsw's tlm_base, 0x4240, plus the thermometer's device id, 2. A command the bus publishes as 0x4281, fsw's cmd_msgid, is taken by fsw and leaves it by its gateway-out link for the heater. Everything crosses one SBN link, from tcspecial at 0.0.0.0:8634 to the peer at 127.0.0.1:2234.</desc>
+  <desc id="desc">The vehicle answers to a cFS flight computer rather than to the ground, as one more peer of its Software Bus Network. The thermometer's readings go by its payload-out link to fsw, a gateway_cfs node, and are published on the software bus as message ID 0x4242: fsw's tlm_base, 0x4240, plus the thermometer's device id, 2. A command the bus publishes as 0x4281, fsw's cmd_msgid, is taken by fsw and leaves it by its gateway-out link for the heater. Everything crosses one SBN link, from tcspecial at 127.0.0.12:8634 to the peer at 127.0.0.1:2234.</desc>
   <defs>
     <style>
       text { font-family: "DejaVu Sans", Helvetica, Arial, sans-serif; fill: #111827; }
@@ -36,20 +36,20 @@
   <rect class="socket" x="55" y="80" width="200" height="80" rx="10"/>
   <text class="name" x="71" y="107">heater</text>
   <text class="kind" x="71" y="128">network payload, id 1</text>
-  <text class="detail" x="71" y="147">udp 127.0.0.1:8601</text>
+  <text class="detail" x="71" y="147">udp 127.0.0.12:8601</text>
 
   <!-- The thermometer, read -->
   <rect class="socket" x="55" y="210" width="200" height="80" rx="10"/>
   <text class="name" x="71" y="237">thermometer</text>
   <text class="kind" x="71" y="258">network payload, id 2</text>
-  <text class="detail" x="71" y="277">udp 127.0.0.1:8602</text>
+  <text class="detail" x="71" y="277">udp 127.0.0.12:8602</text>
 
   <!-- The gateway node, the bus's end of the link both ways -->
   <rect class="socket" x="340" y="110" width="220" height="160" rx="10"/>
   <text class="name" x="356" y="137">fsw</text>
   <text class="kind" x="356" y="158">gateway_cfs, id 0</text>
   <text class="detail" x="356" y="180">no socket of its own:</text>
-  <text class="detail" x="356" y="198">  SBN from 0.0.0.0:8634</text>
+  <text class="detail" x="356" y="198">  SBN from 127.0.0.12:8634</text>
   <text class="detail" x="356" y="216">cmd_msgid 0x4281</text>
   <text class="detail" x="356" y="234">tlm_base  0x4240</text>
 

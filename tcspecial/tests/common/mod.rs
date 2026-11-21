@@ -276,3 +276,36 @@ pub fn moved_each(text: &str, was: &str, now: &str, times: usize) -> String {
     );
     text.replace(was, now)
 }
+
+/// An example's configuration with every loopback host it names made
+/// `127.0.0.1`: an example has a pair of hosts of its own, the MOC's and the
+/// vehicle's, which a test that moves its links onto ports of its own, and
+/// plays both ends itself, need not know.
+///
+/// # Arguments
+///
+/// * `text` - The example's configuration.
+///
+/// # Returns
+///
+/// The text, every `127.0.0.N:` written `127.0.0.1:`.
+#[allow(dead_code)]
+pub fn on_one_host(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find("127.0.0.") {
+        let (before, from) = rest.split_at(at);
+        out.push_str(before);
+        let after = &from["127.0.0.".len()..];
+        let digits = after.bytes().take_while(u8::is_ascii_digit).count();
+        if digits > 0 && after[digits..].starts_with(':') {
+            out.push_str("127.0.0.1");
+            rest = &after[digits..];
+        } else {
+            out.push_str("127.0.0.");
+            rest = after;
+        }
+    }
+    out.push_str(rest);
+    out
+}

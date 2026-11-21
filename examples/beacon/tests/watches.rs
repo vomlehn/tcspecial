@@ -68,14 +68,16 @@ fn a_beacon_from_the_configured_address_is_heard() {
     // Sent to the station's own address rather than to the configured one,
     // because the station below is listening on a port the system chose: two
     // runs of this test at once would otherwise fight over the example's.
-    let vehicle =
-        match UdpSocket::bind(format!("{}:{}", "127.0.0.1", link.send.port)) {
-            Ok(socket) => socket,
-            // The example's send port is in use, which on a machine running the
-            // example is exactly what it looks like. Nothing is proved and
-            // nothing is broken.
-            Err(_) => return,
-        };
+    let vehicle = match UdpSocket::bind(format!(
+        "{}:{}",
+        link.send.address, link.send.port
+    )) {
+        Ok(socket) => socket,
+        // The example's send port is in use, which on a machine running the
+        // example is exactly what it looks like. Nothing is proved and
+        // nothing is broken.
+        Err(_) => return,
+    };
 
     let listening =
         UdpSocket::bind("127.0.0.1:0").expect("a port for the station");

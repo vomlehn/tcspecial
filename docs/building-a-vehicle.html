@@ -493,10 +493,10 @@ science computer that sends each reading over UDP of its own accord.</p>
       # source_base plus the seismometer's device id to dest_base plus the same
       # id. A device id is a node's place among the names of all the nodes,
       # sorted, counting from nought, and the seismometer is the only node, so
-      # it is 0 and the ground hears it on 127.0.0.1:6100.
+      # it is 0 and the ground hears it on 127.0.0.35:6100.
       - payload: seismometer
         read_size: &quot;16&quot;
-        address: &quot;127.0.0.1:5401&quot;
+        address: &quot;127.0.0.36:5401&quot;
         protocol: &quot;udp&quot;
 
 
@@ -506,7 +506,7 @@ reads straight to the ground over the <tt class="docutils literal">tcspecial</tt
 <tt class="docutils literal">payload_telemetry</tt>: to its <tt class="docutils literal">dest_base</tt> port plus the seismometer's
 <em>device id</em>. A device id is a node's place among the names of all the nodes,
 sorted, counting from nought. The seismometer is the only node, so it is 0,
-and the ground hears it on 127.0.0.1:6100.</p>
+and the ground hears it on 127.0.0.35:6100.</p>
 <div class="figure">
 <img alt="tcs-cfge showing one network payload, seismometer, in the Payloads column, with no lines." src="shots/vehicle-stage-01.png" style="width: 100%;" />
 <p class="caption">Stage 1 in tcs-cfge: one payload, nothing drawn from it.</p>
@@ -532,7 +532,7 @@ It is asked once a second, by its own <tt class="docutils literal">trigger_inter
       # two bytes, signed, most significant first, in sixteenths of a degree
       # Celsius. It is asked once a second, by its own trigger_interval. It is
       # device 0, the first name sorted, so the ground hears it on
-      # 127.0.0.1:6100.
+      # 127.0.0.35:6100.
       - payload: regolith_thermometer
         byte_length: &quot;8&quot;
         datarate: &quot;9600&quot;
@@ -641,11 +641,11 @@ one place to receive everything from:</p>
       # somewhere, and the ground is reached through a gateway node. tcspecial
       # sends what each node drawn into it produces to ground_base's address,
       # at its port plus that node's device id: regolith_kelvin is id 1, so its
-      # temperatures arrive on 127.0.0.1:5101, and the seismometer, id 3, on
+      # temperatures arrive on 127.0.0.35:5101, and the seismometer, id 3, on
       # 5103. It is called gateway in every later stage, which is the name the
       # links to it are written with.
       - gateway: gateway
-        ground_base: &quot;127.0.0.1:5100&quot;
+        ground_base: &quot;127.0.0.35:5100&quot;
         world-in: [regolith_kelvin, seismometer]
 
 
@@ -673,7 +673,7 @@ thermostat's decision leaves at its <tt class="docutils literal"><span class="pr
       - payload: probe_heater
         lines: &quot;4&quot;
         path: &quot;/dev/gpiochip1&quot;
-        sim_address: &quot;127.0.0.1:5402&quot;
+        sim_address: &quot;127.0.0.36:5402&quot;
         state_interval: &quot;1 s&quot;
         moc-in: [probe_thermostat]
         world-out:
@@ -902,7 +902,7 @@ subsystem gains one, fed by the seismometer and the probe's temperature:</p>
       # beside tcspecial's own executable, to be sent to the ground when it can
       # be.
       - compute: science_log
-        directory: &quot;/tmp/telemetry&quot;
+        directory: &quot;/tmp/telemetry/building-a-vehicle&quot;
         format: &quot;variable_ts_rc&quot;
         segment_bytes: &quot;65536&quot;
         world-in: [regolith_kelvin, seismometer]
@@ -1000,12 +1000,12 @@ decodes them by a mission database written in XTCE.</dd>
       # bridge_base plus the device id of the node that sent it, as a
       # gateway_radio's ground_base is counted on, and the bridge gives it the
       # F´ ID fprime_id_base plus that same id: the camera, device id 0,
-      # arrives at 127.0.0.1:5100 as 0x3000, and hull_temp, device id 5, at
-      # 127.0.0.1:5105 as 0x3005. What the bridge sends up arrives at address
+      # arrives at 127.0.0.35:5100 as 0x3000, and hull_temp, device id 5, at
+      # 127.0.0.35:5105 as 0x3005. What the bridge sends up arrives at address
       # and port.
       - gateway: gateway
-        address: &quot;127.0.0.1:5000&quot;
-        bridge_base: &quot;127.0.0.1:5100&quot;
+        address: &quot;127.0.0.36:5000&quot;
+        bridge_base: &quot;127.0.0.35:5100&quot;
         fprime_id_base: &quot;0x3000&quot;
         world-in:
           - camera
@@ -1126,12 +1126,12 @@ the rates that reach the ground, added up. Two things on one socket fail the
 run. For stage 9, shortened:</p>
 <pre class="code text literal-block">
 Addresses and ports
-  address         bound by  what
-  0.0.0.0:4000    vehicle   tcs_cmd.recv, where spacecraft commands ...
+  address          bound by  what
+  127.0.0.36:4000  vehicle   tcs_cmd.recv, where spacecraft commands ...
   ...
-  127.0.0.1:5100  ground    &quot;gateway&quot; ground_base plus device id 0: ...
-  127.0.0.1:5105  ground    &quot;gateway&quot; ground_base plus device id 5: ...
-  127.0.0.1:5114  ground    &quot;gateway&quot; ground_base plus device id 14: ...
+  127.0.0.35:5100  ground    &quot;gateway&quot; ground_base plus device id 0: ...
+  127.0.0.35:5105  ground    &quot;gateway&quot; ground_base plus device id 5: ...
+  127.0.0.35:5114  ground    &quot;gateway&quot; ground_base plus device id 14: ...
   ...
 Rates to the ground
   link                     data/s  bytes/datum  bytes/s  how

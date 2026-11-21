@@ -188,8 +188,8 @@ fn the_python_counts_payload_telemetry_apids_as_the_rust_does() {
     assert_eq!(
         rust,
         [
-            "sensor 770 127.0.0.1 16412 0.0.0.0 16402",
-            "tank 771 127.0.0.1 16413 0.0.0.0 16403",
+            "sensor 770 127.0.0.1 16412 127.0.0.2 16402",
+            "tank 771 127.0.0.1 16413 127.0.0.2 16403",
         ],
         "0x300 plus 2 and 3"
     );

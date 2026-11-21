@@ -21,14 +21,14 @@
              quickly. -->
         <beacon>
             <default_interval>5 s</default_interval>
-            <recv>127.0.0.1:5650</recv>
+            <recv>127.0.0.35:5650</recv>
             <reset_interval>1 s</reset_interval>
-            <send>0.0.0.0:5550</send>
+            <send>127.0.0.36:5550</send>
         </beacon>
         <gateway>radio</gateway>
         <interface>b03f49878bcc9c45e7b854c7da1bce47</interface>
         <log>
-            <directory>/tmp/telemetry</directory>
+            <directory>/tmp/telemetry/building-a-vehicle</directory>
             <segment_size>65536</segment_size>
         </log>
         <max_consolidator_inputs>32</max_consolidator_inputs>
@@ -41,16 +41,16 @@
              it is not changed while tcspecial is running. At present only
              applications use the payload_command values. -->
         <payload_command>
-            <dest_base>0.0.0.0:4200</dest_base>
-            <source_base>127.0.0.1:4300</source_base>
+            <dest_base>127.0.0.36:4200</dest_base>
+            <source_base>127.0.0.35:4300</source_base>
         </payload_command>
         <!-- tcspecial sends telemetry from the network interface
              source_base names, plus the payload's device id, and the MOC
              receives it on the network interface dest_base names, plus the
              payload's device id. -->
         <payload_telemetry>
-            <dest_base>127.0.0.1:6100</dest_base>
-            <source_base>0.0.0.0:6000</source_base>
+            <dest_base>127.0.0.35:6100</dest_base>
+            <source_base>127.0.0.36:6000</source_base>
         </payload_telemetry>
         <!-- tcspecial keeps in this file which configuration the next start is
              to run, the last one the ground confirmed, and how many starts of
@@ -63,8 +63,8 @@
              tcs_cmd.send, to tcspecial at tcs_cmd.recv, and tcspecial
              sends its responses back to tcs_cmd.send. -->
         <tcs_cmd>
-            <recv>0.0.0.0:4000</recv>
-            <send>127.0.0.1:4100</send>
+            <recv>127.0.0.36:4000</recv>
+            <send>127.0.0.35:4100</send>
         </tcs_cmd>
     </tcspecial>
     <!-- Payloads read together, once each interval. A group is a clock
@@ -92,12 +92,12 @@
                  what each node drawn into it produces to ground_base's
                  address, at its port plus that node's device id, so each
                  source arrives on a port of its own: hull_temp, id 4, on
-                 127.0.0.1:5104, and the seismometer, id 12, on 5112. What
+                 127.0.0.35:5104, and the seismometer, id 12, on 5112. What
                  the ground sends up arrives at address and port, which the
                  ground's setpoint command needs. -->
             <gateway name="gateway">
-                <address>127.0.0.1:5000</address>
-                <ground_base>127.0.0.1:5100</ground_base>
+                <address>127.0.0.36:5000</address>
+                <ground_base>127.0.0.35:5100</ground_base>
                 <world-in>hull_kelvin_1</world-in>
                 <world-in>hull_kelvin_2</world-in>
                 <world-in>hull_kelvin_3</world-in>
@@ -205,7 +205,7 @@
             <payload name="probe_heater">
                 <lines>4</lines>
                 <path>/dev/gpiochip1</path>
-                <sim_address>127.0.0.1:5402</sim_address>
+                <sim_address>127.0.0.36:5402</sim_address>
                 <state_interval>1 s</state_interval>
                 <moc-in>probe_thermostat</moc-in>
                 <world-out>gateway.probe_heater</world-out>
@@ -226,7 +226,7 @@
                 <group>hull_readings</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5403</sim_address>
+                <sim_address>127.0.0.36:5403</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>hull_kelvin_1.hull_temp_1</world-out>
             </payload>
@@ -237,7 +237,7 @@
                 <group>hull_readings</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5404</sim_address>
+                <sim_address>127.0.0.36:5404</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>hull_kelvin_2.hull_temp_2</world-out>
             </payload>
@@ -247,7 +247,7 @@
                 <group>hull_readings</group>
                 <path>/dev/i2c-1</path>
                 <read_size>2</read_size>
-                <sim_address>127.0.0.1:5405</sim_address>
+                <sim_address>127.0.0.36:5405</sim_address>
                 <world-out-type>i16</world-out-type>
                 <world-out>hull_kelvin_3.hull_temp_3</world-out>
             </payload>
@@ -262,7 +262,7 @@
                  place to receive the vehicle's data from. -->
             <payload name="seismometer">
                 <read_size>16</read_size>
-                <address>127.0.0.1:5401</address>
+                <address>127.0.0.36:5401</address>
                 <group>science_readings</group>
                 <protocol>udp</protocol>
                 <world-out>gateway.seismometer</world-out>

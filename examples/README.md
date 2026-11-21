@@ -16,6 +16,17 @@ ground station. An example may hold a ground program without holding a
 payload: `beacon` does, its ground station watching something tcspecial sends
 on its own account, and so does `ping`, whose ground station is Python 3.
 
+Each example has a pair of loopback hosts of its own, which need nothing set
+up: its MOC software on an odd host, such as `127.0.0.27` for `minimal`, and
+its vehicle, tcspecial and tcs-sim, on the even host after it, `127.0.0.28`.
+Yamcs always sends from `127.0.0.1`, so every example commanded through
+Yamcs has that as its MOC host. Each example also logs in a directory of its
+own, `/tmp/telemetry/<name>`, which `tcsx` makes afresh before running it, so
+two examples can run at once -- but two through Yamcs, whose web port is the
+same, or two that are one vehicle, as the two thermostats are: no two share a
+socket, a log directory or a state file, which a test holds them to. The table of pairs, and why, is
+"Each example's own hosts" in the tcspecial manual, `docs/tcspecial.rst`.
+
 Two examples that are one example with another ground station share what
 they have in common from a directory of its own, which is not an example:
 `ping-common` holds the ping link and the window that `ping` and
@@ -134,10 +145,10 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 ### minimal
 
 The smallest configuration that does anything: one payload, `sensor`, a
-program on this host at `127.0.0.1:5001` that sends its readings over UDP.
+program on this host at `127.0.0.28:5001` that sends its readings over UDP.
 Nothing is drawn from it, so its readings go to the ground over the
 `tcspecial` section's `payload_telemetry`: tcspecial sends each one to
-`dest_base` plus the payload's device id, `127.0.0.1:6100` for `sensor`, which
+`dest_base` plus the payload's device id, `127.0.0.27:6100` for `sensor`, which
 is device 0. tcs-sim simulates `sensor`, sending a packet every second.
 
 ```
@@ -534,7 +545,7 @@ The sensors are temperature sensors on the zone, in
 `temp_2` on an I2C bus, of type `i2c_tmass`, and `temp_3` a SPI peripheral,
 of type `spi_tmass`. The heaters' switches are lines 4 and 5 of
 `/dev/gpiochip1`. On a desk every one of them is a simulated device: each is
-reached over UDP at its `sim_address` -- the sensors at 127.0.0.1:5201 to
+reached over UDP at its `sim_address` -- the sensors at 127.0.0.4:5201 to
 5203, where tcs-sim answers with the zone's temperature, and the switches at
 5204 and 5205, where tcs-sim takes what the vehicle drives them to -- so the
 example needs no dummy device, no sudo and no hardware. Flown, the buses and

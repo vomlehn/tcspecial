@@ -2374,6 +2374,161 @@ configuration beside it, ``<name>-sim.yaml``. Every example is checked by
 ``tcs-verify`` on every test run and must pass with no errors and no warnings,
 so an example is always a configuration that can be copied.
 
+Each example's own hosts
+------------------------
+Every example runs on loopback, ``127.0.0.0/8``, which Linux answers on at
+every one of its addresses with nothing set up: no interface to add, no root,
+no script to run first. Each example has a pair of hosts there of its own, so
+that two examples can run at once -- but for those below that cannot -- and
+so that a capture or a log says at a glance which end a datagram came from:
+
+* the MOC software -- tcs-moc, a ground station in Python or Rust, Yamcs --
+  is on an **odd** host;
+* the vehicle -- tcspecial, and tcs-sim standing in for its payloads -- is on
+  the **even** host after it.
+
+Pair *k* is ``127.0.0.``\ *2k-1* for the MOC and ``127.0.0.``\ *2k* for the
+vehicle. A configuration says which end each address is, as `Where the links
+are`_ does: ``beacon.recv``, ``tcs_cmd.send``, ``payload_command.source_base``,
+``payload_telemetry.dest_base``, ``ground_base`` and ``bridge_base`` are the
+MOC's, and the rest -- a gateway node's ``address``, a payload's ``address``
+and ``sim_address``, tcs-sim's ``ready``, an SBN peer but cFS's, below -- the
+vehicle's. What tcspecial binds -- ``beacon.send``, ``tcs_cmd.recv``,
+``payload_command.dest_base``, ``payload_telemetry.source_base``, ``sbn.local``
+-- is the vehicle's host too, never ``0.0.0.0``: a socket bound to every
+address holds its port on every host, so two examples that both bound
+``0.0.0.0:4000`` would clash whatever hosts they had, and Linux will not bind
+``127.0.0.4:4000`` while another program holds ``0.0.0.0:4000``.
+
+Sockets are not all two tcspecials can share, so each example also logs in a
+directory of its own, ``/tmp/telemetry/``\ *example*, such as
+``/tmp/telemetry/minimal``, which ``tcsx`` makes afresh before it runs the
+example, leaving the others' alone, and keeps a state file of its own. A test
+run holds the examples to this as `tcs-conflict <tcs-conflict.html>`__ would:
+no two share a socket, a port reached as a base plus a device id included, a
+log directory or a state file. Examples meant to share -- the stages of
+`Building a Vehicle <building-a-vehicle.html>`__, which log in
+``/tmp/telemetry/building-a-vehicle``, ``lander-a`` and ``lander-b``, and the
+two thermostats -- are each one vehicle, and run one at a time. A device under
+``/dev`` is left out: the examples are written for one board, a desk simulates
+every device they name, and two of them are never flown on one board.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 18 18 56
+
+   * - pair
+     - MOC
+     - vehicle
+     - example
+   * - 1
+     - ``127.0.0.1``
+     - ``127.0.0.2``
+     - ``ping-yamcs``, and the MOC host of every example commanded through
+       Yamcs
+   * - 2
+     - ``127.0.0.3``
+     - ``127.0.0.4``
+     - ``thermostat`` and ``thermostat-common``; ``thermostat-yamcs`` has
+       this vehicle with the MOC at ``127.0.0.1``
+   * - 3
+     - ``127.0.0.5``
+     - ``127.0.0.6``
+     - ``battery``
+   * - 4
+     - ``127.0.0.7``
+     - ``127.0.0.8``
+     - ``beacon``
+   * - 5
+     - ``127.0.0.9``
+     - ``127.0.0.10``
+     - ``can``
+   * - 6
+     - ``127.0.0.11``
+     - ``127.0.0.12``
+     - ``cfs``; the cFS side, a part of the vehicle, at ``127.0.0.1``, as
+       its SBN table, ``cfs/defs/apps/sbn/fsw/tables/sbn_conf_tbl.c``,
+       says
+   * - 7
+     - ``127.0.0.13``
+     - ``127.0.0.14``
+     - ``consolidator``
+   * - 8
+     - ``127.0.0.15``
+     - ``127.0.0.16``
+     - ``descent``
+   * - 9
+     - ``127.0.0.17``
+     - ``127.0.0.18``
+     - ``fprime``
+   * - 10
+     - ``127.0.0.19``
+     - ``127.0.0.20``
+     - ``gpio``
+   * - 11
+     - ``127.0.0.21``
+     - ``127.0.0.22``
+     - ``iio``
+   * - 12
+     - ``127.0.0.23``
+     - ``127.0.0.24``
+     - ``lander-a``, ``lander-b`` and ``lander-common``, both tcspecials on
+       the one vehicle host; the MOC at ``127.0.0.1``
+   * - 13
+     - ``127.0.0.25``
+     - ``127.0.0.26``
+     - ``memusage``; the MOC at ``127.0.0.1``
+   * - 14
+     - ``127.0.0.27``
+     - ``127.0.0.28``
+     - ``minimal``
+   * - 15
+     - ``127.0.0.29``
+     - ``127.0.0.30``
+     - ``ping``
+   * - 16
+     - ``127.0.0.31``
+     - ``127.0.0.32``
+     - ``simple-app``
+   * - 17
+     - ``127.0.0.33``
+     - ``127.0.0.34``
+     - ``tees``
+   * - 18
+     - ``127.0.0.35``
+     - ``127.0.0.36``
+     - every stage of `Building a Vehicle <building-a-vehicle.html>`__;
+       ``stage-10-yamcs`` has this vehicle with the MOC at ``127.0.0.1``
+   * - 19
+     - ``127.0.0.37``
+     - ``127.0.0.38``
+     - ``example.ytcs``, at the top of the checkout
+
+A new example takes the next pair: 21 on, since 20 -- ``127.0.0.39`` and
+``127.0.0.40`` -- is taken by a demonstration kept elsewhere.
+
+Yamcs is why the MOC has the odd hosts. Its UDP command link sends from a
+socket it never binds, which Linux gives the source address ``127.0.0.1`` on
+loopback, and tcspecial refuses a command that does not come from the host
+its ``tcs_cmd.send`` names. So every example commanded through Yamcs has
+``127.0.0.1`` as its MOC host, shared with the others, and a vehicle host of
+its own. Two of them cannot run at once in any case, since each starts a Yamcs
+at the same web port. Every other ground station binds the address its
+configuration gives it, and so has a host of its own.
+
+cFS's SBN is the same on the vehicle's side. Its UDP module binds every
+address, and so sends from ``127.0.0.1`` whatever its table says, and
+tcspecial takes nothing on the bus that does not come from its ``sbn.peer``.
+So in the ``cfs`` example, and in ``stage-10-cfs``, the cFS flight computer's
+``sbn.peer`` is ``127.0.0.1:2234``, though it is a part of the vehicle;
+tcspecial's own end, ``sbn.local``, is on the vehicle's host. The SBN table
+of the cFS build, which names both, names the ``cfs`` example's.
+
+The configurations under ``tests/`` are fixtures, not examples, and are not
+numbered. Loopback goes no further than its machine or its container, as
+``127.0.0.1`` alone did; on macOS only ``127.0.0.1`` answers until each other
+host is added to ``lo0`` as an alias.
+
 Every node has a *device id*: its position among the names of all the
 configuration's nodes, sorted, counting from nought -- whatever section or
 type each is written under, and across the top file and the files it
@@ -2471,10 +2626,10 @@ The minimal example
    ``examples/minimal``: one payload, and its telemetry going to the ground.
 
 The smallest configuration that does something. It has one payload,
-``sensor``, a UDP socket at ``127.0.0.1:5001``, and no other node: no line is
+``sensor``, a UDP socket at ``127.0.0.28:5001``, and no other node: no line is
 drawn from the sensor at all. tcspecial binds the sensor's address and reads
 whatever arrives there, and sends each reading to the ground over the
-sensor's telemetry link -- from ``0.0.0.0:6000`` to ``127.0.0.1:6100``, the
+sensor's telemetry link -- from ``127.0.0.28:6000`` to ``127.0.0.27:6100``, the
 two ``payload_telemetry`` bases plus device id 0.
 
 The comments in its ``tcspecial`` section say which end of each link is which,
@@ -2513,7 +2668,7 @@ them: ``temp_1`` and ``temp_2`` on an I\ :superscript:`2`\ C bus, of type
 ``examples/thermostat-common/thermostat.ytcs``, which the example includes,
 with the rest of the vehicle. The heaters' switches are GPIO lines 4 and 5 of
 ``/dev/gpiochip1``. On a desk every one of them is a simulated device, reached
-over UDP at its ``sim_address``: the sensors at ``127.0.0.1:5201`` to
+over UDP at its ``sim_address``: the sensors at ``127.0.0.4:5201`` to
 ``5203``, where tcs-sim answers with the zone's temperature, and the switches
 at ``5204`` and ``5205``, where tcs-sim takes what the vehicle drives them to
 -- see `A GPIO Payload`_. So the example needs no dummy device, no root and no
@@ -2529,7 +2684,7 @@ theirs, so that no one part number can take the whole trio out.
 Each reading is converted to kelvin by its own ``to_kelvin`` node,
 ``to_k1``, ``to_k2`` or ``to_k3``, and each converted reading goes two ways:
 to the ground through the gateway node -- at its ``ground_base``,
-``127.0.0.1:5100``, plus each source's device id, so ``to_k1``, ``to_k2`` and
+``127.0.0.3:5100``, plus each source's device id, so ``to_k1``, ``to_k2`` and
 ``to_k3``, ids 8 to 10, arrive on ports 5108 to 5110 -- and into
 ``consensus_temp`` as the input ``in0``, ``in1`` or ``in2``.
 
@@ -2830,7 +2985,7 @@ the first line of the lorem ipsum text one word per packet, then a packet
 holding the line terminator.
 
 tcspecial sends the words to the gateway node on the ground, ``gateway-1``, at
-its ``ground_base``, ``127.0.0.1:5100``, plus ``lorem``'s device id, 1: port
+its ``ground_base``, ``127.0.0.31:5100``, plus ``lorem``'s device id, 1: port
 5101. The ground is ``lorem_gateway``, the example's second program. It gets
 the words from ``gateway-1`` with
 ``tcsmoc::gateway::GatewayReceiver::receive_into``, into a buffer it made
@@ -3131,7 +3286,7 @@ beacon and each exchange:
 .. code-block:: text
 
    connected: the vehicle is running this configuration
-   beacon: tcspecial v0.1.0 md5 27bf79b237069fc4c5d13325e1ac0bb6
+   beacon: tcspecial v0.1.0 md5 c817df0eb691fac23192c493493b5827
    sent: ping #1 1793562467.079578927
    received: ping #1 1793562467.079578927 1793562467.091478556
    times: round trip 11.421073 ms, up 11.899629 ms, down -0.478556 ms
@@ -3317,12 +3472,12 @@ The tees example
 
 The four nodes that do nothing to what passes, each taking one stream. What
 the ground sends goes up to the gateway node ``moc``, which binds
-``127.0.0.1:8600`` aboard, and leaves it for ``echo``, a ``tee-gateway``. The
+``127.0.0.34:8600`` aboard, and leaves it for ``echo``, a ``tee-gateway``. The
 tee sends each command on by its ``moc-out`` to the ``heater``, as it was
 going, and again by its ``world-out`` back to ``moc`` -- so the ground sees
 what the vehicle was told, arriving at ``ground_base`` plus ``echo``'s device
-id, ``127.0.0.1:8701``. The ``sensor``'s readings go to ``readings``, a
-``tee-payload``, which sends each down to the ground at ``127.0.0.1:8704`` and
+id, ``127.0.0.33:8701``. The ``sensor``'s readings go to ``readings``, a
+``tee-payload``, which sends each down to the ground at ``127.0.0.33:8704`` and
 again by its ``moc-out`` to ``dropped``, a ``null-gateway``, standing where
 something aboard that took readings as commands would be. The ``spare``
 payload's data goes to ``unheard``, a ``null-payload``: nobody wants it yet.
@@ -3347,7 +3502,7 @@ The consolidator example
          battery last reported. housekeeping sends one datum when all four
          are new or every two seconds, nine bytes: the four, or their
          defaults until they have reported, down through gateway to
-         127.0.0.1:5102, where the ground decodes it as a structure.
+         127.0.0.13:5102, where the ground decodes it as a structure.
    :width: 100%
 
    ``examples/consolidator``: three sensors' readings and the battery's
@@ -3380,7 +3535,7 @@ value no reading is, and so does 65535 for a sun angle and for the age; a
 wheel at rest reads 0, so its default cannot be told from a reading. After
 an input's first reading, the datum carries its latest, held until another
 comes. Only ``housekeeping`` is drawn into the gateway node; it arrives at
-``ground_base`` plus its device id, ``127.0.0.1:5102``.
+``ground_base`` plus its device id, ``127.0.0.13:5102``.
 
 On the ground the datum is ``housekeeping``'s, as any node's datum is its
 own: the configuration's own XTCE describes it, member by member, and tcs-moc
@@ -3432,23 +3587,23 @@ radio.
 What differs is the gateway node. Where a gateway node says where the ground
 station is as ``ground_base``, a ``gateway_fprime`` node says where the bridge
 is as ``bridge_base``, counted on the same way: the ``thermometer``, device id
-3, reports to ``127.0.0.1:9703``. It also states ``fprime_id_base``, the first
+3, reports to ``127.0.0.17:9703``. It also states ``fprime_id_base``, the first
 of the F´ IDs the bridge gives what arrives, counted on by the same device id
 -- the thermometer's readings are F´ channel ``0x3003`` -- which the bridge's
 model is made from and nothing aboard reads. A command the bridge sends up to
-``fsw``, which binds ``127.0.0.1:9600``, leaves it by its ``moc-out`` for
+``fsw``, which binds ``127.0.0.18:9600``, leaves it by its ``moc-out`` for
 the ``heater``.
 
 The thermometer's readings go to ``zone_temp`` too, a ``to_kelvin`` compute
 node that makes each a temperature, and that goes to ``fsw`` as well: device
-id 4, ``127.0.0.1:9704``, channel ``0x3004``. In the simulator file the
+id 4, ``127.0.0.17:9704``, channel ``0x3004``. In the simulator file the
 thermometer reports a zone of the physics model, in the encoding ``zone_temp``
 reads back, and tcs-sim's heater switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.
 
 ``zone_temp``'s temperatures go on to ``heater_wanted``, a ``thermostat``
 compute node -- on below 283.65 K, off above 284.65 K -- whose decisions go
-to ``fsw``: device id 2, ``127.0.0.1:9702``, channel ``0x3002``. It is
+to ``fsw``: device id 2, ``127.0.0.17:9702``, channel ``0x3002``. It is
 advice and drives nothing, the heater being the flight computer's to drive,
 and it shows the bridge a node that sends decisions.
 
@@ -3600,7 +3755,7 @@ message ID or a base where a radio's configuration has a socket:
        ident: "3b339a5e0f686cef822a5d6ea95004222ab7af33"
        spacecraft_id: "0x42"
        processor_id: "2"
-       local: "0.0.0.0:8634"
+       local: "127.0.0.12:8634"
        peer: "127.0.0.1:2234"
        peer_processor_id: "1"
        max_message: "32768"
@@ -3749,8 +3904,8 @@ on the bus, filtered to its identifier, so ``motor_status`` hears the status
 frames and nothing else, and ``motor_command`` hears nothing it has not sent.
 Each status frame's data goes by ``motor_status``'s ``world-out`` to the
 gateway node ``moc`` and down to the MOC at ``ground_base`` plus its
-device id, ``127.0.0.1:3702``. What the ground sends up to ``moc``, which
-binds ``127.0.0.1:3600``, leaves it by its ``moc-out`` for
+device id, ``127.0.0.9:3702``. What the ground sends up to ``moc``, which
+binds ``127.0.0.10:3600``, leaves it by its ``moc-out`` for
 ``motor_command`` and goes out as one frame, so a command is at most eight
 bytes.
 
@@ -3776,8 +3931,8 @@ The gpio example
 Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. ``switch`` watches line 0
 and twice a second reports it, as the ``u8`` the line is bit 0 of, by its
-``world-out`` to ``moc`` and down to the MOC at ``127.0.0.1:3722``. ``lamp``
-drives line 1: what the ground sends up to ``127.0.0.1:3620`` leaves ``moc``
+``world-out`` to ``moc`` and down to the MOC at ``127.0.0.19:3722``. ``lamp``
+drives line 1: what the ground sends up to ``127.0.0.20:3620`` leaves ``moc``
 by its ``moc-out`` for it, the ``u8`` 1 lighting the lamp and 0 putting it
 out.
 
@@ -3803,7 +3958,7 @@ The iio example
 
 A sensor's buffer, which hands over whole sample sets as they are taken.
 ``sensor`` reads it and each read's sets go by its ``world-out`` to
-``moc`` and down to the MOC at ``127.0.0.1:3741``. Nothing goes up: a
+``moc`` and down to the MOC at ``127.0.0.21:3741``. Nothing goes up: a
 buffer is read and never written, so ``moc`` has no ``moc-out``. Which
 channels are in a set and how often one is taken are the sensor's settings,
 made in ``sysfs`` by whoever brings it up, and nothing in the configuration.
@@ -5323,9 +5478,9 @@ against beforehand. A mission that needs more than one ground station listening
 sends to a relay that fans the beacons out, which is a thing somebody
 configured rather than a thing the network did silently.
 
-``0.0.0.0:5550`` and ``127.0.0.1:5650`` are what the shipped files state, both
-programs being run on one machine; a real ground link names the interface
-facing it on each end.
+``127.0.0.4:5550`` and ``127.0.0.3:5650`` are what the thermostat example
+states, both programs being run on one machine; a real ground link names the
+interface facing it on each end.
 
 Tcs-moc reads both addresses from the configuration tcspecial reads, the same
 way, so moving a beacon moves both ends of it -- and so does moving a command
@@ -5335,7 +5490,7 @@ Tcspecial says both as it starts, on the terminal:
 
 .. code-block:: console
 
-   5000 ms beacon: 0.0.0.0:5550 to 127.0.0.1:5650
+   5000 ms beacon: 127.0.0.4:5550 to 127.0.0.3:5650
 
 ``-q`` or ``--quiet`` leaves that startup summary unsaid -- the file, the
 nodes, the build and digest, the log, the beacon and the command addresses --

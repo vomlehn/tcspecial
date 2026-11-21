@@ -115,8 +115,9 @@ impl Flown {
     ) -> Flown {
         let example = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(format!("../examples/{name}/{name}.ytcs"));
-        let text =
-            tcsos::fs::read_to_string(&example).expect("the example reads");
+        let text = common::on_one_host(
+            &tcsos::fs::read_to_string(&example).expect("the example reads"),
+        );
         let dir = tempfile::tempdir().expect("a directory");
         // tcspecial writes its log into a directory that is there, and does
         // not make one.
@@ -136,7 +137,7 @@ impl Flown {
                 (common::bound(), common::free(), common::free());
             for (was, now) in [
                 (
-                    format!("0.0.0.0:{}", at(3200)),
+                    format!("127.0.0.1:{}", at(3200)),
                     format!("127.0.0.1:{take_at}"),
                 ),
                 (
@@ -144,7 +145,7 @@ impl Flown {
                     format!("127.0.0.1:{}", common::port(&commands)),
                 ),
                 (
-                    format!("0.0.0.0:{}", at(3300)),
+                    format!("127.0.0.1:{}", at(3300)),
                     format!("127.0.0.1:{}", common::free()),
                 ),
                 (
@@ -152,7 +153,7 @@ impl Flown {
                     format!("127.0.0.1:{}", common::free()),
                 ),
                 (
-                    format!("0.0.0.0:{}", at(3400)),
+                    format!("127.0.0.1:{}", at(3400)),
                     format!("127.0.0.1:{}", common::free()),
                 ),
                 (
@@ -160,7 +161,7 @@ impl Flown {
                     format!("127.0.0.1:{}", common::free()),
                 ),
                 (
-                    format!("0.0.0.0:{}", at(3500)),
+                    format!("127.0.0.1:{}", at(3500)),
                     format!("127.0.0.1:{}", common::free()),
                 ),
                 (
@@ -173,7 +174,7 @@ impl Flown {
                     format!("\"127.0.0.1:{}\"", common::free()),
                 ),
                 (
-                    "/tmp/telemetry".to_string(),
+                    format!("/tmp/telemetry/{name}"),
                     dir.path().join("telemetry").display().to_string(),
                 ),
                 (

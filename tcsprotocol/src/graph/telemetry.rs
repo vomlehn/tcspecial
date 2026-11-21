@@ -1077,15 +1077,15 @@ mod tests {
         assert_eq!(
             summary(&links),
             vec![
-                ("consensus_temp", 0, "127.0.0.1", 5100),
+                ("consensus_temp", 0, "127.0.0.3", 5100),
                 // The heaters' switches, each reporting what it was last
                 // told, which the ground sees in place of the thermostat's
                 // decision.
-                ("gpio-out-tmass1", 2, "127.0.0.1", 5102),
-                ("gpio-out-tmass2", 3, "127.0.0.1", 5103),
-                ("to_k1", 8, "127.0.0.1", 5108),
-                ("to_k2", 9, "127.0.0.1", 5109),
-                ("to_k3", 10, "127.0.0.1", 5110),
+                ("gpio-out-tmass1", 2, "127.0.0.3", 5102),
+                ("gpio-out-tmass2", 3, "127.0.0.3", 5103),
+                ("to_k1", 8, "127.0.0.3", 5108),
+                ("to_k2", 9, "127.0.0.3", 5109),
+                ("to_k3", 10, "127.0.0.3", 5110),
             ]
         );
         assert!(links
@@ -1093,7 +1093,7 @@ mod tests {
             .all(|l| l.via == Via::Gateway("gateway".to_string())));
 
         let links = of(&example("simple-app")).expect("it reads");
-        assert_eq!(summary(&links), vec![("lorem", 1, "127.0.0.1", 5101)]);
+        assert_eq!(summary(&links), vec![("lorem", 1, "127.0.0.31", 5101)]);
     }
 
     /// A consolidator's datum is one link's, as any node's is, and its
@@ -1116,10 +1116,13 @@ mod tests {
     #[test]
     fn an_untouched_payload_reports_over_payload_telemetry() {
         let links = of(&example("minimal")).expect("it reads");
-        assert_eq!(summary(&links), vec![("sensor", 0, "127.0.0.1", 6100)]);
+        assert_eq!(summary(&links), vec![("sensor", 0, "127.0.0.27", 6100)]);
         assert_eq!(links[0].via, Via::PayloadTelemetry);
         let vehicle = links[0].vehicle().expect("a link over UDP");
-        assert_eq!((vehicle.address.as_str(), vehicle.port), ("0.0.0.0", 6000));
+        assert_eq!(
+            (vehicle.address.as_str(), vehicle.port),
+            ("127.0.0.28", 6000)
+        );
     }
 
     /// A payload the drawing touches goes only where it is drawn.
@@ -1143,7 +1146,7 @@ mod tests {
             .expect("gateway");
         gateway.attributes.insert(
             "ground_base".to_string(),
-            crate::Scalar::of("127.0.0.1:6097"),
+            crate::Scalar::of("127.0.0.3:6097"),
         );
         let refused = of(&graph).expect_err("two sources on 6105");
         assert!(refused.why.contains("to_k1"), "{}", refused.why);

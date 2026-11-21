@@ -32,7 +32,7 @@ tcspecial:
   gateway: "cfs"
   interface: "b03f49878bcc9c45e7b854c7da1bce47"
   log:
-    directory: "/tmp/telemetry"
+    directory: "/tmp/telemetry/building-a-vehicle"
     segment_size: "65536"
   max_consolidator_inputs: "32"
   # The block of message IDs the mission allotted tcspecial: subsystem 0x42,
@@ -56,9 +56,9 @@ tcspecial:
   # ident is the hash SBN prints in its start-up event.
   sbn:
     ident: "3b339a5e0f686cef822a5d6ea95004222ab7af33"
-    local: "0.0.0.0:8634"
+    local: "127.0.0.36:8634"
     max_message: "32768"
-    peer: "127.0.0.1:2234"
+    peer: "127.0.0.1:2236"
     peer_processor_id: "1"
     processor_id: "2"
     release: "v7.0.1"

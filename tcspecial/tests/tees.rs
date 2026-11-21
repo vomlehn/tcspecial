@@ -77,7 +77,9 @@ fn heard(at: &UdpSocket) -> Option<Vec<u8>> {
 fn a_tee_sends_each_datum_both_ways() {
     let example = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../examples/tees/tees.ytcs");
-    let text = tcsos::fs::read_to_string(&example).expect("the example reads");
+    let text = common::on_one_host(
+        &tcsos::fs::read_to_string(&example).expect("the example reads"),
+    );
 
     // Where the example's own ground hears each tee, which its diagram and
     // the manual say: ground_base, 8700, plus each tee's device id.
@@ -113,15 +115,15 @@ fn a_tee_sends_each_datum_both_ways() {
         (":8600\"", format!(":{uplink}\"")),
         ("127.0.0.1:8700", format!("127.0.0.1:{base}")),
         ("127.0.0.1:8510", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8500", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8300", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:8500", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:8300", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:8310", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:8410", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8400", format!("127.0.0.1:{}", free())),
-        ("0.0.0.0:8200", format!("127.0.0.1:{take_at}")),
+        ("127.0.0.1:8400", format!("127.0.0.1:{}", free())),
+        ("127.0.0.1:8200", format!("127.0.0.1:{take_at}")),
         ("127.0.0.1:8210", format!("127.0.0.1:{}", port(&commands))),
         (
-            "/tmp/telemetry",
+            "/tmp/telemetry/tees",
             dir.path().join("telemetry").display().to_string(),
         ),
     ] {

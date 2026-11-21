@@ -39,6 +39,7 @@ mod faithful;
 mod history;
 mod journal;
 mod nodes;
+mod print;
 mod read;
 mod save;
 mod settings;
@@ -1846,6 +1847,16 @@ fn wire(
         window.on_extent(move |selection| {
             weak.upgrade()
                 .map_or_else(Default::default, |w| extent_of(&w, selection))
+        });
+    }
+    {
+        // Print, from the File menu: the working panes, trimmed to the
+        // nodes and the lines, made a PDF and opened to print. See print.rs.
+        let weak = window.as_weak();
+        window.on_print_clicked(move || {
+            if let Some(w) = weak.upgrade() {
+                print::print(&w, drawing_extent(&w), &w.get_path());
+            }
         });
     }
     {
@@ -8584,6 +8595,46 @@ fn extent_of(window: &MainWindow, selection: bool) -> Extent {
             .and_then(|row| window.get_links().row_data(row))
             .and_then(|line| route::bounds_of(&line.route));
         boxes.extend(line.map(|(l, t, r, b)| (l + left, t, r + left, b)));
+    }
+    boxes
+        .into_iter()
+        .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
+        .map_or_else(Extent::default, |(l, t, r, b)| Extent {
+            x: l,
+            y: t,
+            width: r - l,
+            height: b - t,
+        })
+}
+
+/// Where on the sheet everything drawn is: every node and component, and
+/// every line, which can reach past the nodes it joins. What Print trims the
+/// sheet to.
+///
+/// # Arguments
+///
+/// * `window` - The window, whose nodes and lines are asked.
+///
+/// # Returns
+///
+/// The smallest box round them, in the whole sheet's coordinates; a width
+/// of nought for nothing.
+fn drawing_extent(window: &MainWindow) -> Extent {
+    let left = window.get_physics_width() + window.get_edge_width();
+    let nodes = extent_of(window, false);
+    let mut boxes: Vec<(f32, f32, f32, f32)> = window
+        .get_links()
+        .iter()
+        .filter_map(|line| route::bounds_of(&line.route))
+        .map(|(l, t, r, b)| (l + left, t, r + left, b))
+        .collect();
+    if nodes.width > 0.0 {
+        boxes.push((
+            nodes.x,
+            nodes.y,
+            nodes.x + nodes.width,
+            nodes.y + nodes.height,
+        ));
     }
     boxes
         .into_iter()

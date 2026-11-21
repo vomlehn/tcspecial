@@ -878,6 +878,58 @@ fn recovering(out: &Path, work: &Path) {
     session.close();
 }
 
+/// Prints the battery example as File > Print does, without a screen,
+/// writing the PDF and its picture where `TCS_CFGE_PRINT` names, to be
+/// looked at: run by hand, alone,
+/// `TCS_CFGE_PRINT=<directory> cargo test -p tcs-cfge printing --
+/// --ignored`.
+#[test]
+#[ignore = "prints an example to be looked at: TCS_CFGE_PRINT=<directory>"]
+fn printing() {
+    let Ok(out) = std::env::var("TCS_CFGE_PRINT") else {
+        return;
+    };
+    let out = PathBuf::from(out);
+    // A second platform in one run cannot be set: run this alone.
+    slint::platform::set_platform(Box::new(Headless))
+        .expect("no other platform in this run");
+    let work = std::env::temp_dir().join("tcs-cfge-printing");
+    if tcsos::fs::path_exists(&work) {
+        std::fs::remove_dir_all(&work).expect("the last run's files go");
+    }
+    std::fs::create_dir_all(&work).expect("the scratch directory");
+    std::env::set_var("XDG_STATE_HOME", work.join("state"));
+    std::env::set_var("HOME", work.join("home"));
+    let dir = copy_example(&work, "battery");
+    let session = Session::open(
+        &dir.join("battery.ytcs"),
+        &dir.join("battery-sim.yaml"),
+        true,
+    );
+    let area = drawing_extent(&session.ui);
+    let (picture, pdf) = print::made_now(&session.ui, area, &|w| {
+        drawn(w.window(), WIDE);
+    })
+    .expect("it prints")
+    .expect("there is something to print");
+    std::fs::create_dir_all(&out).expect("the directory");
+    std::fs::write(out.join("battery.pdf"), pdf).expect("the PDF");
+    let file = std::fs::File::create(out.join("battery.png")).expect("png");
+    let mut encoder = png::Encoder::new(
+        std::io::BufWriter::new(file),
+        picture.width as u32,
+        picture.height as u32,
+    );
+    encoder.set_color(png::ColorType::Rgb);
+    encoder.set_depth(png::BitDepth::Eight);
+    encoder
+        .write_header()
+        .and_then(|mut w| w.write_image_data(&picture.rgb))
+        .expect("the picture");
+    session.close();
+    std::fs::remove_dir_all(&work).expect("the scratch directory goes");
+}
+
 /// Takes the manual's screenshots, writing `docs/shots/tcs-cfge-*.png`.
 #[test]
 #[ignore = "takes the manual's screenshots: make screenshots-tcs-cfge"]

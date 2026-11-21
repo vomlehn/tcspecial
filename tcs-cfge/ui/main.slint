@@ -480,6 +480,9 @@ component ListDivider inherits Rectangle {
 component PaneDivider inherits Rectangle {
     // Where the divider is, in the window's own coordinates.
     in property <length> at: 0px;
+    // Whether the sheet is being printed: the handle, a control rather than
+    // part of the drawing, is left out then. See print.rs.
+    in property <bool> printing: false;
     // How far the handle was dragged, said once when the gesture ends.
     callback moved(length);
 
@@ -503,6 +506,7 @@ component PaneDivider inherits Rectangle {
         // dragged and one that cannot look identical without it, and a control
         // nobody can see is a control nobody uses.
         Rectangle {
+            visible: !root.printing;
             x: -6px;
             y: parent.height / 2 - 20px;
             width: 13px;
@@ -687,6 +691,30 @@ component Surface inherits Rectangle {
         root.canvas-offset = top / z;
         sheet.content-y = top;
     }
+    // The view put at a place on the sheet at a zoom chosen as the View
+    // menu chooses one -- nought for the window's own -- its top left at
+    // (`left`, `top`) in the sheet's pixels, or as near as the sheet's
+    // edges let it be: what Print steps across the drawing by, taking a
+    // snapshot at each step, and puts the view back with. See print.rs.
+    public function show-at(left: length, top: length, chosen: float) {
+        root.zoom-chosen = chosen;
+        sheet.content-x = -left * root.zoom;
+        root.canvas-offset = -top;
+        sheet.content-y = -top * root.zoom;
+    }
+    // Where the view is on the sheet, in the sheet's pixels, how much of
+    // the sheet it shows, in the window's, and where in the window it is:
+    // what Print crops each snapshot to, so that the selection lists, the
+    // bar and the scroll bars are left out.
+    // Whether the sheet is being printed, which leaves the dividers'
+    // handles out of it: set by Print. See print.rs.
+    in-out property <bool> printing: false;
+    out property <length> view-left: -sheet.content-x / root.zoom;
+    out property <length> view-top: -sheet.content-y / root.zoom;
+    out property <length> view-width: sheet.visible-width;
+    out property <length> view-height: sheet.visible-height;
+    out property <length> view-x: sheet.absolute-position.x;
+    out property <length> view-y: sheet.absolute-position.y;
     // A subdiagram's page: how wide the margin either side of what is
     // inside it is -- the Physics pane and the working panes -- which holds
     // the page's edge, and the edge's terminals, in the working panes' own
@@ -1609,12 +1637,14 @@ component Surface inherits Rectangle {
                 if root.physics-width > 0: PaneDivider {
                     width: 100%;
                     height: 100%;
+                    printing: root.printing;
                     at: root.left * root.zoom + sheet.content-x;
                     moved(dx) => { root.physics-divider-moved(dx / root.zoom); }
                 }
                 PaneDivider {
                     width: 100%;
                     height: 100%;
+                    printing: root.printing;
                     at: (root.left + root.payload-divider) * root.zoom
                         + sheet.content-x;
                     moved(dx) => { root.payload-divider-moved(dx / root.zoom); }
@@ -1622,6 +1652,7 @@ component Surface inherits Rectangle {
                 PaneDivider {
                     width: 100%;
                     height: 100%;
+                    printing: root.printing;
                     at: (root.left + root.vehicle-divider) * root.zoom
                         + sheet.content-x;
                     moved(dx) => { root.vehicle-divider-moved(dx / root.zoom); }
@@ -2245,6 +2276,20 @@ export component MainWindow inherits Window {
     // nought for nothing. Worked out in Rust, which can look a node up by
     // its name.
     pure callback extent(bool) -> Extent;
+    // Print, from the File menu: see print.rs.
+    callback print-clicked();
+    // The view at a place on the sheet, and where it is: Print's, forwarded
+    // to the Surface's own.
+    public function show-at(left: length, top: length, chosen: float) {
+        surface.show-at(left, top, chosen);
+    }
+    in-out property <bool> printing <=> surface.printing;
+    out property <length> view-left: surface.view-left;
+    out property <length> view-top: surface.view-top;
+    out property <length> view-width: surface.view-width;
+    out property <length> view-height: surface.view-height;
+    out property <length> view-x: surface.view-x;
+    out property <length> view-y: surface.view-y;
     // The zoom the View menu chose, and none, which is the window's own.
     out property <float> zoom-chosen: surface.zoom-chosen;
     // The menu asked for what tcspecial is configured with.
@@ -2325,6 +2370,18 @@ export component MainWindow inherits Window {
                 title: "Edit simulated payload groups";
                 enabled: root.has-simulator && !root.inert;
                 activated => { root.edit-simulator-groups(); }
+            }
+            MenuSeparator { }
+            // The working panes as drawn -- not the selection lists beside
+            // them -- trimmed to the nodes and lines, made a PDF and opened
+            // in the desktop's PDF viewer, whose Print chooses the printer
+            // and the paper. A PDF rather than a print dialog of the
+            // editor's own: the window toolkit has none, and every desktop
+            // has a viewer that prints. See print.rs.
+            MenuItem {
+                enabled: !root.inert;
+                title: "Print...";
+                activated => { root.print-clicked(); }
             }
             MenuSeparator { }
             MenuItem {

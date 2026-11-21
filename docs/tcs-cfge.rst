@@ -218,7 +218,7 @@ The menus
 **File**
     **Save**, **Save as...**, **Autosave** (a check box), **Edit payload
     groups**, **Edit simulated payload groups** (greyed when no simulator file
-    was given), and **Exit**.
+    was given), **Print...**, and **Exit**.
 
 **Edit**
     **Edit tcspecial parameters** and **Arrange the nodes**.
@@ -801,6 +801,23 @@ work.*, which says the session is still open and nothing has been lost. Put
 the cause right and press Save, or use Save as if the files cannot be written
 where they are. The window appears once for each thing that goes wrong, not
 once for each edit that fails the same way.
+
+Printing
+--------
+
+**File -> Print...** prints the working panes -- Physics, Payloads, Vehicle
+and Gateway -- as the window draws them, without the selection lists down the
+left, trimmed to the nodes and the lines between them, with a margin round
+them and the panes' names along the top. The dividers' handles are left out.
+
+The picture is made at full size, whatever the window's zoom, by moving the
+view across the drawing a part at a time; the window shows it moving for a
+moment, and the view is put back where it was. The picture is written as a
+PDF of one page, ``tcs-cfge-print-<name>.pdf`` in the system's temporary
+directory, and opened in the desktop's PDF viewer -- ``xdg-open`` on Linux --
+whose Print chooses the printer, the paper and the orientation, and shows
+what will be printed first. The PDF is a picture of the sheet, not text: it
+prints as the window draws, colours and all.
 
 Leaving
 -------

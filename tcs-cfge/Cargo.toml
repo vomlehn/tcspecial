@@ -46,6 +46,9 @@ path-clean = "1.0.1"
 # so that a history is not replayed or undone onto a file something else has
 # changed: see `history::OnDisk`. The version tcsprotocol digests with.
 md5 = "0.8"
+# Packs the picture Print makes into its PDF, as the PDF's own Flate: the
+# version the window toolkit already brings in. See print.rs.
+miniz_oxide = "0.8"
 
 [dev-dependencies]
 # Lays the window out headlessly, so a test can measure it rather than a

@@ -339,6 +339,17 @@ export component NodeShape inherits Rectangle {
     // press, which may start a drag of it, or by the right click that offers
     // its menu.
     callback chosen();
+    // This node was pressed with Ctrl or Shift held: added to what is
+    // selected, or taken out of it, rather than selected alone. A drag may
+    // follow, as it may a press without them.
+    callback toggled();
+    // A left press on this node let go of without dragging it, and without
+    // Ctrl or Shift held: a click, which selects it alone where several are
+    // selected. The press itself kept them, so that a drag moves them all.
+    callback clicked();
+    // Whether the press under way was made with Ctrl or Shift held, so
+    // that letting go of it is not a click that selects this node alone.
+    property <bool> toggling: false;
     // What the menu a right click opens asks for: the node's attributes, or
     // the node's removal. See the menu itself, below the grip.
     callback edit-requested();
@@ -368,12 +379,25 @@ export component NodeShape inherits Rectangle {
     // gesture ends.
     // Not in a read-only session, where a node stays where it is: a press
     // still opens its window.
+    //
+    // A node not being dragged itself follows another's drag by `carried-x`
+    // and `carried-y`: one selected with the node in the hand, which moves
+    // with it as the hand moves, as in every other program, rather than
+    // jumping to its place when the hand lets go.
     property <length> drag-x: draggable && !Session.read-only && grip.pressed
         ? grip.mouse-x - grip.pressed-x
-        : 0px;
+        : root.carried-x;
     property <length> drag-y: draggable && !Session.read-only && grip.pressed
         ? grip.mouse-y - grip.pressed-y
-        : 0px;
+        : root.carried-y;
+    // How far another node's drag is carrying this one, while it does: see
+    // `drag-x`. Nothing is recorded by it; the drag's own end is the edit.
+    in property <length> carried-x: 0px;
+    in property <length> carried-y: 0px;
+    // How far a drag of this node has gone, told as the pointer moves, so
+    // that the nodes selected with it can be carried; and told nought as the
+    // press ends, however it ends, so that they are carried no further.
+    callback dragging(length, length);
 
     x: node.x;
     y: node.y;
@@ -612,6 +636,12 @@ export component NodeShape inherits Rectangle {
         height: 100%;
         enabled: draggable;
         mouse-cursor: draggable ? MouseCursor.grab : MouseCursor.default;
+        moved => {
+            if (self.pressed && draggable && !Session.read-only) {
+                root.dragging(self.mouse-x - self.pressed-x,
+                              self.mouse-y - self.pressed-y);
+            }
+        }
         pointer-event(event) => {
             if (event.kind == PointerEventKind.down
                 && event.button == PointerEventButton.right) {
@@ -627,11 +657,23 @@ export component NodeShape inherits Rectangle {
                 // Choosing and dragging are the same press: a node you have
                 // started to move is the node you are interested in, and
                 // making them separate gestures would mean pressing twice to
-                // do the obvious thing.
-                chosen();
+                // do the obvious thing. With Ctrl or Shift held, as in every
+                // other program, the node joins what is selected or leaves
+                // it.
+                root.toggling = event.modifiers.control
+                    || event.modifiers.shift;
+                if (root.toggling) {
+                    toggled();
+                } else {
+                    chosen();
+                }
             }
             if (event.kind == PointerEventKind.up
                 && event.button == PointerEventButton.left) {
+                // The nodes carried with this one are let go first, before
+                // the edit that puts them all where they now belong redraws
+                // them there.
+                root.dragging(0px, 0px);
                 // A left press that stayed put is a click, which selected the
                 // node as it went down and does nothing more; one that moved
                 // is a drag, and the editor is told where the node went.
@@ -648,6 +690,8 @@ export component NodeShape inherits Rectangle {
                     || abs(self.mouse-y - self.pressed-y) > root.slop) {
                     dragged(self.mouse-x - self.pressed-x,
                             self.mouse-y - self.pressed-y);
+                } else if (!root.toggling) {
+                    clicked();
                 }
             }
         }

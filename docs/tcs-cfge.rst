@@ -45,9 +45,11 @@ The command line
 
 .. code-block:: text
 
-   tcs-cfge [-r | --read-only] <configuration file> [<simulator file>]
+   tcs-cfge [-h | --help] [-r | --read-only] [<configuration file> [<simulator file>]]
 
-The configuration file is required. Its extension says its format: ``.xtcs``
+With no file named, the window opens with no configuration in it, and
+**File -> Open...** chooses one (see `Opening and closing`_). A configuration
+named is opened at once. Its extension says its format: ``.xtcs``
 is XTCS, in XML, and anything else, normally ``.ytcs``, is YTCS, in YAML. The file need not
 exist yet: a name that is not there is how a new configuration is begun, and
 any directories missing from its path are made when it is first written.
@@ -62,9 +64,9 @@ and it may go anywhere on the line: see `Read-only sessions`_. Any other word
 starting with a dash is refused, so that a mistyped flag is not taken for the
 name of a configuration to create. More than two files are refused too.
 
-Run with no file, or with a command line it does not take, tcs-cfge prints its
-usage on the error output and exits with status 2. There is no ``--help``
-option; running it with no arguments is how to see the usage.
+``-h`` or ``--help`` prints the usage, with a line apiece on the files and the
+flags, and exits. Given a command line it does not take, tcs-cfge prints its
+usage on the error output and exits with status 2.
 
 What happens as it starts
 -------------------------
@@ -216,12 +218,16 @@ The menus
 ---------
 
 **File**
-    **Save**, **Save as...**, **Autosave** (a check box), **Edit payload
-    groups**, **Edit simulated payload groups** (greyed when no simulator file
-    was given), **Print...**, and **Exit**.
+    **Open...** (Ctrl+O) and **Close** (Ctrl+W), **Save**, **Save as...**,
+    **Autosave** (a check box), **Edit payload groups**, **Edit simulated
+    payload groups** (greyed when no simulator file was given), **Print...**,
+    and **Exit**. See `Opening and closing`_.
 
 **Edit**
-    **Edit tcspecial parameters** and **Arrange the nodes**.
+    **Cut** (Ctrl+X), **Copy** (Ctrl+C), **Paste** (Ctrl+V) and **Select
+    all** (Ctrl+A), on the nodes selected on the page (see `Copying, cutting
+    and pasting`_); then **Edit tcspecial parameters** and **Arrange the
+    nodes**.
 
 **View**
     **Zoom to the drawing** fits every node and physics component in the
@@ -316,10 +322,47 @@ A right click selects a node and opens its menu: **Edit**, which opens the
 node's window, and **Delete**. A subdiagram's box has **Open** first. A click
 anywhere else on the sheet selects nothing and closes any menu.
 
+To select several nodes, hold Ctrl or Shift and press each one; the same
+press on a selected node takes it out again. Or drag on bare sheet: a box
+follows the pointer, and every node wholly inside it is selected when you let
+go, beside what was already selected if Ctrl or Shift is held. **Edit ->
+Select all** selects every node on the page. Dragging any of the selected
+nodes moves them all, the others following the pointer with it; each stays in
+its own pane when you let go, and one Undo puts them all back. A click on one
+of them without dragging selects it alone.
+
 The Delete key, or Backspace, removes what is selected: a line at once, a
-node after asking. The question names the node and the lines that go with it.
-Every line to or from a deleted node goes too, and one Undo puts all of it
-back. Cancel leaves everything, the history included, as it was.
+node after asking. The question names the node and the lines that go with it;
+with several nodes selected, it names them all, and the Delete in any of their
+menus asks about them all too. Every line to or from a deleted node goes too,
+and one Undo puts all of it back, each node where it was. Cancel leaves
+everything, the history included, as it was.
+
+Copying, cutting and pasting
+----------------------------
+
+**Edit -> Copy** (Ctrl+C) takes a copy of the nodes selected on the page and
+of the lines between two of them. **Edit -> Cut** (Ctrl+X) does the same and
+removes the nodes, with every line that touches them, in one edit. **Edit ->
+Paste** (Ctrl+V) puts what was taken on the page whose window it is chosen in,
+selected, in one edit, so one Undo takes the whole paste back.
+
+* A line with only one end among the copied nodes is not pasted.
+* A pasted node keeps its name if no node in any file of the configuration
+  has it, which is how a Cut and a Paste move nodes to another page.
+  Otherwise it is numbered as a new node is: ``sensor`` and ``sensor-1``
+  both paste as ``sensor-2`` when those two are taken.
+* A pasted node keeps its place, moved down the sheet a step at a time until
+  none of what is pasted lands exactly on a node already there, so a copy
+  pasted beside its original is seen beside it.
+* A subdiagram's box cannot be copied: open it and select its nodes instead.
+  What the simulator's file says about a payload, the ground's command
+  bindings and a page's exports are not copied with a node.
+
+What was copied stays until something else is copied, through **File ->
+Open**, so nodes can be copied out of one configuration and pasted into
+another. It is kept by tcs-cfge, not by the desktop: it cannot be pasted into
+another program, nor anything from another program into tcs-cfge.
 
 A node's window
 ---------------
@@ -728,9 +771,10 @@ The setting is kept as ``<autosave>`` in ``$HOME/.tcs-cfge/preferences.xml``,
 ``true`` or ``false``, and is on by default.
 
 .. figure:: shots/tcs-cfge-file-menu.png
-   :alt: The File menu open: Save, Save as..., Autosave with a tick beside
-         it, then Edit payload groups and Edit simulated payload groups,
-         then Print..., then Exit.
+   :alt: The File menu open: Open... with Ctrl+O and Close with Ctrl+W,
+         then Save, Save as..., Autosave with a tick beside it, then Edit
+         payload groups and Edit simulated payload groups, then Print...,
+         then Exit.
 
    The File menu, with Autosave on.
 
@@ -818,6 +862,28 @@ directory, and opened in the desktop's PDF viewer -- ``xdg-open`` on Linux --
 whose Print chooses the printer, the paper and the orientation, and shows
 what will be printed first. The PDF is a picture of the sheet, not text: it
 prints as the window draws, colours and all.
+
+Opening and closing
+-------------------
+
+**File -> Open...** (Ctrl+O) opens another configuration in the window, in
+place of the one there. The desktop's Open dialog asks for it: choose one
+configuration, ending in ``.ytcs`` or ``.xtcs``, and, to edit its simulator's
+settings too, its simulator file, ending in ``.yaml``, as the command line
+takes them. Files that cannot be opened are said in an alert, and the
+configuration open before is still open, unchanged.
+
+**File -> Close** (Ctrl+W) puts the configuration away. The window stays,
+saying that no configuration is open, with only **Open...** and **Exit** to
+choose.
+
+Either one, when the files do not have everything, first makes the offer Exit
+makes (see `Leaving`_), with **Save and close**, **Save as and close...**,
+**Close without saving** and **Stay**. The windows about the configuration --
+its subdiagrams' pages, its nodes' windows, the groups -- close with it, and
+its undo history is deleted, as on a tidy exit. A configuration opened is
+started as one named on the command line is, its problems asked about first.
+With ``--read-only``, every configuration opened is read-only too.
 
 Leaving
 -------

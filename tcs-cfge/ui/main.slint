@@ -923,6 +923,31 @@ component Surface inherits Rectangle {
     // Which node is drawn as chosen. What it says about itself is in a window
     // of its own -- see NodeWindow -- so this is all the canvas needs.
     in property <string> selected: "";
+    // Which others are selected with it, by a flag for each of `nodes` in
+    // its order: what Ctrl or Shift and a press, a box drawn on bare sheet,
+    // and Select all add. A flag each rather than a list of names, so that
+    // each node can be asked about by its place.
+    in property <[bool]> also-chosen: [];
+    // A press on a node with Ctrl or Shift held; a click on one that did not
+    // drag it; and a box drawn on bare sheet, by its edges in the working
+    // panes' coordinates and whether Ctrl or Shift was held, which keeps
+    // what was selected. See NodeShape's toggled and clicked.
+    callback node-toggled(string);
+    callback node-clicked(string);
+    callback band-chosen(length, length, length, length, bool);
+    // A box being drawn on bare sheet, from where the press was, in the
+    // whole sheet's coordinates, while the press lasts; and whether it adds
+    // to what is selected.
+    property <bool> banding: false;
+    // How far the node in the hand has been dragged, while one of several
+    // selected is: the others are drawn carried by as much. Nought when no
+    // such drag is under way. See NodeShape's dragging.
+    // Out for the tests, which hold the carrying to it.
+    out property <length> group-x: 0px;
+    out property <length> group-y: 0px;
+    property <bool> band-adding: false;
+    property <length> band-x: 0px;
+    property <length> band-y: 0px;
     // Which line is selected instead, by its place in `links`, or -1; and
     // which physics component, by name. At most one of the three is set:
     // whatever is selected is what the Delete key takes.
@@ -1345,6 +1370,28 @@ component Surface inherits Rectangle {
                             width: 100%;
                             height: 100%;
                             pointer-event(event) => {
+                                // A box drawn on bare sheet, let go of: the
+                                // nodes wholly inside it are selected. One
+                                // that went nowhere was a click, which was
+                                // answered as it went down.
+                                if (event.kind == PointerEventKind.up
+                                    && root.banding) {
+                                    root.banding = false;
+                                    if (abs(self.mouse-x - root.band-x) > 4px
+                                        || abs(self.mouse-y - root.band-y)
+                                            > 4px) {
+                                        root.band-chosen(
+                                            min(self.mouse-x, root.band-x)
+                                                - root.left,
+                                            min(self.mouse-y, root.band-y),
+                                            max(self.mouse-x, root.band-x)
+                                                - root.left,
+                                            max(self.mouse-y, root.band-y),
+                                            root.band-adding);
+                                        picks.focus();
+                                    }
+                                    return;
+                                }
                                 if (event.kind != PointerEventKind.down) {
                                     return;
                                 }
@@ -1356,7 +1403,21 @@ component Surface inherits Rectangle {
                                 let line = root.link-at(
                                     self.mouse-x - root.left, self.mouse-y);
                                 if (line < 0) {
-                                    root.unpicked();
+                                    // Bare sheet: nothing selected, unless
+                                    // Ctrl or Shift is held, and a box begun
+                                    // with a left press, which a drag draws.
+                                    let adding = event.modifiers.control
+                                        || event.modifiers.shift;
+                                    if (!adding) {
+                                        root.unpicked();
+                                    }
+                                    if (event.button
+                                        == PointerEventButton.left) {
+                                        root.banding = true;
+                                        root.band-adding = adding;
+                                        root.band-x = self.mouse-x;
+                                        root.band-y = self.mouse-y;
+                                    }
                                 } else {
                                     root.link-picked(line);
                                     picks.focus();
@@ -1442,10 +1503,34 @@ component Surface inherits Rectangle {
                         stroke-width: 1.25px;
                         fill: transparent;
                     }
-                    for n in nodes: NodeShape {
+                    for n[i] in nodes: NodeShape {
                         node: n;
                         draggable: true;
-                        selected: n.name == root.selected;
+                        selected: n.name == root.selected
+                            || root.also-chosen[i];
+                        // Carried by the drag of another node selected with
+                        // it; the node in the hand ignores this, following
+                        // the hand itself.
+                        carried-x: n.name == root.selected
+                            || root.also-chosen[i] ? root.group-x : 0px;
+                        carried-y: n.name == root.selected
+                            || root.also-chosen[i] ? root.group-y : 0px;
+                        // Only a selected node's drag carries the others,
+                        // that being the drag that moves them when it ends:
+                        // one just taken out of the selection by Ctrl moves
+                        // alone. Let go, whichever it was, carries nothing.
+                        dragging(dx, dy) => {
+                            if (n.name == root.selected || root.also-chosen[i]
+                                || (dx == 0 && dy == 0)) {
+                                root.group-x = dx;
+                                root.group-y = dy;
+                            }
+                        }
+                        toggled => {
+                            root.node-toggled(n.name);
+                            picks.focus();
+                        }
+                        clicked => { root.node-clicked(n.name); }
                         dragged(dx, dy) => { node-moved(n.name, dx, dy); }
                         open-requested => { open-subdiagram(n.name); }
                         link-from(terminal) => {
@@ -1517,6 +1602,23 @@ component Surface inherits Rectangle {
                             dragged(x, y) => {
                                 root.link-moved(edge.x + x, edge.y + y);
                             }
+                        }
+
+                        // The box being drawn on bare sheet, over everything
+                        // on it so that it is seen whatever it crosses: an
+                        // outline round a pale fill that lets what is under
+                        // it show, which nothing else on the sheet is, so it
+                        // is told from a node by its shape and not by its
+                        // colour alone. It takes no presses, having no
+                        // TouchArea.
+                        if root.banding && ground.pressed: Rectangle {
+                            x: min(ground.mouse-x, root.band-x);
+                            y: min(ground.mouse-y, root.band-y);
+                            width: abs(ground.mouse-x - root.band-x);
+                            height: abs(ground.mouse-y - root.band-y);
+                            background: #0072B222;
+                            border-width: 1px;
+                            border-color: #0072B2;
                         }
 
                         // While a line is in hand, every click on the sheet
@@ -2193,6 +2295,10 @@ export component MainWindow inherits Window {
     // How large the sheet is drawn, and how narrow the window may be, for
     // the tests: see Surface's `zoom`.
     out property <float> sheet-zoom: surface.zoom;
+    // How far the nodes selected with the one being dragged are carried, for
+    // the tests: see Surface's group-x.
+    out property <length> carried-x: surface.group-x;
+    out property <length> carried-y: surface.group-y;
     out property <length> narrowest: root.min-width;
     in property <color> gateway-ground: white;
     in property <color> vehicle-ground: white;
@@ -2283,6 +2389,30 @@ export component MainWindow inherits Window {
     pure callback extent(bool) -> Extent;
     // Print, from the File menu: see print.rs.
     callback print-clicked();
+    // Open and Close, from the File menu: another configuration in this
+    // window in place of this one, and none. See open_asked and leave.
+    callback open-clicked();
+    callback close-clicked();
+    // Whether no configuration is open: after Close, until Open. Everything
+    // but Open and Exit is greyed then, there being nothing for it to act
+    // on.
+    in property <bool> closed: false;
+    // Cut, Copy, Paste and Select all, from the Edit menu: see clipboard.rs.
+    callback cut-clicked();
+    callback copy-clicked();
+    callback paste-clicked();
+    callback select-all();
+    // Whether anything has been copied, which Paste needs.
+    in property <bool> can-paste: false;
+    // The nodes selected beside the chosen one, and the presses that change
+    // which: see Surface's.
+    in property <[bool]> also-chosen: [];
+    callback node-toggled(string);
+    callback node-clicked(string);
+    callback band-chosen(length, length, length, length, bool);
+    // Whether the window is taking commands about a configuration: not
+    // while it is inert, and not with none open.
+    property <bool> working: !root.inert && !root.closed;
     // The view at a place on the sheet, and where it is: Print's, forwarded
     // to the Surface's own.
     public function show-at(left: length, top: length, chosen: float) {
@@ -2318,6 +2448,27 @@ export component MainWindow inherits Window {
     MenuBar {
         Menu {
             title: "File";
+            // Another configuration, in this window in place of this one:
+            // chosen in the desktop's own Open dialog, with its simulator
+            // file if that is to be edited too, and opened once this one
+            // owes nothing -- the offer to save first where it does. Not
+            // while a question about the one open is waiting.
+            MenuItem {
+                enabled: !root.inert;
+                title: "Open...";
+                shortcut: @keys(Control + O);
+                activated => { root.open-clicked(); }
+            }
+            // This configuration put away, the window kept for the next:
+            // the same offer first, and then a window with nothing in it
+            // but Open and Exit.
+            MenuItem {
+                enabled: root.working;
+                title: "Close";
+                shortcut: @keys(Control + W);
+                activated => { root.close-clicked(); }
+            }
+            MenuSeparator { }
             // Saving needs no command while Autosave is on -- every edit is
             // written as it is made -- and there is one anyway, for when it
             // is off, and for the three things the ordinary case does not
@@ -2327,7 +2478,7 @@ export component MainWindow inherits Window {
             // has been taught by every other program to save their work. Both
             // files of a session go together, each written atomically.
             MenuItem {
-                enabled: !root.inert && !Session.read-only;
+                enabled: root.working && !Session.read-only;
                 title: "Save";
                 activated => { root.save-clicked(); }
             }
@@ -2335,7 +2486,7 @@ export component MainWindow inherits Window {
             // session carried on there: for files that cannot be written
             // where they are, and for a copy. See Editor::save_as.
             MenuItem {
-                enabled: !root.inert && !Session.read-only;
+                enabled: root.working && !Session.read-only;
                 title: "Save as...";
                 activated => { root.save-as-clicked(); }
             }
@@ -2345,7 +2496,7 @@ export component MainWindow inherits Window {
             // when the editor stopped is put back the next time it opens the
             // configuration. Kept as a setting.
             MenuItem {
-                enabled: !root.inert && !Session.read-only;
+                enabled: root.working && !Session.read-only;
                 title: "Autosave";
                 checkable: true;
                 checked: root.autosave;
@@ -2356,7 +2507,7 @@ export component MainWindow inherits Window {
             // of payloads read together, and which payloads those are is
             // written on the nodes rather than drawn between them.
             MenuItem {
-                enabled: !root.inert;
+                enabled: root.working;
                 title: "Edit payload groups";
                 activated => { root.edit-groups(); }
             }
@@ -2373,7 +2524,7 @@ export component MainWindow inherits Window {
             // says about itself.
             MenuItem {
                 title: "Edit simulated payload groups";
-                enabled: root.has-simulator && !root.inert;
+                enabled: root.has-simulator && root.working;
                 activated => { root.edit-simulator-groups(); }
             }
             MenuSeparator { }
@@ -2384,7 +2535,7 @@ export component MainWindow inherits Window {
             // editor's own: the window toolkit has none, and every desktop
             // has a viewer that prints. See print.rs.
             MenuItem {
-                enabled: !root.inert;
+                enabled: root.working;
                 title: "Print...";
                 activated => { root.print-clicked(); }
             }
@@ -2397,8 +2548,40 @@ export component MainWindow inherits Window {
         }
         Menu {
             title: "Edit";
+            // The usual four, on the nodes selected on this page: see
+            // clipboard.rs. What is copied is the nodes and the lines
+            // between them, and it is kept by the editor rather than the
+            // desktop, so it can be pasted into the next configuration
+            // opened. Paste puts it on this page, selected.
             MenuItem {
-                enabled: !root.inert;
+                enabled: root.working && !Session.read-only
+                    && root.selected != "";
+                title: "Cut";
+                shortcut: @keys(Control + X);
+                activated => { root.cut-clicked(); }
+            }
+            MenuItem {
+                enabled: root.working && root.selected != "";
+                title: "Copy";
+                shortcut: @keys(Control + C);
+                activated => { root.copy-clicked(); }
+            }
+            MenuItem {
+                enabled: root.working && !Session.read-only
+                    && root.can-paste;
+                title: "Paste";
+                shortcut: @keys(Control + V);
+                activated => { root.paste-clicked(); }
+            }
+            MenuItem {
+                enabled: root.working;
+                title: "Select all";
+                shortcut: @keys(Control + A);
+                activated => { root.select-all(); }
+            }
+            MenuSeparator { }
+            MenuItem {
+                enabled: root.working;
                 title: "Edit tcspecial parameters";
                 activated => { root.edit-parameters(); }
             }
@@ -2408,7 +2591,7 @@ export component MainWindow inherits Window {
             // over more sheet than the window shows, and for a morning's
             // dragging that has left one nobody can read.
             MenuItem {
-                enabled: !root.inert && !Session.read-only;
+                enabled: root.working && !Session.read-only;
                 title: "Arrange the nodes";
                 activated => { root.arrange(); }
             }
@@ -2420,13 +2603,13 @@ export component MainWindow inherits Window {
         Menu {
             title: "View";
             MenuItem {
-                enabled: !root.inert;
+                enabled: root.working;
                 title: "Zoom to the drawing";
                 activated => { surface.zoom-onto(root.extent(false)); }
             }
             // Disabled with nothing selected, rather than doing nothing.
             MenuItem {
-                enabled: !root.inert && (root.selected != ""
+                enabled: root.working && (root.selected != ""
                     || root.selected-link >= 0
                     || root.selected-physics != "");
                 title: "Zoom to the selection";
@@ -2434,12 +2617,12 @@ export component MainWindow inherits Window {
             }
             MenuSeparator { }
             MenuItem {
-                enabled: !root.inert;
+                enabled: root.working;
                 title: "Actual size";
                 activated => { surface.zoom-to(1.0); }
             }
             MenuItem {
-                enabled: !root.inert;
+                enabled: root.working;
                 title: "Fit the width";
                 activated => { surface.zoom-to-width(); }
             }
@@ -2535,6 +2718,12 @@ export component MainWindow inherits Window {
         edge-terminals: root.edge-terminals;
         edge-started(terminal) => { root.edge-started(terminal); }
         selected: root.selected;
+        also-chosen: root.also-chosen;
+        node-toggled(n) => { root.node-toggled(n); }
+        node-clicked(n) => { root.node-clicked(n); }
+        band-chosen(l, t, r, b, adding) => {
+            root.band-chosen(l, t, r, b, adding);
+        }
         selected-link: root.selected-link;
         selected-physics: root.selected-physics;
         node-selected(n) => { root.node-selected(n); }
@@ -2546,6 +2735,23 @@ export component MainWindow inherits Window {
         tip-at(x, y, page-x) => { return root.tip-at(x, y, page-x); }
         node-edit(n) => { root.node-edit(n); }
         node-delete(n) => { root.node-delete(n); }
+    }
+
+    // With no configuration open, what the window is for now: one sentence
+    // over the whole of it, which takes the presses, so that nothing of the
+    // empty sheet under it can be edited. See Editor::closed.
+    if root.closed: Rectangle {
+        background: Colors.window;
+        TouchArea { }
+        Text {
+            text: "No configuration is open. File > Open... opens one, "
+                + "and File > Exit leaves.";
+            font-size: Type.strong;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            width: parent.width - 4 * Space.wide;
+        }
     }
 
     // What makes it inert: a veil over the whole window that takes presses
@@ -3586,6 +3792,8 @@ export component DeleteWindow inherits Window {
     // said in words by the editor.
     in property <string> node: "";
     in property <string> carries: "";
+    // The question itself, said by the editor: which node, or which several.
+    in property <string> question: "Delete \"" + root.node + "\"?";
 
     callback confirmed();
     callback cancelled();
@@ -3595,7 +3803,7 @@ export component DeleteWindow inherits Window {
         spacing: Space.step;
 
         Copyable {
-            text: "Delete \"" + root.node + "\"?";
+            text: root.question;
             font-size: Type.strong;
             font-weight: Type.bold;
             wrap: word-wrap;
@@ -3606,7 +3814,7 @@ export component DeleteWindow inherits Window {
             wrap: word-wrap;
         }
         Copyable {
-            text: "Undo takes it back, with its attributes and its lines.";
+            text: "Undo takes it all back, with the attributes and the lines.";
             font-size: Type.small;
             color: #6b7280;
             wrap: word-wrap;
@@ -3621,7 +3829,7 @@ export component DeleteWindow inherits Window {
                 clicked => { root.cancelled(); }
             }
             CopyButton {
-                said: "Delete \"" + root.node + "\"?"
+                said: root.question
                     + (root.carries != "" ? "\n" + root.carries : "");
             }
             Rectangle { }
@@ -3696,7 +3904,12 @@ export component ReplaceWindow inherits Window {
 
 export component LeaveWindow inherits Window {
     default-font-size: Fonts.window;
-    title: "Leave tcs-cfge";
+    // What the offer is the way into: "leave", out of the editor, or
+    // "close", of the configuration, for Close and for Open, which closes
+    // this one to open another. The buttons say which.
+    in property <string> going: "leave";
+    title: root.going == "leave" ? "Leave tcs-cfge"
+        : "Close the configuration";
     background: Colors.window;
     min-width: 360px;
     min-height: 160px;
@@ -3748,17 +3961,20 @@ export component LeaveWindow inherits Window {
             }
             Rectangle { }
             Button {
-                text: "Leave without saving";
+                text: root.going == "leave" ? "Leave without saving"
+                    : "Close without saving";
                 clicked => { root.left(); }
             }
             // For files that cannot be written where they are: every file
             // of the session somewhere else, and then out.
             Button {
-                text: "Save as and leave...";
+                text: root.going == "leave" ? "Save as and leave..."
+                    : "Save as and close...";
                 clicked => { root.saved-as(); }
             }
             Button {
-                text: "Save and leave";
+                text: root.going == "leave" ? "Save and leave"
+                    : "Save and close";
                 primary: true;
                 clicked => { root.saved(); }
             }

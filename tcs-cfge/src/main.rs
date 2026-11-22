@@ -33,6 +33,7 @@
 //! Nothing of it is on the canvas -- it introduces no nodes and no connections
 //! -- so it is edited from the menu; see `sim.rs`.
 
+mod clipboard;
 mod document;
 mod editor;
 mod faithful;
@@ -56,7 +57,7 @@ mod subdiagram;
 mod title;
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use slint::{Model, ModelRc, VecModel};
@@ -170,6 +171,55 @@ enum Picked {
     Link(Link),
     /// A physics component, by its name.
     Physics(String),
+}
+
+/// What is to happen once the offer to save, if one is made, is answered:
+/// the editor left, the configuration closed, or another opened in its
+/// place.
+///
+/// Carried rather than decided again when the answer comes, because the
+/// answer comes from a window of its own -- Save, Save as, or leaving the
+/// changes -- and each of those ends by doing what was asked before it was
+/// made. See [`leave`] and [`carry_on`].
+enum Next {
+    /// Out of the editor: File > Exit, and the questions at startup.
+    Exit,
+    /// No configuration open, the window kept: File > Close.
+    Close,
+    /// Another configuration in this window: File > Open. Its files are
+    /// already read, so that one that cannot be read is said before the one
+    /// open now is let go.
+    Open(Box<Editor>),
+}
+
+/// What the windows hold for somebody between presses, beside what they
+/// draw: the nodes selected with the chosen one, what was copied, and what
+/// is to happen once an offer to save is answered.
+///
+/// Apart from the rest of [`Views`] only so that it is one field to give a
+/// window's views: each is empty until somebody does something.
+#[derive(Default)]
+struct Held {
+    /// The nodes selected beside the one in `Views::chosen`, by the page's
+    /// home as `chosen` is keyed, each by its own name on the page: what a
+    /// press with Ctrl or Shift held, a box drawn on bare sheet, and Edit >
+    /// Select all add. Empty for a page with one node selected or none.
+    ///
+    /// Apart from `chosen` rather than in place of it, because one node is
+    /// still the one a press last went to -- the one the Delete key asks
+    /// about by name, and the one a drag is of -- and everything that knows
+    /// about one selected node goes on knowing about it.
+    also: RefCell<BTreeMap<String, BTreeSet<String>>>,
+    /// What Copy or Cut last took, kept for as long as the editor runs, so
+    /// that it can be pasted into a configuration opened after it was
+    /// copied. See `clipboard`.
+    clipping: RefCell<Option<clipboard::Clipping>>,
+    /// What is to happen once the offer to save is answered, while it is
+    /// being made: see [`Next`].
+    next: RefCell<Option<Next>>,
+    /// The nodes the question about deleting several is about, by their
+    /// page and their own names, while it is asked: see [`confirm_removal`].
+    deleting: RefCell<Option<(Home, Vec<String>)>>,
 }
 
 /// The top diagram, and one per open subdiagram. Held so that an edit made in
@@ -319,6 +369,9 @@ struct Views {
     /// The line chosen from the errors button, drawn lit until it is put
     /// right or another error is chosen.
     lit: Rc<RefCell<Option<Link>>>,
+    /// The selection beyond one node, the clipboard, and what follows the
+    /// offer to save: see [`Held`].
+    held: Held,
 }
 
 impl Views {
@@ -352,6 +405,7 @@ impl Views {
         };
         let node = self.chosen.borrow().get(&key).cloned();
         window.set_selected(node.unwrap_or_default().into());
+        self.mark_also(&window, &key);
         // A line's place among the lines is the picking handler's to say,
         // having it to hand; anything else selected is no line.
         let picked = self.picked.borrow().get(&key).cloned();
@@ -384,11 +438,113 @@ impl Views {
             Some(node) => self.chosen.borrow_mut().insert(key.clone(), node),
             None => self.chosen.borrow_mut().remove(&key),
         };
+        self.held.also.borrow_mut().remove(&key);
         match picked {
             Some(picked) => self.picked.borrow_mut().insert(key, picked),
             None => self.picked.borrow_mut().remove(&key),
         };
         self.chose(home);
+    }
+
+    /// The nodes selected on a page: the chosen one first, then any others
+    /// in the order of their names.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The page: `None` for the top.
+    ///
+    /// # Returns
+    ///
+    /// Each node's own name on the page; nothing for a page with no node
+    /// selected.
+    fn selection(&self, home: &Home) -> Vec<String> {
+        let key = home.clone().unwrap_or_default();
+        let chosen = self.chosen.borrow().get(&key).cloned();
+        let also = self.held.also.borrow().get(&key).cloned();
+        chosen
+            .into_iter()
+            .chain(also.into_iter().flatten())
+            .collect()
+    }
+
+    /// Selects some nodes on a page, in place of whatever was selected
+    /// there or beside the nodes that were, and draws them so.
+    ///
+    /// # Arguments
+    ///
+    /// * `home`   - The page: `None` for the top.
+    /// * `names`  - The nodes, each by its own name on the page; the first
+    ///              becomes the chosen one where none is.
+    /// * `adding` - Whether to keep the nodes selected already, as a box
+    ///              drawn with Ctrl or Shift held does.
+    fn gather(&self, home: &Home, names: Vec<String>, adding: bool) {
+        let mut all = if adding {
+            self.selection(home)
+        } else {
+            Vec::new()
+        };
+        for name in names {
+            if !all.contains(&name) {
+                all.push(name);
+            }
+        }
+        let mut all = all.into_iter();
+        // One thing selected on a page, and that is the nodes: a line or a
+        // component selected before is selected no longer.
+        self.select(home, all.next(), None);
+        let rest: BTreeSet<String> = all.collect();
+        if !rest.is_empty() {
+            let key = home.clone().unwrap_or_default();
+            self.held.also.borrow_mut().insert(key, rest);
+        }
+        self.chose(home);
+    }
+
+    /// Adds a node to a page's selection, or takes it out of it: a press on
+    /// it with Ctrl or Shift held.
+    ///
+    /// The node taken out where it was the chosen one leaves another of the
+    /// selection chosen in its place, so that what is still selected is
+    /// still what the Delete key takes.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The page: `None` for the top.
+    /// * `name` - The node's own name on the page.
+    fn toggle(&self, home: &Home, name: &str) {
+        let mut all = self.selection(home);
+        match all.iter().position(|one| one == name) {
+            Some(at) => {
+                all.remove(at);
+            }
+            None => all.push(name.to_string()),
+        }
+        self.gather(home, all, false);
+    }
+
+    /// Draws the nodes selected beside the chosen one as selected, in one
+    /// window, and nothing else.
+    ///
+    /// By a flag for each node the window draws, in the order it draws
+    /// them, so that it is one property to set and the canvas is not
+    /// rebuilt: see [`Views::chose`] for why that matters.
+    ///
+    /// # Arguments
+    ///
+    /// * `window` - The page's window.
+    /// * `key`    - The page, as `chosen` is keyed: empty for the top.
+    fn mark_also(&self, window: &MainWindow, key: &str) {
+        let also = self.held.also.borrow();
+        let also = also.get(key);
+        let flags: Vec<bool> = window
+            .get_nodes()
+            .iter()
+            .map(|node| {
+                also.is_some_and(|also| also.contains(node.name.as_str()))
+            })
+            .collect();
+        window.set_also_chosen(ModelRc::from(Rc::new(VecModel::from(flags))));
+        window.set_can_paste(self.held.clipping.borrow().is_some());
     }
 
     /// Says what went wrong where it cannot be missed.
@@ -644,6 +800,8 @@ impl Views {
                 lists,
                 (held.as_ref(), lit.as_ref()),
             );
+            self.mark_also(&top, "");
+            top.set_closed(!editor.is_open());
         }
         for (name, window) in &self.open {
             window.set_path(editor.files().0.display().to_string().into());
@@ -656,6 +814,7 @@ impl Views {
                 lists,
                 (held.as_ref(), lit.as_ref()),
             );
+            self.mark_also(window, name);
         }
         // The same list in every window, each of which has the button; and
         // what might be wrong, counted on the two buttons beside it, the list
@@ -723,10 +882,24 @@ macro_rules! furnish {
     }};
 }
 
-/// Reads the command line: the files it names, in order, and whether the
-/// session is to be read-only.
+/// What the command line asks for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Asked {
+    /// The files named, in the order given: the configuration, and the
+    /// simulator's file after it. None for a window with nothing open.
+    files: Vec<String>,
+    /// Whether the session may change nothing: `-r`, `--read-only` or
+    /// `--readonly`.
+    read_only: bool,
+    /// Whether the usage was asked for instead of a session: `-h` or
+    /// `--help`.
+    help: bool,
+}
+
+/// Reads the command line: the files it names, in order, whether the session
+/// is to be read-only, and whether the usage was asked for instead.
 ///
-/// The flag wherever it is, in any of its three spellings. Any other word
+/// The flags wherever they are, in any of their spellings. Any other word
 /// starting with a dash is refused rather than taken for a file name: a
 /// mistyped flag would otherwise be a configuration created under that name.
 /// More than two files is refused too, there being nothing for a third to be.
@@ -737,21 +910,20 @@ macro_rules! furnish {
 ///
 /// # Returns
 ///
-/// The files named, in the order given, and whether `-r`, `--read-only` or
-/// `--readonly` was among the words.
+/// What the words ask for.
 ///
 /// # Errors
 ///
 /// A sentence saying what is wrong, for a word that starts with a dash and
-/// is not the flag (a lone `-` is a file name), or for more than two files.
-fn command_line(
-    words: impl Iterator<Item = String>,
-) -> Result<(Vec<String>, bool), String> {
+/// is not a flag (a lone `-` is a file name), or for more than two files.
+fn command_line(words: impl Iterator<Item = String>) -> Result<Asked, String> {
     let mut files = Vec::new();
     let mut read_only = false;
+    let mut help = false;
     for word in words {
         match word.as_str() {
             "-r" | "--read-only" | "--readonly" => read_only = true,
+            "-h" | "--help" => help = true,
             flag if flag.starts_with('-') && flag != "-" => {
                 return Err(format!("there is no option {flag:?}"));
             }
@@ -765,19 +937,54 @@ fn command_line(
             files.len()
         ));
     }
-    Ok((files, read_only))
+    Ok(Asked {
+        files,
+        read_only,
+        help,
+    })
 }
 
-/// What is said when the command line is not one tcs-cfge takes.
-const USAGE: &str = "usage: tcs-cfge [-r | --read-only] \
-     <configuration file> [<simulator file>]";
+/// What is said when the command line is not one tcs-cfge takes, and by
+/// `--help`.
+const USAGE: &str = "usage: tcs-cfge [-h | --help] [-r | --read-only] \
+     [<configuration file> [<simulator file>]]";
+
+/// Says what the command line takes, on standard output: `--help`.
+fn print_help() {
+    println!("tcs-cfge: {USAGE}");
+    println!(
+        "tcs-cfge: with no file named, the window opens with nothing in it, \
+         and File > Open chooses a configuration"
+    );
+    println!(
+        "tcs-cfge: a configuration named need not exist yet; with Autosave \
+         on, as it is unless turned off, it is written as edits are made"
+    );
+    println!(
+        "tcs-cfge: while it is edited, a history of the edits is kept in the \
+         state directory, $XDG_STATE_HOME/tcs-cfge or \
+         ~/.local/state/tcs-cfge, so that a crash loses nothing; leaving \
+         tcs-cfge deletes it"
+    );
+    println!(
+        "tcs-cfge: a second file is the simulator's own configuration -- how \
+         fast a simulated payload sends and what it does wrong -- and is \
+         edited from the menu. It is written as YAML, so its name has to end \
+         in \".yaml\""
+    );
+    println!(
+        "tcs-cfge: -r, --read-only or --readonly opens the files to look at: \
+         nothing in them can be changed and nothing is written"
+    );
+}
 
 /// Runs the editor: reads the command line and the files it names, opens
 /// and wires the windows, runs the event loop, and on the way out writes
 /// anything the files do not have and removes the session's history.
 ///
-/// A command line tcs-cfge does not take, or no configuration named, says why
-/// on standard error and exits with status 2.
+/// A command line tcs-cfge does not take says why on standard error and
+/// exits with status 2. No configuration named opens the window with none
+/// open, for File > Open to choose one.
 ///
 /// # Returns
 ///
@@ -792,42 +999,25 @@ fn main() -> Result<(), slint::PlatformError> {
     // flag: `-r`, `--read-only` or `--readonly`, a session that shows a
     // configuration and changes nothing -- see `Editor::set_read_only` and
     // `command_line`.
-    let (files, read_only_asked) = match command_line(std::env::args().skip(1))
-    {
-        Ok(said) => said,
+    let asked = match command_line(std::env::args().skip(1)) {
+        Ok(asked) => asked,
         Err(why) => {
             eprintln!("tcs-cfge: {why}");
             eprintln!("tcs-cfge: {USAGE}");
             std::process::exit(2);
         }
     };
-    let _ = READ_ONLY.set(read_only_asked);
-    let mut files = files.into_iter();
+    if asked.help {
+        print_help();
+        return Ok(());
+    }
+    let _ = READ_ONLY.set(asked.read_only);
+    let mut files = asked.files.into_iter();
 
-    let path = files.next().unwrap_or_else(|| {
-        eprintln!("tcs-cfge: {USAGE}");
-        eprintln!(
-            "tcs-cfge: the file need not exist yet; with Autosave on, as it is \
-             unless turned off, it is written as edits are made"
-        );
-        eprintln!(
-            "tcs-cfge: while it is edited, a history of the edits is kept in \
-             the state directory, $XDG_STATE_HOME/tcs-cfge or \
-             ~/.local/state/tcs-cfge, so that a crash loses nothing; leaving \
-             tcs-cfge deletes it"
-        );
-        eprintln!(
-            "tcs-cfge: a second file is the simulator's own configuration -- \
-             how fast a simulated payload sends and what it does wrong -- and \
-             is edited from the menu. It is written as YAML, so its name has \
-             to end in \".yaml\""
-        );
-        eprintln!(
-            "tcs-cfge: -r, --read-only or --readonly opens the files to look \
-             at: nothing in them can be changed and nothing is written"
-        );
-        std::process::exit(2);
-    });
+    // The configuration, where one was named. Without one the editor opens
+    // with nothing in it, for File > Open to choose one: see
+    // `Editor::closed`.
+    let path = files.next();
     // The simulator's configuration, where one was named. A second argument
     // and not a name derived from the first: the shipped sets call it after
     // the configuration with `sim` on the end, and nothing requires that.
@@ -886,25 +1076,30 @@ fn main() -> Result<(), slint::PlatformError> {
         eprintln!("tcs-cfge: {why}");
         std::process::exit(1);
     };
-    let editor = Editor::open(std::path::Path::new(&path), divider.get())
-        .unwrap_or_else(|why| refused(why));
+    let editor = match &path {
+        Some(path) => Editor::open(std::path::Path::new(path), divider.get())
+            .unwrap_or_else(|why| refused(why)),
+        None => Editor::closed(),
+    };
     let editor = Rc::new(RefCell::new(editor));
-    // Before anything can be edited -- the seeding below included, which is
-    // an edit like any other and so is not made.
-    editor.borrow_mut().set_read_only(read_only());
-    editor.borrow_mut().set_autosave(settings.autosave);
-    if let Some(simulator) = &simulator {
-        editor
-            .borrow_mut()
-            .open_simulator(std::path::Path::new(simulator))
-            .unwrap_or_else(|why| refused(why));
+    if path.is_some() {
+        // Before anything can be edited -- the seeding below included, which
+        // is an edit like any other and so is not made.
+        editor.borrow_mut().set_read_only(read_only());
+        editor.borrow_mut().set_autosave(settings.autosave);
+        if let Some(simulator) = &simulator {
+            editor
+                .borrow_mut()
+                .open_simulator(std::path::Path::new(simulator))
+                .unwrap_or_else(|why| refused(why));
+        }
+        // The undo history, and whatever a session that stopped badly had
+        // not written, once every file is open, the history being of them
+        // all: see `Editor::recover`. Before the seeding, which would be an
+        // edit on top of a document the history does not yet describe.
+        editor.borrow_mut().recover();
+        seed(&mut editor.borrow_mut());
     }
-    // The undo history, and whatever a session that stopped badly had not
-    // written, once every file is open, the history being of them all: see
-    // `Editor::recover`. Before the seeding, which would be an edit on top
-    // of a document the history does not yet describe.
-    editor.borrow_mut().recover();
-    seed(&mut editor.borrow_mut());
 
     let (ui, _views) = open_main(&editor, &settings, divider, lists)?;
     let outcome = slint::run_event_loop();
@@ -1034,6 +1229,7 @@ fn open_main(
         errors: Rc::new(RefCell::new(Vec::new())),
         lit: Rc::new(RefCell::new(None)),
         unfinished: Rc::new(RefCell::new(Vec::new())),
+        held: Held::default(),
     }));
     alerting(&views);
     // Which node the panel is showing, per window.
@@ -1296,14 +1492,45 @@ fn wire(
                 // back is a gesture that changed nothing, and an entry
                 // in the history for it would be an undo that does
                 // nothing visible.
-                if now == was {
-                    return;
+                // One of several selected: all of them move by the
+                // same distance, each held inside its own pane, in one
+                // edit, so one Undo puts them all back.
+                let names = selected_with(&views.borrow(), &home, &name);
+                if names.len() > 1 {
+                    let edits: Vec<Edit> = names
+                        .iter()
+                        .filter_map(|one| {
+                            let whole = Qualified::of(one, &home).absolute();
+                            let node = editor.document().node(&whole)?;
+                            let now = confine(
+                                &node.node_type,
+                                views.borrow().divider.get(),
+                                snap((
+                                    node.at.0 + dx.round() as i32,
+                                    node.at.1 + dy.round() as i32,
+                                )),
+                            );
+                            (now != node.at).then_some(Edit::MoveNode {
+                                node: whole,
+                                was: node.at,
+                                now,
+                            })
+                        })
+                        .collect();
+                    if edits.is_empty() {
+                        return;
+                    }
+                    editor.edit(Edit::Group { edits });
+                } else {
+                    if now == was {
+                        return;
+                    }
+                    editor.edit(Edit::MoveNode {
+                        node: absolute,
+                        was,
+                        now,
+                    });
                 }
-                editor.edit(Edit::MoveNode {
-                    node: absolute,
-                    was,
-                    now,
-                });
             }
             views.borrow().refresh(&editor.borrow());
         });
@@ -1397,7 +1624,7 @@ fn wire(
         let editor = editor.clone();
         let views = views.clone();
         window.on_exit_requested(move || {
-            leave(&editor, &views);
+            leave(&editor, &views, Next::Exit);
         });
     }
     {
@@ -1767,9 +1994,21 @@ fn wire(
         let home_for_delete = home.clone();
         // And Delete, which asks before it does anything: see
         // `confirm_delete`.
+        //
+        // A node among several selected takes the others with it, as the
+        // Delete key does: see `selected_with`.
         window.on_node_delete(move |name| {
-            let absolute = Qualified::of(&name, &home_for_delete).absolute();
-            confirm_delete(&editor_for_delete, &views_for_delete, &absolute);
+            let names = selected_with(
+                &views_for_delete.borrow(),
+                &home_for_delete,
+                &name,
+            );
+            confirm_delete(
+                &editor_for_delete,
+                &views_for_delete,
+                &home_for_delete,
+                &names,
+            );
         });
     }
     {
@@ -1784,7 +2023,124 @@ fn wire(
             // that starts dragging it, and rebuilding the canvas here
             // would replace the element the pointer is holding. See
             // Views::chose.
+            //
+            // A press on one of several selected keeps them all, so
+            // that the drag it may start moves them together; a click
+            // that does not drag then selects it alone. See
+            // on_node_clicked, below.
+            let views = views.borrow();
+            let all = views.selection(&home);
+            if all.len() > 1
+                && all.iter().any(|one| one.as_str() == name.as_str())
+            {
+                return;
+            }
+            views.select(&home, Some(name.to_string()), None);
+        });
+    }
+    {
+        // A press with Ctrl or Shift held: the node added to what is
+        // selected, or taken out of it.
+        let views = views.clone();
+        let home = home.clone();
+        window.on_node_toggled(move |name| {
+            views.borrow().toggle(&home, &name);
+        });
+    }
+    {
+        // A click on a node that did not drag it, without Ctrl or Shift:
+        // it alone selected, among several or not.
+        let views = views.clone();
+        let home = home.clone();
+        window.on_node_clicked(move |name| {
             views.borrow().select(&home, Some(name.to_string()), None);
+        });
+    }
+    {
+        // A box drawn on bare sheet: every node wholly inside it
+        // selected, beside what was where Ctrl or Shift was held. In the
+        // working panes' coordinates, as the nodes are drawn.
+        let views = views.clone();
+        let home = home.clone();
+        let weak = window.as_weak();
+        window.on_band_chosen(move |left, top, right, bottom, adding| {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            let inside: Vec<String> = window
+                .get_nodes()
+                .iter()
+                .filter(|node| {
+                    node.x >= left
+                        && node.y >= top
+                        && node.x + node.width <= right
+                        && node.y + node.height <= bottom
+                })
+                .map(|node| node.name.to_string())
+                .collect();
+            views.borrow().gather(&home, inside, adding);
+        });
+    }
+    {
+        // Edit > Select all: every node on the page.
+        let views = views.clone();
+        let home = home.clone();
+        let weak = window.as_weak();
+        window.on_select_all(move || {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            let all: Vec<String> = window
+                .get_nodes()
+                .iter()
+                .map(|node| node.name.to_string())
+                .collect();
+            views.borrow().gather(&home, all, false);
+        });
+    }
+    {
+        // Edit > Copy: what is selected on the page, taken into the
+        // editor's own clipboard. See clipboard.rs.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        window.on_copy_clicked(move || {
+            copy_selection(&editor, &views, &home, false);
+        });
+    }
+    {
+        // Edit > Cut: the same, and the nodes taken away in one edit.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        window.on_cut_clicked(move || {
+            copy_selection(&editor, &views, &home, true);
+        });
+    }
+    {
+        // Edit > Paste: what was copied, put on this page and selected.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        window.on_paste_clicked(move || {
+            paste_clipping(&editor, &views, &home);
+        });
+    }
+    {
+        // File > Open: the desktop's own dialog, and the files chosen
+        // opened in this window in place of these. See open_asked.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_open_clicked(move || {
+            open_asked(&editor, &views);
+        });
+    }
+    {
+        // File > Close: the configuration put away, the window kept.
+        let editor = editor.clone();
+        let views = views.clone();
+        window.on_close_clicked(move || {
+            leave(&editor, &views, Next::Close);
         });
     }
     {
@@ -3087,36 +3443,75 @@ fn centre_on(views: &Views, home: &Home, middle: f32) {
     }
 }
 
-/// Asks whether a node should go, and takes it away if the answer is yes.
+/// The nodes a command given on one node is about: every node selected on
+/// its page where it is one of them, and otherwise it alone.
+///
+/// # Arguments
+///
+/// * `views` - The windows, which hold the selection.
+/// * `home`  - The node's page: `None` for the top.
+/// * `name`  - The node's own name on the page.
+///
+/// # Returns
+///
+/// The nodes, each by its own name on the page.
+fn selected_with(views: &Views, home: &Home, name: &str) -> Vec<String> {
+    let all = views.selection(home);
+    if all.iter().any(|one| one == name) {
+        all
+    } else {
+        vec![name.to_string()]
+    }
+}
+
+/// Asks whether a node, or several, should go, and takes them away if the
+/// answer is yes.
 ///
 /// A node's Delete asks first. It is next to Edit in a menu a click opens, so
 /// a press meant for Edit is a press away from it -- and a node is not one
 /// word: it is its attributes and every line that touches it, which go with
 /// it. Undo would put all of that back, a removal being one edit, but an undo
 /// somebody has to discover is no answer to a node that has already gone.
+/// Several selected go together, by one answer and in one edit, as one Cut
+/// takes them.
 ///
-/// One window at a time, re-pointed at whichever node was asked about: it
-/// names the node, and two of them would leave somebody answering whichever
-/// was on top. Deleting is what the window's Delete does and nothing else
-/// here does it, so a window that cannot be made is a node that cannot be
+/// One window at a time, re-pointed at whatever was asked about: it names
+/// what goes, and two of them would leave somebody answering whichever was
+/// on top. Deleting is what the window's Delete does and nothing else here
+/// does it, so a window that cannot be made is a node that cannot be
 /// deleted -- said on the error output, rather than deleting it unasked.
 ///
 /// # Arguments
 ///
-/// * `editor` - The session the node is in.
+/// * `editor` - The session the nodes are in.
 /// * `views`  - The windows, which keep the question's window once it is
 ///              made.
-/// * `node`   - The qualified name of the node asked about; a node already
-///              gone asks nothing.
+/// * `home`   - The page the nodes are on: `None` for the top.
+/// * `names`  - The nodes asked about, each by its own name on the page; a
+///              node already gone is not asked about, and nothing is asked
+///              where none is left.
 fn confirm_delete(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
-    node: &str,
+    home: &Home,
+    names: &[String],
 ) {
-    // Nothing to ask about: a node somebody deleted while the menu was open.
-    if editor.borrow().document().node(node).is_none() {
+    // Nothing to ask about: nodes somebody deleted while the menu was open.
+    let names: Vec<String> = names
+        .iter()
+        .filter(|name| {
+            let whole = Qualified::of(name, home).absolute();
+            editor.borrow().document().node(&whole).is_some()
+        })
+        .cloned()
+        .collect();
+    let Some(first) = names.first() else {
         return;
-    }
+    };
+    let node = match names.len() {
+        1 => Qualified::of(first, home).absolute(),
+        many => format!("{many} nodes"),
+    };
 
     if views.borrow().deleting.is_none() {
         let window = match DeleteWindow::new() {
@@ -3133,15 +3528,16 @@ fn confirm_delete(
             let editor = editor.clone();
             let views = views.clone();
             window.on_confirmed(move || {
-                let asked = views
-                    .borrow()
-                    .deleting
-                    .as_ref()
-                    .map(|window| window.get_node().to_string())
-                    .unwrap_or_default();
-                let removal = editor.borrow().document().removal_of(&asked);
-                if let Some(removal) = removal {
-                    editor.borrow_mut().edit(removal);
+                let asked = views.borrow().held.deleting.borrow_mut().take();
+                if let Some((home, names)) = asked {
+                    let removal = clipboard::removal(
+                        editor.borrow().document(),
+                        &home,
+                        &names,
+                    );
+                    if let Some(removal) = removal {
+                        editor.borrow_mut().edit(removal);
+                    }
                 }
                 hide_deleting(&views);
                 views.borrow().refresh(&editor.borrow());
@@ -3154,12 +3550,26 @@ fn confirm_delete(
         views.borrow_mut().deleting = Some(window);
     }
 
-    let lines = editor.borrow().document().lines_touching(node);
+    let lines = {
+        let wholes: Vec<String> = names
+            .iter()
+            .map(|name| Qualified::of(name, home).absolute())
+            .collect();
+        editor.borrow().document().lines_touching(&wholes)
+    };
+    let them = if names.len() == 1 { "it" } else { "them" };
     let carries = match lines {
         0 => String::new(),
-        1 => "One line is attached to it and goes with it.".to_string(),
-        many => format!("{many} lines are attached to it and go with it."),
+        1 => format!("One line is attached to {them} and goes with {them}."),
+        many => {
+            format!("{many} lines are attached to {them} and go with {them}.")
+        }
     };
+    let question = match names.len() {
+        1 => format!("Delete \"{node}\"?"),
+        _ => format!("Delete these {node}: {}?", names.join(", ")),
+    };
+    *views.borrow().held.deleting.borrow_mut() = Some((home.clone(), names));
 
     let window = views
         .borrow()
@@ -3167,7 +3577,8 @@ fn confirm_delete(
         .as_ref()
         .map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
-        window.set_node(node.into());
+        window.set_node(node.as_str().into());
+        window.set_question(question.into());
         window.set_carries(carries.into());
         if let Err(e) = window.show() {
             eprintln!("tcs-cfge: {node} cannot be asked about: {e}");
@@ -3447,6 +3858,10 @@ fn troubles_of(document: &Document) -> Vec<Trouble> {
 /// The errors, the editor's own first; and what tcs-verify warned of, as
 /// concerns.
 fn errors_of(editor: &Editor) -> (Vec<Trouble>, Vec<Concern>) {
+    // Nothing open, nothing wrong: see `Editor::closed`.
+    if !editor.is_open() {
+        return (Vec::new(), Vec::new());
+    }
     let mut troubles = troubles_of(editor.document());
     let (errors, warnings) = verified(editor);
     troubles.extend(errors);
@@ -3709,7 +4124,7 @@ fn warn_of_errors(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let views = views.clone();
         // A way out of the editor, through the same path the menu's Exit
         // takes: nothing has been edited yet, so it ends there and then.
-        window.on_problems_quit(move || leave(&editor, &views));
+        window.on_problems_quit(move || leave(&editor, &views, Next::Exit));
     }
     window.set_problems_said(said.into());
     window.set_problems_up(true);
@@ -3791,7 +4206,7 @@ fn warn_of_spellings(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         let views = views.clone();
         // Through the same path the menu's Exit takes: nothing has been
         // edited yet, so it ends there and then.
-        window.on_spellings_quit(move || leave(&editor, &views));
+        window.on_spellings_quit(move || leave(&editor, &views, Next::Exit));
     }
     window.set_spellings_opened(opened.display().to_string().into());
     window.set_spellings_other(other.display().to_string().into());
@@ -4043,6 +4458,7 @@ fn on_top(views: &Rc<RefCell<Views>>, wanted: bool) {
 ///
 /// * `views` - The windows, which let go of the question's window.
 fn hide_deleting(views: &Rc<RefCell<Views>>) {
+    views.borrow().held.deleting.borrow_mut().take();
     let window = views.borrow_mut().deleting.take();
     if let Some(window) = window {
         let _ = window.hide();
@@ -4113,13 +4529,15 @@ fn alerting(views: &Rc<RefCell<Views>>) {
     }
 }
 
-/// Leaves, offering first to write anything the files do not have.
+/// Leaves the configuration -- the editor, or only the configuration -- offering
+/// first to write anything the files do not have.
 ///
 /// Normally there is nothing to offer: every edit is written as it is made, so
-/// the files are already the configuration in the window, and this quits. What
-/// it catches is the session where a write failed -- a full device, a
-/// directory made read-only -- because leaving a session's work in a process
-/// that is ending is the one way this editor could lose anything.
+/// the files are already the configuration in the window, and this goes
+/// straight on to `next`. What it catches is the session where a write failed
+/// -- a full device, a directory made read-only -- or where Autosave is off,
+/// because leaving a session's work behind is the one way this editor could
+/// lose anything.
 ///
 /// The offer and not the saving: somebody who has been told the device is full
 /// may want to leave and deal with it, and a program that insisted on writing
@@ -4129,9 +4547,18 @@ fn alerting(views: &Rc<RefCell<Views>>) {
 ///
 /// * `editor` - The session left.
 /// * `views`  - The windows, which keep the offer's window once it is made.
-fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+/// * `next`   - What to do once the offer is answered, or at once where none
+///              is made: see [`Next`]. It replaces whatever an offer still
+///              open was to be followed by.
+fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>, next: Next) {
+    // The words of the offer, which say what it is the way into.
+    let going = match next {
+        Next::Exit => "leave",
+        Next::Close | Next::Open(_) => "close",
+    };
+    *views.borrow().held.next.borrow_mut() = Some(next);
     if !editor.borrow().unsaved() {
-        slint::quit_event_loop().ok();
+        carry_on(editor, views);
         return;
     }
 
@@ -4143,10 +4570,15 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             }
             Err(e) => {
                 // Nothing to ask with. The work is still on the disk as of
-                // the last write that succeeded, and refusing to quit would
-                // trap somebody in an editor they asked to leave.
+                // the last write that succeeded, and refusing to go on would
+                // trap somebody in an editor they asked to leave -- but a
+                // configuration is only let go of here for the way out, which
+                // tries to write it once more.
                 eprintln!("tcs-cfge: the offer to save cannot be shown: {e}");
-                slint::quit_event_loop().ok();
+                let next = views.borrow().held.next.borrow_mut().take();
+                if matches!(next, Some(Next::Exit)) {
+                    slint::quit_event_loop().ok();
+                }
                 return;
             }
         };
@@ -4156,21 +4588,21 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             window.on_saved(move || {
                 editor.borrow_mut().save();
                 match editor.borrow().trouble() {
-                    None => {
-                        slint::quit_event_loop().ok();
-                    }
+                    None => (),
                     // Still not written. Said again, and the way out left
-                    // open: the one thing not to do is quit quietly.
+                    // open: the one thing not to do is go on quietly.
                     Some(why) => {
                         eprintln!("tcs-cfge: still not saved: {why}");
                         views.borrow().refresh(&editor.borrow());
+                        return;
                     }
                 }
+                carry_on(&editor, &views);
             });
         }
         {
             // Where the files cannot be written where they are: somewhere
-            // else, and then out. See save_as.
+            // else, and then on. See save_as.
             let editor = editor.clone();
             let views = views.clone();
             window.on_saved_as(move || {
@@ -4185,16 +4617,13 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             let views = views.clone();
             window.on_left(move || {
                 editor.borrow_mut().abandon_unsaved();
-                let window = views.borrow_mut().leaving.take();
-                if let Some(window) = window {
-                    let _ = window.hide();
-                }
-                slint::quit_event_loop().ok();
+                carry_on(&editor, &views);
             });
         }
         {
             let views = views.clone();
             window.on_stayed(move || {
+                views.borrow().held.next.borrow_mut().take();
                 let window = views.borrow_mut().leaving.take();
                 if let Some(window) = window {
                     let _ = window.hide();
@@ -4210,12 +4639,392 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         .as_ref()
         .map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
+        window.set_going(going.into());
         window
             .set_trouble(editor.borrow().trouble().unwrap_or_default().into());
         if let Err(e) = window.show() {
             eprintln!("tcs-cfge: the offer to save cannot be shown: {e}");
+            let next = views.borrow().held.next.borrow_mut().take();
+            if matches!(next, Some(Next::Exit)) {
+                slint::quit_event_loop().ok();
+            }
+        }
+    }
+}
+
+/// Does what the offer to save was the way into, now that nothing is owed:
+/// leaves the editor, closes the configuration, or opens another.
+///
+/// The offer's window, where one was made, goes first. Nothing at all where
+/// nothing was asked for, which is a second answer to an offer already
+/// answered.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `views`  - The windows, which hold what was asked for: see [`Held`].
+fn carry_on(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let window = views.borrow_mut().leaving.take();
+    if let Some(window) = window {
+        let _ = window.hide();
+    }
+    let next = views.borrow().held.next.borrow_mut().take();
+    match next {
+        None => (),
+        Some(Next::Exit) => {
             slint::quit_event_loop().ok();
         }
+        Some(Next::Close) => replace_session(editor, views, Editor::closed()),
+        Some(Next::Open(opened)) => replace_session(editor, views, *opened),
+    }
+}
+
+/// Puts another session in the window in place of the one there: what Open
+/// and Close come to, once the one there owes nothing.
+///
+/// The one there ends as the way out of the editor ends it, its history
+/// thrown away, that being a close somebody asked for. Every window about it
+/// goes -- its subdiagrams' pages, its nodes' attributes, its groups, the
+/// questions and lists about it -- and with them whatever was selected or
+/// half drawn on its pages. What was copied stays, which is what lets nodes
+/// copied from one configuration be pasted into the next. The new one is
+/// then started as `main` starts one: its history read back, its first
+/// nodes given where it is new, and what is wrong with it asked about in
+/// front of its drawing.
+///
+/// # Arguments
+///
+/// * `editor` - The session, whose contents are replaced: every window's
+///              handlers hold this one.
+/// * `views`  - The windows.
+/// * `next`   - The session put in its place, its files read; one that is
+///              [`Editor::closed`] leaves the window empty.
+fn replace_session(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    mut next: Editor,
+) {
+    editor.borrow().forget_history();
+
+    // Every window about the configuration that is going. Hidden now and
+    // let go of after this press is over, rather than dropped here: the
+    // press may have come from one of them -- Close in a subdiagram's
+    // window -- and a window dropped inside its own handler is a handler
+    // whose captures are gone while it is still running.
+    let mut going: Vec<Box<dyn std::any::Any>> = Vec::new();
+    {
+        let mut views = views.borrow_mut();
+        for (_, window) in std::mem::take(&mut views.open) {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        for (_, window) in std::mem::take(&mut views.attributes) {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        if let Some(window) = views.group.take() {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        if let Some(window) = views.parameters.take() {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        for window in [views.sim_groups.take(), views.physics.take()]
+            .into_iter()
+            .flatten()
+        {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        if let Some(window) = views.concerns.take() {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        if let Some(window) = views.deleting.take() {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        if let Some(window) = views.replacing.take() {
+            let _ = window.hide();
+            going.push(Box::new(window));
+        }
+        // The alert is kept, hidden, for the next thing to go wrong: see
+        // `alerting`.
+        if let Some(window) = views.alert.as_ref() {
+            let _ = window.hide();
+        }
+        views.names = None;
+        views.chosen.borrow_mut().clear();
+        views.picked.borrow_mut().clear();
+        views.drawing.borrow_mut().take();
+        views.lit.borrow_mut().take();
+        views.held.also.borrow_mut().clear();
+        views.held.deleting.borrow_mut().take();
+        views.alerted.borrow_mut().clear();
+        views.faulted.borrow_mut().clear();
+        views.showing.borrow_mut().clear();
+        views.showing_sim_group.borrow_mut().clear();
+        views.showing_physics.borrow_mut().clear();
+    }
+    slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+        drop(going);
+    });
+
+    // Started as `main` starts the session it is given, Autosave as the
+    // setting says, the history after every file is open and the seeding
+    // after the history.
+    if next.is_open() {
+        next.set_autosave(views.borrow().autosave.get());
+        next.recover();
+        seed(&mut next);
+    }
+    *editor.borrow_mut() = next;
+
+    let top = views.borrow().top.upgrade();
+    let Some(top) = top else {
+        return;
+    };
+    top.set_spellings_up(false);
+    top.set_problems_up(false);
+    top.set_alert_up(false);
+    top.set_join_offers(ModelRc::default());
+    top.set_join_hint("".into());
+    top.set_joining("".into());
+    top.set_drawing_route("".into());
+    top.set_canvas_offset(0.0);
+    // Inert until what the new configuration arrived with has been read, as
+    // at startup: see `open_main`.
+    top.set_inert(true);
+    settled(editor, views);
+    views.borrow().refresh(&editor.borrow());
+    if editor.borrow().is_open() {
+        warn_of_spellings(editor, views);
+    }
+    let waiting = startup_waiting(views, None);
+    top.set_inert(waiting);
+    on_top(views, waiting);
+}
+
+/// Asks which configuration to open, in the desktop's own Open dialog, and
+/// opens it in this window: File > Open.
+///
+/// The dialog starts where the configuration open now is. One configuration
+/// is chosen, and with it, where it is to be edited too, the simulator's
+/// file: the two are named together on the command line, and are chosen
+/// together here. The dialog runs while the editor goes on drawing; what it
+/// answers is opened by [`open_chosen`].
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `views`  - The windows.
+fn open_asked(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_title("Open a configuration, and its simulator file if wanted")
+        .add_filter("tcspecial configuration", &["ytcs", "xtcs", "yaml"]);
+    if editor.borrow().is_open() {
+        let now = editor.borrow().files().0.to_path_buf();
+        if let Some(directory) = std::path::absolute(&now)
+            .ok()
+            .and_then(|now| now.parent().map(|parent| parent.to_path_buf()))
+        {
+            dialog = dialog.set_directory(directory);
+        }
+    }
+    let editor = editor.clone();
+    let views = views.clone();
+    let asked = slint::spawn_local(async move {
+        let Some(chosen) = dialog.pick_files().await else {
+            return;
+        };
+        let paths: Vec<std::path::PathBuf> = chosen
+            .iter()
+            .map(|file| file.path().to_path_buf())
+            .collect();
+        open_chosen(&editor, &views, &paths);
+    });
+    if let Err(e) = asked {
+        eprintln!("tcs-cfge: the Open dialog cannot be shown: {e}");
+    }
+}
+
+/// Opens the files chosen in the Open dialog, in place of the configuration
+/// open now, once that owes nothing: see [`leave`].
+///
+/// They are read before anything else happens, so that files that cannot be
+/// opened are said with the configuration open now still open, as it was.
+/// The same checks as the command line's: one configuration, and at most one
+/// simulator file, which is YAML and joins that configuration.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `views`  - The windows.
+/// * `paths`  - The files chosen.
+fn open_chosen(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    paths: &[std::path::PathBuf],
+) {
+    // Read apart from the match, so that the borrow is over before `leave`
+    // borrows the views again: a temporary in a match's scrutinee lives to
+    // the end of the match.
+    let dividers = views.borrow().divider.get();
+    match opened(paths, dividers) {
+        Ok(next) => leave(editor, views, Next::Open(Box::new(next))),
+        Err(why) => views.borrow().say(
+            "The configuration could not be opened.",
+            &why,
+            "Nothing has changed: the configuration open before is still \
+             open. Choose one configuration, ending in .ytcs or .xtcs, and \
+             at most one simulator file, ending in .yaml.",
+        ),
+    }
+}
+
+/// Reads the files chosen to open into a session of their own, as `main`
+/// reads the ones the command line names.
+///
+/// # Arguments
+///
+/// * `paths`    - The files chosen: one configuration, and the simulator's
+///                file or nothing.
+/// * `dividers` - Where the working panes meet, which a node read in the
+///                wrong one is brought into its own by.
+///
+/// # Returns
+///
+/// The session, its files read and its history not yet: see
+/// `Editor::recover`, which [`replace_session`] calls.
+///
+/// # Errors
+///
+/// A sentence saying what is wrong: no configuration chosen, or two, or
+/// two simulator files, or a file that cannot be read or joined.
+fn opened(
+    paths: &[std::path::PathBuf],
+    dividers: Dividers,
+) -> Result<Editor, String> {
+    let is = |path: &std::path::Path, extensions: &[&str]| {
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extensions.contains(&extension))
+    };
+    let (configurations, others): (Vec<_>, Vec<_>) =
+        paths.iter().partition(|path| is(path, &["ytcs", "xtcs"]));
+    let configuration = match configurations.as_slice() {
+        [one] => *one,
+        [] => {
+            return Err("no configuration was chosen; one ends in .ytcs or \
+                        .xtcs"
+                .to_string());
+        }
+        _ => {
+            return Err(format!(
+                "{} configurations were chosen, and one is opened at a time",
+                configurations.len()
+            ));
+        }
+    };
+    let simulator = match others.as_slice() {
+        [] => None,
+        [one] => {
+            sim::must_be_yaml(one)?;
+            Some(*one)
+        }
+        _ => {
+            return Err(format!(
+                "{} simulator files were chosen, and a configuration is \
+                 simulated by one",
+                others.len()
+            ));
+        }
+    };
+    let mut next = Editor::open(configuration, dividers)?;
+    next.set_read_only(read_only());
+    if let Some(simulator) = simulator {
+        next.open_simulator(simulator)?;
+    }
+    Ok(next)
+}
+
+/// Takes what is selected on a page into the clipboard: Edit > Copy, and
+/// Edit > Cut, which takes it off the page as well.
+///
+/// What cannot be copied is said in the window's line for what the last
+/// command did, and nothing is taken: see `clipboard::copy`.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `views`  - The windows, which keep the clipboard.
+/// * `home`   - The page: `None` for the top.
+/// * `cut`    - Whether the nodes are taken away too, in one edit.
+fn copy_selection(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    home: &Home,
+    cut: bool,
+) {
+    let names = views.borrow().selection(home);
+    let copied = clipboard::copy(editor.borrow().document(), home, &names);
+    match copied {
+        Ok(clipping) => {
+            *views.borrow().held.clipping.borrow_mut() = Some(clipping);
+            if cut {
+                let removal = clipboard::removal(
+                    editor.borrow().document(),
+                    home,
+                    &names,
+                );
+                if let Some(removal) = removal {
+                    editor.borrow_mut().edit(removal);
+                }
+                views.borrow().select(home, None, None);
+            }
+        }
+        Err(why) => editor.borrow_mut().tell(why),
+    }
+    views.borrow().refresh(&editor.borrow());
+}
+
+/// Puts what was copied on a page, in one edit, and selects what was put
+/// there: Edit > Paste.
+///
+/// # Arguments
+///
+/// * `editor` - The session.
+/// * `views`  - The windows, which keep the clipboard.
+/// * `home`   - The page: `None` for the top.
+fn paste_clipping(
+    editor: &Rc<RefCell<Editor>>,
+    views: &Rc<RefCell<Views>>,
+    home: &Home,
+) {
+    let clipping = views.borrow().held.clipping.borrow().clone();
+    let Some(clipping) = clipping else {
+        return;
+    };
+    let pasted = clipboard::paste(
+        editor.borrow().document(),
+        &clipping,
+        home,
+        views.borrow().divider.get(),
+    );
+    let Some((edit, names)) = pasted else {
+        return;
+    };
+    editor.borrow_mut().edit(edit);
+    // Selected only where the paste was made: a read-only session takes no
+    // edit, and has nothing new to select.
+    let made = names.iter().all(|name| {
+        let whole = Qualified::of(name, home).absolute();
+        editor.borrow().document().node(&whole).is_some()
+    });
+    views.borrow().refresh(&editor.borrow());
+    if made {
+        views.borrow().gather(home, names, false);
     }
 }
 
@@ -4231,8 +5040,9 @@ fn leave(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
 ///
 /// * `editor`  - The session.
 /// * `views`   - The windows.
-/// * `leaving` - Whether this is the way out: the editor quits once the
-///               files are written.
+/// * `leaving` - Whether this is the way out of the configuration: what the
+///               offer to save was the way into follows once the files are
+///               written. See `carry_on`.
 fn save_as(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -4280,7 +5090,7 @@ fn save_as(
 /// * `views`   - The windows.
 /// * `to`      - The new top file.
 /// * `replace` - Whether replacing files already there has been agreed.
-/// * `leaving` - Whether to quit once the files are written.
+/// * `leaving` - Whether to go on once the files are written: see `carry_on`.
 fn write_as(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -4298,7 +5108,9 @@ fn write_as(
         return;
     }
     if !editor.borrow().unsaved() {
-        slint::quit_event_loop().ok();
+        // On to what the offer was the way into: out, or another
+        // configuration. See carry_on.
+        carry_on(editor, views);
         return;
     }
     // Still not written. Said in the offer to leave, which is still open:
@@ -4318,7 +5130,7 @@ fn write_as(
 /// * `views`     - The windows, which keep the question while it is asked.
 /// * `to`        - The new top file.
 /// * `replacing` - The files that would be written over.
-/// * `leaving`   - Whether to quit once the files are written.
+/// * `leaving`   - Whether to go on once the files are written.
 fn ask_replace(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
@@ -9039,19 +9851,29 @@ mod tests {
     fn the_command_line_takes_the_read_only_flag() {
         let said =
             |words: &[&str]| command_line(words.iter().map(|w| w.to_string()));
-        assert_eq!(said(&["a.ytcs"]), Ok((vec!["a.ytcs".to_string()], false)));
+        let asked = |files: &[&str], read_only: bool, help: bool| {
+            Ok(Asked {
+                files: files.iter().map(|f| f.to_string()).collect(),
+                read_only,
+                help,
+            })
+        };
+        assert_eq!(said(&["a.ytcs"]), asked(&["a.ytcs"], false, false));
         for flag in ["-r", "--read-only", "--readonly"] {
             assert_eq!(
                 said(&[flag, "a.ytcs"]),
-                Ok((vec!["a.ytcs".to_string()], true))
+                asked(&["a.ytcs"], true, false)
             );
             assert_eq!(
                 said(&["a.ytcs", "a-sim.yaml", flag]),
-                Ok((
-                    vec!["a.ytcs".to_string(), "a-sim.yaml".to_string()],
-                    true
-                ))
+                asked(&["a.ytcs", "a-sim.yaml"], true, false)
             );
+        }
+        // No file at all, which opens a window with nothing in it; and the
+        // usage asked for.
+        assert_eq!(said(&[]), asked(&[], false, false));
+        for flag in ["-h", "--help"] {
+            assert_eq!(said(&[flag]), asked(&[], false, true));
         }
         assert!(
             said(&["--readonley", "a.ytcs"]).is_err(),
@@ -13394,6 +14216,529 @@ mod tests {
         a_component_placed_on_a_page_is_drawn_only_there();
         every_field_of_a_node_is_in_view_and_its_name_clears();
         a_line_or_a_node_is_selected_by_a_right_click_and_deleted();
+        several_nodes_are_selected_by_ctrl_a_box_and_select_all();
+        what_is_selected_is_copied_cut_pasted_moved_and_deleted_together();
+        open_and_close_put_another_configuration_in_the_window();
+        started_with_no_file_the_window_has_nothing_open();
+    }
+
+    /// Started with no file named, as `main` starts it, the window opens with
+    /// nothing in it, taking presses, asking nothing; and Open opens a
+    /// configuration in it.
+    fn started_with_no_file_the_window_has_nothing_open() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("later.ytcs");
+        {
+            let mut writer = Editor::open(&path, dividers()).expect("opens");
+            writer.edit(Edit::AddNode {
+                name: "ground".into(),
+                node_type: "gateway_radio".into(),
+                home: None,
+            });
+            assert!(writer.trouble().is_none(), "{:?}", writer.trouble());
+        }
+
+        let settings = settings::Settings::default();
+        let editor = Rc::new(RefCell::new(Editor::closed()));
+        let (ui, views) = open_main(
+            &editor,
+            &settings,
+            Rc::new(std::cell::Cell::new(dividers())),
+            Rc::new(std::cell::Cell::new(lists())),
+        )
+        .expect("a window");
+        assert!(ui.get_closed(), "it says nothing is open");
+        assert!(!ui.get_inert(), "and takes presses, for File > Open");
+        assert!(!ui.get_spellings_up() && !ui.get_problems_up());
+        assert!(!ui.get_alert_up(), "nothing is wrong with nothing");
+        assert_eq!(ui.get_nodes().row_count(), 0);
+        assert_eq!(ui.get_path(), "", "and no file is named in the title");
+
+        open_chosen(&editor, &views, std::slice::from_ref(&path));
+        assert!(editor.borrow().is_open());
+        assert!(!ui.get_closed());
+        assert!(editor.borrow().document().node("ground").is_some());
+        ui.hide().ok();
+    }
+
+    /// A session on a new file in a temporary directory, with nodes at
+    /// places and lines between them, and a main window wired to it and
+    /// drawn, wide enough that the sheet is drawn whole.
+    ///
+    /// # Arguments
+    ///
+    /// * `where_` - The directory the configuration is written in.
+    /// * `nodes`  - Each node's name, type and place, which is brought onto
+    ///              the grid and into the node's own pane.
+    /// * `lines`  - Each line, by the names of the nodes it joins, leaving
+    ///              its first's `world-out`.
+    ///
+    /// # Returns
+    ///
+    /// The session, the window and its views.
+    fn drawn(
+        where_: &std::path::Path,
+        nodes: &[(&str, &str, (i32, i32))],
+        lines: &[(&str, &str)],
+    ) -> (Rc<RefCell<Editor>>, MainWindow, Rc<RefCell<Views>>) {
+        let editor = Rc::new(RefCell::new(
+            Editor::open(&where_.join("drawn.ytcs"), dividers())
+                .expect("it opens"),
+        ));
+        for (name, node_type, at) in nodes {
+            editor.borrow_mut().edit(Edit::AddNode {
+                name: name.to_string(),
+                node_type: node_type.to_string(),
+                home: None,
+            });
+            // Where the editor would put it: on the grid and in its own
+            // pane, as a node placed or dragged always is.
+            editor.borrow_mut().edit(Edit::MoveNode {
+                node: name.to_string(),
+                was: (0, 0),
+                now: confine(node_type, dividers(), *at),
+            });
+        }
+        for (from, to) in lines {
+            editor.borrow_mut().edit(Edit::AddLink {
+                link: journal::Link::joining(from, Some("world-out"), to, None),
+            });
+        }
+        let ui = MainWindow::new().expect("a window");
+        furnish!(&ui, descriptions());
+        let views = views_for(&ui);
+        let chosen = views.borrow().chosen.clone();
+        let drawing = views.borrow().drawing.clone();
+        wire(&ui, &editor, &views, &drawing, &chosen, &None);
+        views.borrow().refresh(&editor.borrow());
+        ui.window()
+            .set_size(slint::LogicalSize::new(2400.0, 1000.0));
+        (editor, ui, views)
+    }
+
+    /// Which nodes a window draws as selected, by name, in its order.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui` - The window.
+    ///
+    /// # Returns
+    ///
+    /// The names.
+    fn drawn_selected(ui: &MainWindow) -> Vec<String> {
+        let also = ui.get_also_chosen();
+        ui.get_nodes()
+            .iter()
+            .enumerate()
+            .filter(|(i, node)| {
+                node.name == ui.get_selected()
+                    || also.row_data(*i).unwrap_or(false)
+            })
+            .map(|(_, node)| node.name.to_string())
+            .collect()
+    }
+
+    /// A press with Ctrl or Shift held adds a node to what is selected or
+    /// takes it out; a click without them selects one alone; a box drawn on
+    /// bare sheet selects what is wholly inside it, beside what was with
+    /// Ctrl held; and Select all selects every node on the page.
+    ///
+    /// Through the window, as a person does it, for the markup's part: the
+    /// modifiers reach the node's press, and the box is drawn by the sheet.
+    fn several_nodes_are_selected_by_ctrl_a_box_and_select_all() {
+        use slint::platform::{Key, PointerEventButton, WindowEvent};
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let vehicle = dividers().vehicle;
+        let (editor, ui, views) = drawn(
+            where_.path(),
+            &[
+                ("ground", "gateway_radio", (16, 120)),
+                ("sensor", "i2c", (vehicle + 24, 120)),
+                ("probe", "i2c", (vehicle + 24, 400)),
+            ],
+            &[],
+        );
+        ui.show().expect("the window shows");
+        let canvas =
+            i_slint_backend_testing::ElementHandle::find_by_element_id(
+                &ui,
+                "Surface::canvas",
+            )
+            .next()
+            .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+        let on_sheet = |(x, y): (f32, f32)| {
+            slint::LogicalPosition::new(origin.x + x, origin.y + y)
+        };
+        let middle = |name: &str| {
+            let node = ui
+                .get_nodes()
+                .iter()
+                .find(|node| node.name == name)
+                .expect("drawn");
+            on_sheet((node.x + node.width / 2.0, node.y + node.height / 2.0))
+        };
+        let press = |at| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: at });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position: at,
+                button: PointerEventButton::Left,
+            });
+        };
+        let release = |at| {
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position: at,
+                button: PointerEventButton::Left,
+            });
+        };
+        let click = |at| {
+            press(at);
+            release(at);
+        };
+        let control = |down: bool| {
+            let text: slint::SharedString = Key::Control.into();
+            ui.window().dispatch_event(if down {
+                WindowEvent::KeyPressed { text }
+            } else {
+                WindowEvent::KeyReleased { text }
+            });
+        };
+
+        click(middle("sensor"));
+        assert_eq!(drawn_selected(&ui), ["sensor"]);
+        control(true);
+        click(middle("probe"));
+        click(middle("ground"));
+        control(false);
+        assert_eq!(
+            views.borrow().selection(&None),
+            ["sensor", "ground", "probe"],
+            "Ctrl adds, the first press's node still the chosen one"
+        );
+        let mut shown = drawn_selected(&ui);
+        shown.sort();
+        assert_eq!(shown, ["ground", "probe", "sensor"], "and draws them");
+
+        // Taken out again, and the chosen one taken out leaves another.
+        control(true);
+        click(middle("sensor"));
+        control(false);
+        assert_eq!(views.borrow().selection(&None), ["ground", "probe"]);
+        assert_eq!(ui.get_selected(), "ground");
+
+        // A press on one of several keeps them, for a drag; letting go
+        // without dragging selects it alone.
+        press(middle("probe"));
+        assert_eq!(views.borrow().selection(&None).len(), 2);
+        release(middle("probe"));
+        assert_eq!(views.borrow().selection(&None), ["probe"]);
+
+        // A box round the sensor alone, on bare sheet.
+        let sensor = ui
+            .get_nodes()
+            .iter()
+            .find(|node| node.name == "sensor")
+            .unwrap();
+        let from = on_sheet((sensor.x - 12.0, sensor.y - 12.0));
+        let to = on_sheet((
+            sensor.x + sensor.width + 12.0,
+            sensor.y + sensor.height + 12.0,
+        ));
+        let band = |from, to| {
+            press(from);
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position: to });
+            release(to);
+        };
+        band(from, to);
+        assert_eq!(
+            views.borrow().selection(&None),
+            ["sensor"],
+            "what is wholly inside, in place of what was"
+        );
+        // And with Ctrl held, beside what was.
+        click(middle("probe"));
+        control(true);
+        band(from, to);
+        control(false);
+        assert_eq!(views.borrow().selection(&None), ["probe", "sensor"]);
+
+        // Dragged by one of them, the other is carried as the hand moves, by
+        // as much, and both are where the hand left them once it lets go.
+        let at = |name: &str| {
+            editor.borrow().document().node(name).map(|node| node.at.1)
+        };
+        let (probe_y, sensor_y) = (at("probe"), at("sensor"));
+        let start = middle("probe");
+        let end = slint::LogicalPosition::new(start.x, start.y + 60.0);
+        press(start);
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: end });
+        assert_eq!(
+            (ui.get_carried_x(), ui.get_carried_y()),
+            (0.0, 60.0),
+            "the other selected node is carried with the hand"
+        );
+        // And drawn there: the sensor's body, which is where the drag draws
+        // a node, sixty pixels below where the sensor is.
+        let sensor = ui
+            .get_nodes()
+            .iter()
+            .find(|node| node.name == "sensor")
+            .expect("drawn");
+        let body = on_sheet((sensor.x, sensor.y));
+        let drawn_at = |at: slint::LogicalPosition| {
+            i_slint_backend_testing::ElementHandle::find_by_element_id(
+                &ui,
+                "NodeShape::moving",
+            )
+            .any(|body| {
+                let p = body.absolute_position();
+                (p.x - at.x).abs() < 0.5 && (p.y - at.y).abs() < 0.5
+            })
+        };
+        assert!(
+            drawn_at(slint::LogicalPosition::new(body.x, body.y + 60.0)),
+            "the sensor is drawn carried"
+        );
+        release(end);
+        assert_eq!(
+            (ui.get_carried_x(), ui.get_carried_y()),
+            (0.0, 0.0),
+            "and carried no further once it lets go"
+        );
+        let moved =
+            |was: Option<i32>, now: Option<i32>| now.unwrap() - was.unwrap();
+        assert!(moved(probe_y, at("probe")) > 0, "the probe moved");
+        // The same number of grid steps, which is a pixel more or less from
+        // one place to another: a step is five millimetres, rounded to
+        // pixels.
+        assert!(
+            (moved(probe_y, at("probe")) - moved(sensor_y, at("sensor"))).abs()
+                <= 1,
+            "and the sensor with it"
+        );
+        assert_eq!(views.borrow().selection(&None), ["probe", "sensor"]);
+
+        // A node taken out of the selection by Ctrl and dragged moves alone,
+        // carrying nothing.
+        let start = middle("sensor");
+        let end = slint::LogicalPosition::new(start.x, start.y + 60.0);
+        control(true);
+        press(start);
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: end });
+        assert_eq!(ui.get_carried_y(), 0.0, "nothing carried");
+        release(end);
+        control(false);
+
+        // A click on bare sheet selects nothing, as it did.
+        click(on_sheet((sensor.x - 12.0, 900.0)));
+        assert!(views.borrow().selection(&None).is_empty());
+
+        ui.invoke_select_all();
+        let mut all = views.borrow().selection(&None);
+        all.sort();
+        assert_eq!(all, ["ground", "probe", "sensor"]);
+        ui.hide().ok();
+    }
+
+    /// What is selected is copied with the lines between its nodes, pasted
+    /// beside itself under new names and selected, cut in one edit, pasted
+    /// back where it was, dragged as one, and deleted as one after asking.
+    fn what_is_selected_is_copied_cut_pasted_moved_and_deleted_together() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let (vehicle, payloads) = (dividers().vehicle, dividers().payloads);
+        let (editor, ui, views) = drawn(
+            where_.path(),
+            &[
+                ("ground", "gateway_radio", (16, 120)),
+                ("mean", "compute", (payloads + 40, 120)),
+                ("sensor", "i2c", (vehicle + 24, 120)),
+            ],
+            &[("sensor", "mean"), ("mean", "ground")],
+        );
+        let at = |name: &str| {
+            editor.borrow().document().node(name).map(|node| node.at)
+        };
+        let (mean_at, sensor_at) = (at("mean"), at("sensor"));
+
+        assert!(!ui.get_can_paste(), "nothing copied yet");
+        ui.invoke_node_selected("sensor".into());
+        ui.invoke_node_toggled("mean".into());
+        ui.invoke_copy_clicked();
+        assert!(ui.get_can_paste());
+        let depth = editor.borrow().undo_depth();
+        ui.invoke_paste_clicked();
+        {
+            let editor = editor.borrow();
+            let document = editor.document();
+            assert_eq!(document.nodes.len(), 5);
+            assert!(document.links.iter().any(|link| {
+                link.from == "sensor-1" && link.to == "mean-1"
+            }));
+            assert!(
+                !document
+                    .links
+                    .iter()
+                    .any(|link| link.to == "ground" && link.from == "mean-1"),
+                "the line to the ground had an end outside what was copied"
+            );
+        }
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+        let mut pasted = views.borrow().selection(&None);
+        pasted.sort();
+        assert_eq!(pasted, ["mean-1", "sensor-1"], "what was pasted");
+        editor.borrow_mut().undo();
+        views.borrow().refresh(&editor.borrow());
+        assert_eq!(editor.borrow().document().nodes.len(), 3);
+
+        // Cut, in one edit, and pasted back where it was, under its own
+        // names, the line between them with it.
+        ui.invoke_node_selected("sensor".into());
+        ui.invoke_node_toggled("mean".into());
+        let depth = editor.borrow().undo_depth();
+        ui.invoke_cut_clicked();
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+        assert_eq!(editor.borrow().document().nodes.len(), 1);
+        assert!(editor.borrow().document().links.is_empty());
+        assert!(views.borrow().selection(&None).is_empty());
+        ui.invoke_paste_clicked();
+        assert_eq!((at("mean"), at("sensor")), (mean_at, sensor_at));
+        assert_eq!(editor.borrow().document().links.len(), 1);
+
+        // Dragged as one: both move, in one edit.
+        let depth = editor.borrow().undo_depth();
+        ui.invoke_node_moved("mean".into(), 0.0, 120.0);
+        assert_ne!(at("mean"), mean_at);
+        // By the same number of grid steps: see above.
+        let by = |now: Option<(i32, i32)>, was: Option<(i32, i32)>| {
+            now.unwrap().1 - was.unwrap().1
+        };
+        assert!(
+            (by(at("sensor"), sensor_at) - by(at("mean"), mean_at)).abs() <= 1,
+            "both moved the same way"
+        );
+        assert_eq!(editor.borrow().undo_depth(), depth + 1);
+        editor.borrow_mut().undo();
+        assert_eq!((at("mean"), at("sensor")), (mean_at, sensor_at));
+        views.borrow().refresh(&editor.borrow());
+
+        // Deleted as one, by the Delete of either of them, after asking
+        // about both.
+        ui.invoke_node_delete("sensor".into());
+        let question = views
+            .borrow()
+            .deleting
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("asked")
+            .upgrade()
+            .unwrap();
+        assert!(
+            question.get_question().contains("2 nodes"),
+            "{}",
+            question.get_question()
+        );
+        // The line between them, which the paste brought back: the one to
+        // the ground went with the Cut, having an end outside it.
+        assert!(
+            question
+                .get_carries()
+                .contains("One line is attached to them"),
+            "{}",
+            question.get_carries()
+        );
+        question.invoke_confirmed();
+        assert_eq!(editor.borrow().document().nodes.len(), 1);
+        editor.borrow_mut().undo();
+        assert_eq!((at("mean"), at("sensor")), (mean_at, sensor_at));
+        assert_eq!(editor.borrow().document().links.len(), 1);
+    }
+
+    /// Open puts another configuration in the window, its pages' windows
+    /// going with the old one and what was copied staying; files that
+    /// cannot be opened are said and change nothing; Close leaves a window
+    /// with nothing in it, offering first to save what is owed.
+    fn open_and_close_put_another_configuration_in_the_window() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let vehicle = dividers().vehicle;
+        let (editor, ui, views) = drawn(
+            where_.path(),
+            &[("sensor", "i2c", (vehicle + 24, 120))],
+            &[],
+        );
+        alerting(&views);
+        // Another configuration, written by a session of its own.
+        let other = where_.path().join("other.ytcs");
+        {
+            let mut writer = Editor::open(&other, dividers()).expect("opens");
+            writer.edit(Edit::AddNode {
+                name: "ground".into(),
+                node_type: "gateway_radio".into(),
+                home: None,
+            });
+            assert!(writer.trouble().is_none(), "{:?}", writer.trouble());
+        }
+        ui.invoke_node_selected("sensor".into());
+        ui.invoke_copy_clicked();
+
+        // Two configurations at once is refused, and nothing changes.
+        open_chosen(&editor, &views, &[other.clone(), other.clone()]);
+        assert_eq!(editor.borrow().files().0, where_.path().join("drawn.ytcs"));
+        let said = views.borrow().alert.as_ref().unwrap().get_trouble();
+        assert!(said.contains("2 configurations"), "{said}");
+
+        open_chosen(&editor, &views, std::slice::from_ref(&other));
+        assert_eq!(editor.borrow().files().0, other);
+        assert!(editor.borrow().document().node("ground").is_some());
+        assert!(editor.borrow().document().node("sensor").is_none());
+        assert!(!ui.get_closed());
+        assert_eq!(ui.get_path(), other.display().to_string());
+        assert!(ui.get_can_paste(), "what was copied stays");
+        ui.invoke_paste_clicked();
+        assert!(
+            editor.borrow().document().node("sensor").is_some(),
+            "pasted into the configuration opened after it was copied"
+        );
+
+        // Owed nothing, closed at once.
+        ui.invoke_close_clicked();
+        assert!(!editor.borrow().is_open());
+        assert!(ui.get_closed());
+        assert_eq!(ui.get_nodes().row_count(), 0);
+        assert!(editor.borrow().faults().is_empty(), "nothing open is fine");
+
+        // Owing something, the offer comes first and says it closes.
+        open_chosen(&editor, &views, std::slice::from_ref(&other));
+        assert!(editor.borrow().is_open());
+        editor.borrow_mut().set_autosave(false);
+        editor.borrow_mut().edit(Edit::AddNode {
+            name: "unsaved".into(),
+            node_type: "compute".into(),
+            home: None,
+        });
+        ui.invoke_close_clicked();
+        let offer = views
+            .borrow()
+            .leaving
+            .as_ref()
+            .map(|window| window.as_weak())
+            .expect("the offer is made")
+            .upgrade()
+            .unwrap();
+        assert_eq!(offer.get_going(), "close");
+        assert!(editor.borrow().is_open(), "not until it is answered");
+        offer.invoke_left();
+        assert!(!editor.borrow().is_open());
+        assert!(views.borrow().leaving.is_none());
+        let reread = Editor::open(&other, dividers()).expect("opens");
+        assert!(
+            reread.document().node("unsaved").is_none(),
+            "left without saving"
+        );
     }
 
     /// A click of either button on a line or a node selects it, a right
@@ -14282,6 +15627,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }))
     }
 
@@ -14646,6 +15992,19 @@ mod tests {
                 None,
             ),
         });
+        // Somewhere other than where a node put back is put, and with words
+        // of its own, so that the undo below shows it puts both back.
+        let placed = confine("i2c", dividers(), (dividers().vehicle + 40, 300));
+        editor.borrow_mut().edit(Edit::MoveNode {
+            node: "sensor".into(),
+            was: (0, 0),
+            now: placed,
+        });
+        editor.borrow_mut().edit(Edit::SetNodeComment {
+            node: "sensor".into(),
+            was: None,
+            now: Some("The zone's air.".into()),
+        });
 
         let ui = MainWindow::new().expect("a window");
         furnish!(&ui, descriptions());
@@ -14683,6 +16042,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14748,10 +16108,14 @@ mod tests {
             "a link was left dangling"
         );
 
-        // One edit, so one undo puts the node and its line back.
+        // One edit, so one undo puts the node and its line back -- where it
+        // was, and with what was written about it.
         assert_eq!(editor.borrow().undo_depth(), depth + 1);
         editor.borrow_mut().undo();
-        assert!(editor.borrow().document().node("sensor").is_some());
+        let back = editor.borrow().document().node("sensor").cloned();
+        let back = back.expect("the node put back");
+        assert_eq!(back.at, placed, "put back where it was");
+        assert_eq!(back.comment.as_deref(), Some("The zone's air."));
         assert_eq!(editor.borrow().document().links.len(), 1);
 
         // And a node that is not there is not asked about: a menu left open
@@ -14830,6 +16194,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -14992,6 +16357,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15085,6 +16451,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         alerting(&views);
 
@@ -15231,6 +16598,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         alerting(&views);
 
@@ -15381,6 +16749,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15509,6 +16878,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -15720,6 +17090,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -16065,6 +17436,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -16219,6 +17591,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -16326,6 +17699,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -16497,6 +17871,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
 
         show_group(&editor, &views);
@@ -16583,6 +17958,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
 
         // Nothing owed: leaving asks nothing. (The loop is not running in a
@@ -16594,7 +17970,7 @@ mod tests {
             home: None,
         });
         assert!(!editor.borrow().unsaved());
-        leave(&editor, &views);
+        leave(&editor, &views, Next::Exit);
         assert!(
             views.borrow().leaving.is_none(),
             "a session that owes nothing should not be asked"
@@ -16612,7 +17988,7 @@ mod tests {
         });
         assert!(editor.borrow().unsaved(), "the write should have failed");
 
-        leave(&editor, &views);
+        leave(&editor, &views, Next::Exit);
         let window = views
             .borrow()
             .leaving
@@ -16632,7 +18008,7 @@ mod tests {
 
         // Put right, and saving on the way out writes it.
         shut(0o700);
-        leave(&editor, &views);
+        leave(&editor, &views, Next::Exit);
         let window = views
             .borrow()
             .leaving
@@ -16743,6 +18119,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -17028,6 +18405,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
 
         show_node(&editor, &views, "temp_1");
@@ -17124,6 +18502,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
         let chosen: Rc<RefCell<BTreeMap<String, String>>> =
             Rc::new(RefCell::new(BTreeMap::new()));
@@ -17263,6 +18642,7 @@ mod tests {
             errors: Rc::new(RefCell::new(Vec::new())),
             lit: Rc::new(RefCell::new(None)),
             unfinished: Rc::new(RefCell::new(Vec::new())),
+            held: Held::default(),
         }));
 
         // The only group there is, so the window opens on it.

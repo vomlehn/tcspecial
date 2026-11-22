@@ -194,6 +194,51 @@ the files as they are is not one the next start should undo.
 thing not to do is to quit quietly with the work unwritten. An exit with
 nothing unsaved asks nothing.
 
+Opening and closing
+-------------------
+
+Requirement
+    **File -> Open...** puts another configuration in the window in place of
+    the one there, and **File -> Close** puts it away and leaves the window
+    empty, saying that nothing is open, with only Open and Exit to press.
+    Either first makes the offer Exit makes, its buttons saying *close* where
+    Exit's say *leave*, and goes on only once it is answered; *Stay* leaves
+    everything as it was. Open asks in the desktop's own Open dialog for one
+    configuration and, where the simulator's settings are to be edited too, its
+    simulator file, the two the command line takes, and reads them before the
+    configuration open now is let go: files that cannot be opened are said in
+    an alert, and the configuration open before is still open, unchanged.
+
+One process edits one configuration at a time, as it always did; Open changes
+which. In place rather than in a second process, because what was copied is the
+editor's own (see `Copying, cutting and pasting`_), and nodes copied from one
+configuration are most often wanted in the next one opened.
+
+The configuration that goes ends as an exit ends it, its undo history deleted,
+that being a close somebody asked for; every window about it goes with it --
+its subdiagrams' pages, its nodes' windows, the groups, the questions and lists
+about it -- and whatever was selected or half drawn. The one that comes is
+started as the command line's is: its history read back and held to its files,
+its first nodes given where it is new, and what it arrived with asked about in
+front of its drawing, the window taking no presses until that is answered.
+
+Closed, the session is ``Editor::closed``: an empty document that is read-only
+as well, so that nothing it is asked to do can write a file or a history --
+there is no file it could rightly write to. Nothing in it is an error: an empty
+document lacks what every configuration must say, and no configuration is
+being said. The window greys everything but Open and Exit, and covers the sheet
+with the sentence saying what to do. The read-only flag of the command line
+holds for every configuration opened after it.
+
+Requirement
+    Started with no file named, tcs-cfge opens its window in this state, for
+    **File -> Open...** to choose a configuration; ``-h`` or ``--help``
+    prints the usage and exits.
+
+The command line used to require a configuration, and with none printed the
+usage, there being nothing for a window to show. With Open there is: a window
+with nothing in it is a way in, as every other editor's is.
+
 Files that cannot be opened
 ---------------------------
 
@@ -1272,8 +1317,9 @@ grip shows the menu by name.
 
 A click of either button selects: a node, a physics component or a line,
 outlined in the dark grey a selected node always was, a line by a wider line
-under it so that it still says which stream it carries. One thing is selected on
-a page at a time, and the Delete key, or Backspace, takes it -- a line at once,
+under it so that it still says which stream it carries. A line or a component is
+selected alone, and nodes alone or several together (below); the Delete key, or
+Backspace, takes what is selected -- a line at once,
 a node after asking, as its menu's Delete does. A right click on a line selects
 it and opens a menu of its own, whose one item is Delete. A click of either
 button anywhere else on the page selects nothing, and closes whatever menu was
@@ -1292,8 +1338,29 @@ not manage: every click carried a fraction of a pixel, every click was read as
 a drag, and the menu was unreachable by the gesture meant to open it. The same
 slack keeps a trembling click from recording a one-pixel move as an edit.
 
+Several nodes are selected together, as in every other program: a press with
+Ctrl or Shift held adds a node to what is selected or takes it out; a box drawn
+by dragging on bare sheet selects every node wholly inside it, beside what was
+selected where Ctrl or Shift is held; and **Edit -> Select all** selects every
+node on the page. One of them is still the chosen one -- the first pressed, or
+another where that one was taken out -- because everything that knows about one
+selected node goes on knowing about it, and the others are drawn as selected
+beside it by a flag apiece, so that a change of selection sets one property
+rather than rebuilding the canvas under a press. A press on one of several
+keeps them all, so that a drag that follows moves them together, by the same
+distance, each held inside its own pane, in one edit; let go without dragging,
+the press was a click, and selects that node alone. The others follow the hand
+while it moves, rather than jumping to their places when it lets go: the
+dragged node says how far it has gone as the pointer moves, and each node
+selected with it is drawn carried by as much, nothing being recorded until the
+drag ends. Only a selected node's drag carries the others -- one just taken out
+of the selection by Ctrl moves alone, as it will when let go. What is selected is one
+page's: each window has its own.
+
 Delete asks, with the node's name and what goes with it: "2 lines are attached
-to it and go with it." Every line to it or from it goes, a node of a
+to it and go with it." With several selected, the Delete key and the Delete of
+any of their menus ask about them all at once, naming them, and take them in
+one edit. Every line to it or from it goes, a node of a
 subdiagram's as well as one of the top file's: a line left naming a node that is
 not there would be a configuration refused when it is loaded. Undo would put all
 of that back, a removal being one edit, but an undo somebody has to discover is
@@ -1301,6 +1368,53 @@ no answer to a node that has already gone and taken four lines with it -- and
 the press that deleted it is one key away from the press that opens its
 attributes. Cancel leaves the document exactly as it was, the history included:
 a question answered no is not an edit.
+
+Undo puts a deleted node back where it was, with what was written about it.
+A node's removal carries its attributes and its lines and not its place or its
+comment, so a removal is a group: the comment taken off, the node moved to
+where a node put back is put, and then removed, each node of several worked out
+on the document the ones before it left, so that a line between two of them is
+carried once and comes back once (``clipboard::removal``). The undo runs the
+group backwards and so ends with the node home, its words back.
+
+Copying, cutting and pasting
+----------------------------
+
+Requirement
+    **Edit -> Copy** takes the nodes selected on a page, with the lines
+    between two of them; **Edit -> Cut** takes them too and removes them, with
+    every line that touches them, in one edit; **Edit -> Paste** puts what was
+    taken on the page it is chosen on, in one edit, and selects it. A line
+    with only one end among the nodes taken is not pasted. Ctrl+C, Ctrl+X,
+    Ctrl+V and Ctrl+A are the usual keys for them and for Select all.
+
+What is taken is each node's type, attributes, comment and place, and the
+lines between them, names and comments and all (``clipboard::Clipping``). A
+line with one end outside is left behind because pasted it would join the
+copy to the original, or to a node that is not on the page, and a line nobody
+drew from the copy is not one to draw for them. A subdiagram's box is refused,
+saying so: its nodes are a file of their own, and copying the box would be a
+second include of the same file. So are left behind the simulator's settings
+for a payload, the ground's command bindings and a page's exports, which are
+about the configuration the node was in rather than about the node.
+
+A pasted node keeps its own name where no node in any file of the
+configuration, and no physics component, has it -- so a Cut and a Paste move
+nodes from one page to another under their names -- and is otherwise given the
+first free number on its name's stem, ``temp-2`` for ``temp``, the shape of
+name the editor gives a node it places. It keeps its place, moved down the
+sheet a grid step at a time until none of the pasted nodes lands on the corner
+of a node already on the page, so a copy pasted beside its original is seen
+beside it rather than hidden under it, and is then held inside its own pane as
+a dragged node is. The paste is one group of the edits placing a node is made
+of, so one Undo takes it all back.
+
+The clipboard is the editor's own and not the desktop's. It lives as long as
+the editor does, across Open, so nodes can be copied from one configuration and
+pasted into another; and it is never read back from text somebody else put
+there, which a desktop clipboard would mean: a configuration's text pasted from
+anywhere would have to be parsed and checked as a file is, for a gesture that
+is about moving nodes about.
 
 Placing a node
 --------------
@@ -1820,11 +1934,14 @@ The menu bar and the title
 
 The menu bar holds what belongs to the configuration as a whole rather than to
 anything on the canvas -- there is nothing to press on a diagram that would mean
-"the configuration", or "the groups", or "the way out". **File** holds Save,
-Save as, Autosave, the two kinds of group -- **Edit payload groups** and **Edit
-simulated payload groups** -- and Exit; **Edit** holds **Edit tcspecial
+"the configuration", or "the groups", or "the way out". **File** holds Open
+and Close, Save, Save as, Autosave, the two kinds of group -- **Edit payload
+groups** and **Edit simulated payload groups** -- Print and Exit; **Edit**
+holds Cut, Copy, Paste and Select all, which act on what is selected on the
+canvas but are where every program has them, then **Edit tcspecial
 parameters** and **Arrange the nodes**; **View** holds how large the sheet is
-drawn. Undo and redo are not in a menu but on the bar, where each says what it
+drawn. Open, Close, Cut, Copy, Paste and Select all carry the usual keys,
+Ctrl+O, Ctrl+W, Ctrl+X, Ctrl+C, Ctrl+V and Ctrl+A. Undo and redo are not in a menu but on the bar, where each says what it
 would take back (see `Undo and redo on the bar`_). The editor generates
 nothing: what it writes is the configuration and the simulator's file.
 

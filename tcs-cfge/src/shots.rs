@@ -854,7 +854,7 @@ fn saving_and_leaving(out: &Path, work: &Path) {
         name: "file-menu",
         window: ui.window(),
         size: WIDE,
-        part: Some((0, 0, 420, 270)),
+        part: Some((0, 0, 420, 385)),
         markers: Vec::new(),
     }
     .take(out);

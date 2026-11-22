@@ -98,6 +98,9 @@ pub struct Editor {
     /// beside it: see [`OnDisk`]. Where they stand in it, and what each held
     /// when the session last wrote or read it.
     on_disk: OnDisk,
+    /// Whether a configuration is open at all: false after File > Close,
+    /// until File > Open opens another. See [`Editor::closed`].
+    open: bool,
 }
 
 impl Editor {
@@ -124,7 +127,42 @@ impl Editor {
             written: BTreeMap::new(),
             autosave: crate::settings::DEFAULT_AUTOSAVE,
             on_disk: OnDisk::default(),
+            open: true,
         }
+    }
+
+    /// A session with no configuration open: what the window holds after
+    /// File > Close.
+    ///
+    /// Read-only as well as empty, so that nothing it is asked to do can
+    /// write a file, a history, or anything else: there is no file it could
+    /// rightly write to. The window greys everything but Open and Exit, and
+    /// this is what holds if something it did not grey asks anyway.
+    ///
+    /// # Returns
+    ///
+    /// The session, with nothing in it.
+    pub fn closed() -> Self {
+        Editor {
+            read_only: true,
+            open: false,
+            ..Editor::new(Path::new(""))
+        }
+    }
+
+    /// Whether a configuration is open: false for [`Editor::closed`].
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// Says something in the window's line for what the last command did,
+    /// for a command that changed nothing and has to say why.
+    ///
+    /// # Arguments
+    ///
+    /// * `said` - The sentence.
+    pub fn tell(&mut self, said: String) {
+        self.said = Some(said);
     }
 
     /// Whether every edit is written to the files as it is made.
@@ -471,7 +509,18 @@ impl Editor {
         &self.journal
     }
 
+    /// What is wrong with the configuration: see [`Document::faults`].
+    ///
+    /// # Returns
+    ///
+    /// The faults, in the order the checking finds them; none where no
+    /// configuration is open.
     pub fn faults(&self) -> Vec<Fault> {
+        // Nothing open is nothing wrong: an empty document lacks what every
+        // configuration must say, and no configuration is being said.
+        if !self.open {
+            return Vec::new();
+        }
         self.document.faults()
     }
 
@@ -519,6 +568,10 @@ impl Editor {
     ///
     /// Its path, or `None` where the configuration is kept in one spelling.
     pub fn other_spelling(&self) -> Option<PathBuf> {
+        // Nothing open has no spelling, and so no other one.
+        if !self.open {
+            return None;
+        }
         self.document.other_spelling(&self.path)
     }
 

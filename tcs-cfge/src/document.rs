@@ -1654,20 +1654,23 @@ impl Document {
         })
     }
 
-    /// How many lines touch this node, which is what a question about
-    /// deleting it has to say.
+    /// How many lines touch any of these nodes, which is what a question
+    /// about deleting them has to say: each line once, however many of them
+    /// it joins.
     ///
     /// # Arguments
     ///
-    /// * `name` - The node's absolute name.
+    /// * `names` - The nodes' absolute names.
     ///
     /// # Returns
     ///
-    /// How many links start or end at it.
-    pub fn lines_touching(&self, name: &str) -> usize {
+    /// How many links start or end at one of them.
+    pub fn lines_touching(&self, names: &[String]) -> usize {
         self.links
             .iter()
-            .filter(|link| link.from == name || link.to == name)
+            .filter(|link| {
+                names.contains(&link.from) || names.contains(&link.to)
+            })
             .count()
     }
 

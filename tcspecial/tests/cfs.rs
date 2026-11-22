@@ -71,26 +71,6 @@ impl Drop for Flying {
     }
 }
 
-/// Writes `was` as `now` in `text`, where it appears exactly once.
-///
-/// # Arguments
-///
-/// * `text` - The example's text.
-/// * `was`  - What the example says, which it must say once.
-/// * `now`  - What it is to say instead.
-///
-/// # Returns
-///
-/// The text, with `was` changed to `now`.
-fn moved(text: &str, was: &str, now: &str) -> String {
-    assert_eq!(
-        text.matches(was).count(),
-        1,
-        "the example should say {was} once"
-    );
-    text.replace(was, now)
-}
-
 /// The cFS end of the bus, played by the test.
 struct Peer {
     socket: UdpSocket,
@@ -270,7 +250,7 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
     let heater = bound();
     let thermometer = free();
     let mut text = text;
-    for (was, now) in [
+    let moves = [
         ("127.0.0.1:8634", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:2234", format!("127.0.0.1:{}", port(&socket))),
         (":8601\"", format!(":{}\"", port(&heater))),
@@ -283,9 +263,8 @@ fn example() -> (tempfile::TempDir, std::path::PathBuf, Peer, UdpSocket, u16) {
             "/tmp/tcspecial-cfs.state",
             dir.path().join("state").display().to_string(),
         ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    ];
+    text = common::moved(&text, &moves);
     let configuration = dir.path().join("cfs.ytcs");
     tcsos::fs::write(&configuration, &text).expect("written");
     let ident = sbn::ident_of("3b339a5e0f686cef822a5d6ea95004222ab7af33")

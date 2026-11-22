@@ -227,54 +227,93 @@ impl Drop for Flying {
     }
 }
 
-/// Writes `was` as `now` in `text`, where it appears exactly once: a
-/// socket the example stops naming is a test that no longer moves it, and
-/// would bind the example's own port.
-///
-/// # Arguments
-///
-/// * `text` - The example's configuration.
-/// * `was`  - What it says now, which must appear exactly once.
-/// * `now`  - What to say instead.
-///
-/// # Returns
-///
-/// `text` with the one `was` replaced by `now`.
-///
-/// # Panics
-///
-/// If `text` does not say `was` exactly once.
-#[allow(dead_code)]
-pub fn moved(text: &str, was: &str, now: &str) -> String {
-    moved_each(text, was, now, 1)
-}
-
-/// Writes `was` as `now` in `text`, where it appears exactly `times` times:
-/// for what several nodes of an example name alike, such as the one bus two
-/// payloads are on.
+/// Writes each `was` as its `now` in `text`, where each appears exactly
+/// once: a socket the example stops naming is a test that no longer moves
+/// it, and would bind the example's own port. All are written at once, as
+/// [`moved_each`] says.
 ///
 /// # Arguments
 ///
 /// * `text`  - The example's configuration.
-/// * `was`   - What it says now.
-/// * `now`   - What to say instead.
-/// * `times` - How many times `text` must say `was`.
+/// * `moves` - What it says now, each of which must appear exactly once,
+///             and what to say instead.
 ///
 /// # Returns
 ///
-/// `text` with every `was` replaced by `now`.
+/// `text` with each `was` replaced by its `now`.
 ///
 /// # Panics
 ///
-/// If `text` does not say `was` exactly `times` times.
+/// If `text` does not say a `was` exactly once, or says one inside
+/// another.
 #[allow(dead_code)]
-pub fn moved_each(text: &str, was: &str, now: &str, times: usize) -> String {
-    assert_eq!(
-        text.matches(was).count(),
-        times,
-        "the example should say {was} {times} times"
-    );
-    text.replace(was, now)
+pub fn moved<W: AsRef<str>, N: AsRef<str>>(
+    text: &str,
+    moves: &[(W, N)],
+) -> String {
+    let each: Vec<(&str, &str, usize)> = moves
+        .iter()
+        .map(|(was, now)| (was.as_ref(), now.as_ref(), 1))
+        .collect();
+    moved_each(text, &each)
+}
+
+/// Writes each `was` as its `now` in `text`, where it appears exactly
+/// `times` times: for what several nodes of an example name alike, such as
+/// the one bus two payloads are on.
+///
+/// Every `was` is found in `text` as it was given, and all are replaced in
+/// one pass, so that what one move writes is never taken for what another
+/// replaces. Made one after another, a port found free that happens to be
+/// one the example names, such as 4300 written for 5650 before 4300 is
+/// moved, would be said twice, and moved twice.
+///
+/// # Arguments
+///
+/// * `text`  - The example's configuration.
+/// * `moves` - What it says now, what to say instead, and how many times
+///             it must say it.
+///
+/// # Returns
+///
+/// `text` with every `was` replaced by its `now`.
+///
+/// # Panics
+///
+/// If `text` does not say a `was` exactly `times` times, or says one
+/// inside another.
+#[allow(dead_code)]
+pub fn moved_each<W: AsRef<str>, N: AsRef<str>>(
+    text: &str,
+    moves: &[(W, N, usize)],
+) -> String {
+    // Where each `was` is, as (start, end, which move).
+    let mut found = Vec::new();
+    for (which, (was, _, times)) in moves.iter().enumerate() {
+        let was = was.as_ref();
+        let at: Vec<usize> = text.match_indices(was).map(|(i, _)| i).collect();
+        assert_eq!(
+            at.len(),
+            *times,
+            "the example should say {was} {times} times"
+        );
+        found.extend(at.into_iter().map(|i| (i, i + was.len(), which)));
+    }
+    found.sort_unstable();
+    let mut out = String::with_capacity(text.len());
+    let mut from = 0;
+    for (start, end, which) in found {
+        assert!(
+            start >= from,
+            "the example says {} inside another text being moved",
+            moves[which].0.as_ref()
+        );
+        out.push_str(&text[from..start]);
+        out.push_str(moves[which].1.as_ref());
+        from = end;
+    }
+    out.push_str(&text[from..]);
+    out
 }
 
 /// An example's configuration with every loopback host it names made

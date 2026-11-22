@@ -108,7 +108,7 @@ fn a_tee_sends_each_datum_both_ways() {
     // and where tcs_cmd.recv says tcspecial takes them.
     let (commands, take_at) = (bound(), free());
     let mut text = text;
-    for (was, now) in [
+    let moves = [
         (":8001\"", format!(":{}\"", port(&heater))),
         (":8002\"", format!(":{sensor}\"")),
         (":8003\"", format!(":{}\"", free())),
@@ -126,9 +126,8 @@ fn a_tee_sends_each_datum_both_ways() {
             "/tmp/telemetry/tees",
             dir.path().join("telemetry").display().to_string(),
         ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    ];
+    text = moved(&text, &moves);
     let configuration = dir.path().join("tees.ytcs");
     tcsos::fs::write(&configuration, &text).expect("written");
 

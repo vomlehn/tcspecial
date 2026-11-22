@@ -135,7 +135,7 @@ impl Flown {
             let mut written = text.clone();
             let (commands, take_at, uplink) =
                 (common::bound(), common::free(), common::free());
-            for (was, now) in [
+            let ports = [
                 (
                     format!("127.0.0.1:{}", at(3200)),
                     format!("127.0.0.1:{take_at}"),
@@ -181,14 +181,16 @@ impl Flown {
                     format!("/tmp/tcspecial-{name}.state"),
                     dir.path().join("tcspecial.state").display().to_string(),
                 ),
-            ] {
-                written = common::moved(&written, &was, &now);
-            }
-            let (was, now, times) = device;
-            written = common::moved_each(&written, was, now, times);
-            for (was, now) in changed {
-                written = common::moved(&written, was, now);
-            }
+            ];
+            // All at once, so that a port found free is never taken for
+            // one of the example's, nor a change for either.
+            let mut moves: Vec<(&str, &str, usize)> = ports
+                .iter()
+                .map(|(was, now)| (was.as_str(), now.as_str(), 1))
+                .collect();
+            moves.push(device);
+            moves.extend(changed.iter().map(|&(was, now)| (was, now, 1)));
+            written = common::moved_each(&written, &moves);
 
             let configuration = dir.path().join(format!("{name}.ytcs"));
             tcsos::fs::write(&configuration, &written).expect("written");

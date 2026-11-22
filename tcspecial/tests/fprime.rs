@@ -55,32 +55,6 @@ impl Drop for Flying {
     }
 }
 
-/// Writes `was` as `now` in `text`, where it appears exactly once: a
-/// socket the example stops naming is a test that no longer moves it, and
-/// would bind the example's own port.
-///
-/// # Arguments
-///
-/// * `text` - The example's configuration.
-/// * `was`  - What it says now, which must appear exactly once.
-/// * `now`  - What to say instead.
-///
-/// # Returns
-///
-/// `text` with the one `was` replaced by `now`.
-///
-/// # Panics
-///
-/// If `text` does not say `was` exactly once.
-fn moved(text: &str, was: &str, now: &str) -> String {
-    assert_eq!(
-        text.matches(was).count(),
-        1,
-        "the example should say {was} once"
-    );
-    text.replace(was, now)
-}
-
 /// Sends `datum` to `to` until something arrives at `at`, which is how
 /// long tcspecial takes to start.
 ///
@@ -156,7 +130,7 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
     // and where tcs_cmd.recv says tcspecial takes them.
     let (commands, take_at) = (bound(), free());
     let mut text = text;
-    for (was, now) in [
+    let moves = [
         (":9001\"", format!(":{}\"", port(&heater))),
         (":9002\"", format!(":{thermometer}\"")),
         (":9600\"", format!(":{uplink}\"")),
@@ -173,9 +147,8 @@ fn a_vehicle_answering_to_fprime_reports_to_the_bridge_and_takes_its_commands()
             "/tmp/telemetry/fprime",
             dir.path().join("telemetry").display().to_string(),
         ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    ];
+    text = common::moved(&text, &moves);
     let configuration = dir.path().join("fprime.ytcs");
     tcsos::fs::write(&configuration, &text).expect("written");
 

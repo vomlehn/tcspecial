@@ -138,7 +138,7 @@ fn example(dir: &Path, commands: u16) -> Example {
     let (sun, wheel, battery, base) = (free(), free(), free(), free());
     // Where tcs_cmd.recv says tcspecial takes the ground's commands.
     let take_at = free();
-    for (was, now) in [
+    let moves = [
         (":5001\"", format!(":{sun}\"")),
         (":5002\"", format!(":{wheel}\"")),
         (":5003\"", format!(":{battery}\"")),
@@ -168,9 +168,8 @@ fn example(dir: &Path, commands: u16) -> Example {
                     .display()
             ),
         ),
-    ] {
-        text = moved(&text, was, &now);
-    }
+    ];
+    text = moved(&text, &moves);
     let configuration = dir.join("consolidator.ytcs");
     tcsos::fs::write(&configuration, &text).expect("written");
     Example {
@@ -204,6 +203,24 @@ fn flying(configuration: &Path) -> common::Flying {
             .spawn()
             .expect("tcspecial starts"),
     )
+}
+
+/// A port found free that is one the example names is moved once, not
+/// twice: 4300, written for 5650, is not taken for the example's own 4300,
+/// which `example` once did, failing now and then.
+#[test]
+fn a_free_port_the_example_names_is_not_moved_again() {
+    let text = "a: \"127.0.0.1:5650\"\nb: \"127.0.0.1:4300\"\n";
+    assert_eq!(
+        moved(
+            text,
+            &[
+                ("127.0.0.1:5650", "127.0.0.1:4300"),
+                ("127.0.0.1:4300", "127.0.0.1:4301"),
+            ],
+        ),
+        "a: \"127.0.0.1:4300\"\nb: \"127.0.0.1:4301\"\n"
+    );
 }
 
 #[test]

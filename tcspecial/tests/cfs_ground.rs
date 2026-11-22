@@ -62,7 +62,7 @@ fn example(dir: &Path) -> (std::path::PathBuf, u16) {
     );
     tcsos::fs::create_dir(dir.join("telemetry")).expect("the log's directory");
     let thermometer = free();
-    for (was, now) in [
+    let moves = [
         ("127.0.0.1:8634", format!("127.0.0.1:{}", free())),
         ("127.0.0.1:2234", format!("127.0.0.1:{}", free())),
         (":8601\"", format!(":{}\"", free())),
@@ -75,10 +75,8 @@ fn example(dir: &Path) -> (std::path::PathBuf, u16) {
             "/tmp/tcspecial-cfs.state",
             dir.join("state").display().to_string(),
         ),
-    ] {
-        assert_eq!(text.matches(was).count(), 1, "the example says {was}");
-        text = text.replace(was, &now);
-    }
+    ];
+    text = common::moved(&text, &moves);
     let configuration = dir.join("cfs.ytcs");
     tcsos::fs::write(&configuration, &text).expect("written");
     (configuration, thermometer)

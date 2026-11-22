@@ -313,7 +313,7 @@ Selecting, moving and the node's menu
 -------------------------------------
 
 A press on a node selects it, and a press that moves more than a few pixels
-drags it. A node moves in steps of five millimetres on the sheet, which keeps
+drags it, its lines following. A node moves in steps of five millimetres on the sheet, which keeps
 terminals level with each other, and stays in its own pane. Because the
 corners hold the terminals, a press on a corner takes a line rather than
 moving the node.
@@ -327,8 +327,9 @@ press on a selected node takes it out again. Or drag on bare sheet: a box
 follows the pointer, and every node wholly inside it is selected when you let
 go, beside what was already selected if Ctrl or Shift is held. **Edit ->
 Select all** selects every node on the page. Dragging any of the selected
-nodes moves them all, the others following the pointer with it; each stays in
-its own pane when you let go, and one Undo puts them all back. A click on one
+nodes moves them all, the others and the lines to every one of them following
+the pointer; each stays in its own pane when you let go, and one Undo puts
+them all back. A click on one
 of them without dragging selects it alone.
 
 The Delete key, or Backspace, removes what is selected: a line at once, a

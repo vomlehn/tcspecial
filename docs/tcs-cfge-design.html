@@ -1656,7 +1656,11 @@ the press was a click, and selects that node alone. The others follow the hand
 while it moves, rather than jumping to their places when it lets go: the
 dragged node says how far it has gone as the pointer moves, and each node
 selected with it is drawn carried by as much, nothing being recorded until the
-drag ends. Only a selected node's drag carries the others -- one just taken out
+drag ends. The lines follow too, a single node's as well as several's: as the
+pointer moves, the page's lines are routed again from a copy of the document
+with the dragged nodes where the hand has them, and only the lines are drawn
+again -- the nodes are under the hand, and rebuilding them would end the
+gesture -- and as the hand lets go they are drawn from the document again. Only a selected node's drag carries the others -- one just taken out
 of the selection by Ctrl moves alone, as it will when let go. What is selected is one
 page's: each window has its own.</p>
 <p>Delete asks, with the node's name and what goes with it: &quot;2 lines are attached

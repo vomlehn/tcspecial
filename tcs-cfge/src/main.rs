@@ -2039,6 +2039,50 @@ fn wire(
         });
     }
     {
+        // A node being dragged, as the hand moves: the lines drawn again
+        // with it, and with the nodes selected with it, where the hand has
+        // them, so that the lines follow the drag rather than jumping when
+        // it ends. Only the lines: the nodes are under the hand, and
+        // rebuilding them would end the gesture (see Views::relink). Nothing
+        // is recorded; the drag's own end is the edit, and nought, which
+        // the drag says as it ends, puts the lines back as the document has
+        // them.
+        let editor = editor.clone();
+        let views = views.clone();
+        let home = home.clone();
+        let weak = window.as_weak();
+        window.on_node_dragging(move |name, dx, dy| {
+            let Some(window) = weak.upgrade() else {
+                return;
+            };
+            let views = views.borrow();
+            let editor = editor.borrow();
+            let dividers = views.divider.get();
+            let (dx, dy) = (dx.round() as i32, dy.round() as i32);
+            let mut document = editor.document().clone();
+            if (dx, dy) != (0, 0) {
+                let names = selected_with(&views, &home, &name);
+                for node in &mut document.nodes {
+                    if node.home == home && names.contains(&node.name) {
+                        node.at = (node.at.0 + dx, node.at.1 + dy);
+                    }
+                }
+            }
+            let lit = views.lit.borrow();
+            window.set_links(ModelRc::from(Rc::new(VecModel::from(lines_of(
+                &document,
+                &home,
+                dividers,
+                None,
+                lit.as_ref(),
+            )))));
+            let (_, physics) = physics_views_of(&document, dividers, &home);
+            window.set_physics_links(ModelRc::from(Rc::new(VecModel::from(
+                physics,
+            ))));
+        });
+    }
+    {
         // A press with Ctrl or Shift held: the node added to what is
         // selected, or taken out of it.
         let views = views.clone();
@@ -2374,7 +2418,7 @@ fn put(
     ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
     let (physics_nodes, physics_links) =
-        physics_views_of(editor, dividers, home);
+        physics_views_of(editor.document(), dividers, home);
     // The Physics pane whether or not there is a simulator file for it to be
     // the world of: some of every pane is always to be seen, and a pane that
     // appeared only with a second file would be one nobody knew to look for.
@@ -6288,6 +6332,34 @@ fn views_of(
         })
         .collect();
 
+    (nodes, lines_of(document, home, dividers, held, lit))
+}
+
+/// Builds the lines one window shows: those with an end on its page.
+///
+/// Apart from [`views_of`] so that the lines can be drawn again while a drag
+/// is under way, from a document with the dragged nodes where the hand has
+/// them, without the nodes being rebuilt under the hand: see
+/// `on_node_dragging` in [`wire`].
+///
+/// # Arguments
+///
+/// * `document` - The configuration drawn.
+/// * `home`     - The page: `None` for the top.
+/// * `dividers` - Where the panes are, which says where the page's edge is.
+/// * `held`     - The link whose end is being dragged, which is left out.
+/// * `lit`      - The link chosen from the errors button, which is drawn lit.
+///
+/// # Returns
+///
+/// The lines with an end on the page.
+fn lines_of(
+    document: &Document,
+    home: &Home,
+    dividers: Dividers,
+    held: Option<&Link>,
+    lit: Option<&Link>,
+) -> Vec<LinkView> {
     // Every node, whichever page it is on, because a line to one on another
     // page is drawn to a stub whose height is taken from it; and the lines
     // with an end on this one. The drawing is tcs-diagram's, which
@@ -6320,16 +6392,14 @@ fn views_of(
     // The line chosen from the errors button is lit, as tcspecial's visual
     // window lights a line data crosses: a wide pale line under it, which
     // says which one it is by its width as well as its colour.
-    let links: Vec<LinkView> = tcs_diagram::view::link_looks(&sheet, &lines)
+    tcs_diagram::view::link_looks(&sheet, &lines)
         .into_iter()
         .zip(&drawn)
         .map(|(look, link)| LinkView {
             lit: lit.is_some_and(|lit| lit.same_connection(link)),
             ..link_view(look)
         })
-        .collect();
-
-    (nodes, links)
+        .collect()
 }
 
 /// The simulator file's physics, drawn: its components as nodes in the
@@ -6344,7 +6414,7 @@ fn views_of(
 ///
 /// # Arguments
 ///
-/// * `editor`   - The session drawn.
+/// * `document` - The configuration drawn, its simulator file with it.
 /// * `dividers` - Where the panes are, the Physics pane's width included.
 /// * `home`     - The page the lines to payloads are drawn on: `None` for
 ///                the top.
@@ -6353,11 +6423,10 @@ fn views_of(
 ///
 /// The physics nodes, and the physics links.
 fn physics_views_of(
-    editor: &Editor,
+    document: &Document,
     dividers: Dividers,
     home: &Home,
 ) -> (Vec<NodeView>, Vec<LinkView>) {
-    let document = editor.document();
     let Some(simulator) = &document.simulator else {
         return (Vec::new(), Vec::new());
     };
@@ -14220,6 +14289,101 @@ mod tests {
         what_is_selected_is_copied_cut_pasted_moved_and_deleted_together();
         open_and_close_put_another_configuration_in_the_window();
         started_with_no_file_the_window_has_nothing_open();
+        the_lines_follow_a_drag_of_several_nodes();
+    }
+
+    /// While one of two selected nodes is dragged, the lines to both are
+    /// drawn where the hand has them, the line between two nodes that are
+    /// not moving staying where it was; once the hand lets go, they are
+    /// drawn where the document then has them.
+    ///
+    /// Through the window, with the pointer, for the markup's part: the drag
+    /// reports how far it has gone as the hand moves.
+    fn the_lines_follow_a_drag_of_several_nodes() {
+        use slint::platform::{PointerEventButton, WindowEvent};
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let payloads = dividers().payloads;
+        let (editor, ui, views) = drawn(
+            where_.path(),
+            &[
+                ("ground", "gateway_radio", (16, 120)),
+                ("mean", "compute", (payloads + 40, 120)),
+                ("scale", "compute", (payloads + 40, 400)),
+                ("sensor", "i2c", (24, 120)),
+            ],
+            &[("sensor", "mean"), ("mean", "ground"), ("scale", "ground")],
+        );
+        ui.show().expect("the window shows");
+        ui.invoke_node_selected("mean".into());
+        ui.invoke_node_toggled("scale".into());
+
+        let canvas =
+            i_slint_backend_testing::ElementHandle::find_by_element_id(
+                &ui,
+                "Surface::canvas",
+            )
+            .next()
+            .expect("the window has a canvas");
+        let origin = canvas.absolute_position();
+        let mean = ui
+            .get_nodes()
+            .iter()
+            .find(|node| node.name == "mean")
+            .expect("drawn");
+        let start = slint::LogicalPosition::new(
+            origin.x + mean.x + mean.width / 2.0,
+            origin.y + mean.y + mean.height / 2.0,
+        );
+        let end = slint::LogicalPosition::new(start.x, start.y + 60.0);
+        let routes = |ui: &MainWindow| -> Vec<String> {
+            ui.get_links().iter().map(|l| l.route.to_string()).collect()
+        };
+        // What the lines are with these nodes this far down, as the
+        // document would draw them.
+        let moved_by = |down: i32, names: &[&str]| -> Vec<String> {
+            let mut document = editor.borrow().document().clone();
+            for node in &mut document.nodes {
+                if names.contains(&node.name.as_str()) {
+                    node.at.1 += down;
+                }
+            }
+            lines_of(&document, &None, dividers(), None, None)
+                .iter()
+                .map(|l| l.route.to_string())
+                .collect()
+        };
+        let before = routes(&ui);
+        assert_eq!(before, moved_by(0, &[]));
+
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: start });
+        ui.window().dispatch_event(WindowEvent::PointerPressed {
+            position: start,
+            button: PointerEventButton::Left,
+        });
+        ui.window()
+            .dispatch_event(WindowEvent::PointerMoved { position: end });
+        let during = routes(&ui);
+        assert_eq!(
+            during,
+            moved_by(60, &["mean", "scale"]),
+            "the lines are drawn where the hand has both nodes"
+        );
+        assert_ne!(during, before, "and so have moved");
+        assert_eq!(views.borrow().selection(&None).len(), 2);
+
+        ui.window().dispatch_event(WindowEvent::PointerReleased {
+            position: end,
+            button: PointerEventButton::Left,
+        });
+        assert_eq!(
+            routes(&ui),
+            moved_by(0, &[]),
+            "and once it lets go, where the document has them"
+        );
+        assert_ne!(routes(&ui), before, "which has moved them");
+        ui.hide().ok();
     }
 
     /// Started with no file named, as `main` starts it, the window opens with
@@ -15166,7 +15330,9 @@ mod tests {
 
         ui.invoke_place_physics("thermal_mass".into());
         let drawn = |home: &Home| {
-            physics_views_of(&editor.borrow(), dividers(), home).0.len()
+            physics_views_of(editor.borrow().document(), dividers(), home)
+                .0
+                .len()
         };
         assert_eq!(drawn(&page), 1, "drawn on the page it was placed from");
         assert_eq!(drawn(&None), 0, "and not on the top page");

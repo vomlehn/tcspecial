@@ -935,6 +935,10 @@ component Surface inherits Rectangle {
     callback node-toggled(string);
     callback node-clicked(string);
     callback band-chosen(length, length, length, length, bool);
+    // A node being dragged, by how far the hand has taken it, as the hand
+    // moves, and nought as it lets go: what the lines are drawn again by,
+    // so that they follow the drag. See NodeShape's dragging.
+    callback node-dragging(string, length, length);
     // A box being drawn on bare sheet, from where the press was, in the
     // whole sheet's coordinates, while the press lasts; and whether it adds
     // to what is selected.
@@ -1525,6 +1529,7 @@ component Surface inherits Rectangle {
                                 root.group-x = dx;
                                 root.group-y = dy;
                             }
+                            root.node-dragging(n.name, dx, dy);
                         }
                         toggled => {
                             root.node-toggled(n.name);
@@ -2410,6 +2415,7 @@ export component MainWindow inherits Window {
     callback node-toggled(string);
     callback node-clicked(string);
     callback band-chosen(length, length, length, length, bool);
+    callback node-dragging(string, length, length);
     // Whether the window is taking commands about a configuration: not
     // while it is inert, and not with none open.
     property <bool> working: !root.inert && !root.closed;
@@ -2721,6 +2727,7 @@ export component MainWindow inherits Window {
         also-chosen: root.also-chosen;
         node-toggled(n) => { root.node-toggled(n); }
         node-clicked(n) => { root.node-clicked(n); }
+        node-dragging(n, dx, dy) => { root.node-dragging(n, dx, dy); }
         band-chosen(l, t, r, b, adding) => {
             root.band-chosen(l, t, r, b, adding);
         }

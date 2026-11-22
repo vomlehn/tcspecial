@@ -343,6 +343,10 @@ mod tests {
     use crate::editor::Editor;
 
     /// Where the dividers sit until somebody moves them.
+    ///
+    /// # Returns
+    ///
+    /// The dividers the editor opens with.
     fn dividers() -> Dividers {
         pane::dividers_for(
             crate::settings::DEFAULT_GATEWAY,
@@ -415,6 +419,15 @@ mod tests {
     }
 
     /// The names of the links that run between two of `names`.
+    ///
+    /// # Arguments
+    ///
+    /// * `document` - The configuration.
+    /// * `names`    - The nodes, by their absolute names.
+    ///
+    /// # Returns
+    ///
+    /// Each such link's ends, by name, in the document's order.
     fn between(document: &Document, names: &[&str]) -> Vec<(String, String)> {
         document
             .links

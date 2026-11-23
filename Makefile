@@ -469,6 +469,7 @@ THERMOSTAT_YAMCS = examples/thermostat-yamcs/thermostat-yamcs
 SPELLINGS = \
 	tests/manual/thermostat:tests/manual/thermostat-sim.yaml \
 	tests/consolidator/yamcs:tests/consolidator/yamcs-sim.yaml \
+	tests/undrawn/undrawn:tests/undrawn/undrawn-sim.yaml \
 	examples/minimal/minimal:examples/minimal/minimal-sim.yaml \
 	examples/consolidator/consolidator:examples/consolidator/consolidator-sim.yaml \
 	examples/thermostat/thermostat:examples/thermostat/thermostat-sim.yaml \
@@ -484,7 +485,8 @@ SPELLINGS = \
 		$(stage)/deck:$(stage)/deck-sim.yaml)
 
 # Every shipped configuration, both spellings: the examples, the thermostat
-# fixture, the consolidator-to-Yamcs fixture, the top-level example and the
+# fixture, the consolidator-to-Yamcs fixture, the undrawn-payload fixture,
+# the top-level example and the
 # stages of "Building a Vehicle", but
 # not the simulator files, which name no interface, nor the files in
 # examples/*-common and docs/building-a-vehicle/common that others include,
@@ -492,6 +494,7 @@ SPELLINGS = \
 SHIPPED_CONFIGURATIONS = example.ytcs example.xtcs \
 	tests/manual/thermostat.ytcs tests/manual/thermostat.xtcs \
 	tests/consolidator/yamcs.ytcs tests/consolidator/yamcs.xtcs \
+	tests/undrawn/undrawn.ytcs tests/undrawn/undrawn.xtcs \
 	$(filter-out $(wildcard examples/*-common/*), \
 		$(wildcard examples/*/*.ytcs) \
 		$(wildcard examples/*/*.xtcs)) \

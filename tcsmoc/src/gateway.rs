@@ -966,7 +966,9 @@ payloads:
     #[test]
     fn untouched_payloads_are_received_over_payload_telemetry() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let mut graph = Graph::load(root.join("examples/minimal/minimal.ytcs"))
+        // The fixture of a payload nothing is drawn from: the minimal
+        // example as it was before it had a gateway.
+        let mut graph = Graph::load(root.join("tests/undrawn/undrawn.ytcs"))
             .expect("it reads");
         // Somewhere free instead of the example's 6100.
         let port = a_free_port();

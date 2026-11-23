@@ -2,7 +2,7 @@
 <configuration
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../tcsprotocol/schema/tcspecial.xsd">
-    <description>One payload, its telemetry going to the ground</description>
+    <description>One payload, its telemetry going to the ground through a gateway</description>
     <tcspecial>
         <!-- tcspecial sends beacons from the interface the send attribute
              names, and the MOC receives them on the address the recv
@@ -53,17 +53,38 @@
             <send>127.0.0.27:4100</send>
         </tcs_cmd>
     </tcspecial>
+    <gateways>
+        <type name="gateway_radio">
+            <!-- The ground's end of the link. What comes down arrives at
+                 ground_base plus the device id of the node that sent it:
+                 the sensor, device id 1, at 127.0.0.27:5101. What the
+                 ground sends goes up to address, which this node binds
+                 aboard. -->
+            <gateway name="ground">
+                <address>127.0.0.28:5000</address>
+                <ground_base>127.0.0.27:5100</ground_base>
+                <world-in>sensor</world-in>
+            </gateway>
+        </type>
+    </gateways>
     <payloads>
         <type name="network">
-            <!-- Software on this host that sends its readings over UDP. -->
+            <!-- Software on this host that sends its readings over UDP,
+                 each one on to the ground through the gateway. Up to 16
+                 bytes a reading, which is what tcs-sim sends for it:
+                 bounded, so that what carries a reading down is sized for
+                 it rather than for the largest datum there is. -->
             <payload name="sensor">
                 <address>127.0.0.28:5001</address>
                 <protocol>udp</protocol>
+                <world-out-type>bytes(16)</world-out-type>
+                <world-out>ground.sensor</world-out>
             </payload>
         </type>
     </payloads>
     <tcs-cfge>
         <nodes>
+            <node name="ground" x="469" y="34"/>
             <node name="sensor" x="34" y="34"/>
         </nodes>
     </tcs-cfge>

@@ -3227,12 +3227,13 @@ vehicle:
     }
 
     /// A payload nothing in the drawing touches is read, and what it reads
-    /// goes to the ground over its own link: the minimal example.
+    /// goes to the ground over its own link: the undrawn fixture, which is
+    /// the minimal example as it was before it had a gateway.
     #[test]
     fn an_undrawn_payload_reports_over_its_own_link() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let graph = Graph::load(root.join("examples/minimal/minimal.ytcs"))
-            .expect("the example reads");
+        let graph = Graph::load(root.join("tests/undrawn/undrawn.ytcs"))
+            .expect("the fixture reads");
 
         let sent = kept();
         let mut system = System::of_opening(

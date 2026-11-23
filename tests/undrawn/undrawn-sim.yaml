@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial-sim.schema.json
+
+# How tcs-sim simulates the one payload of undrawn.ytcs.
+description: Simulator settings for the payload of undrawn.ytcs
+
+# Where tcs-sim answers whether it has made its simulated devices, which
+# whatever starts the run asks before it starts tcspecial. A port no other
+# example uses, so that two can be run at once.
+tcs-sim:
+  ready: "127.0.0.28:7903"
+
+simulated_payloads:
+  - type network:
+      # One packet a second, sent whole.
+      - payload: sensor
+        packet_interval: 1 s
+        protocol: udp
+        simulate: true

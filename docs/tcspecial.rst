@@ -2623,20 +2623,24 @@ The minimal example
 -------------------
 .. figure:: ../examples/minimal/minimal.svg
    :alt: The minimal example: one UDP payload, sensor, whose readings
-         tcspecial sends to the ground over the sensor's telemetry link.
+         go to the ground through ground, a radio gateway node.
    :width: 100%
 
-   ``examples/minimal``: one payload, and its telemetry going to the ground.
+   ``examples/minimal``: one payload, and its telemetry going to the ground
+   through a gateway.
 
 Its configuration, printed by tcs-cfge:
 `minimal.pdf <../examples/minimal/minimal.pdf>`__.
 
 The smallest configuration that does something. It has one payload,
-``sensor``, a UDP socket at ``127.0.0.28:5001``, and no other node: no line is
-drawn from the sensor at all. tcspecial binds the sensor's address and reads
-whatever arrives there, and sends each reading to the ground over the
-sensor's telemetry link -- from ``127.0.0.28:6000`` to ``127.0.0.27:6100``, the
-two ``payload_telemetry`` bases plus device id 0.
+``sensor``, a UDP socket at ``127.0.0.28:5001``, and one gateway, ``ground``, a
+``gateway_radio`` node. tcspecial binds the sensor's address and reads
+whatever arrives there, and the sensor's ``world-out`` link carries each
+reading to ``ground``, which sends it down to its ``ground_base`` plus the
+sensor's device id: ``127.0.0.27:5101``, the sensor being device 1 and
+``ground`` device 0. ``ground`` binds ``127.0.0.28:5000``, where what the
+ground sends up would arrive. Each reading is up to 16 bytes, its
+``world-out-type`` says, so that what carries it down is sized for it.
 
 The comments in its ``tcspecial`` section say which end of each link is which,
 and they are worth reading before writing a configuration of your own.

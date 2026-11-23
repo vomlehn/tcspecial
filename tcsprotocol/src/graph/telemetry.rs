@@ -997,6 +997,15 @@ mod tests {
             .expect("the example reads")
     }
 
+    /// The fixture of a payload nothing is drawn from, which reports to the
+    /// ground over the section's `payload_telemetry`: what the minimal
+    /// example was before it had a gateway.
+    fn undrawn() -> Graph {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        Graph::load(root.join("tests/undrawn/undrawn.ytcs"))
+            .expect("the fixture reads")
+    }
+
     /// Names that differ only in case are two names, and ids follow the
     /// names' code points, as tests/ids/case.ids says and the Python's test
     /// of the same file holds it to.
@@ -1115,7 +1124,7 @@ mod tests {
     /// A payload nothing touches reports over the section's payload_telemetry.
     #[test]
     fn an_untouched_payload_reports_over_payload_telemetry() {
-        let links = of(&example("minimal")).expect("it reads");
+        let links = of(&undrawn()).expect("it reads");
         assert_eq!(summary(&links), vec![("sensor", 0, "127.0.0.27", 6100)]);
         assert_eq!(links[0].via, Via::PayloadTelemetry);
         let vehicle = links[0].vehicle().expect("a link over UDP");
@@ -1175,7 +1184,7 @@ mod tests {
     /// No section: the gateway links stand, and no payload reports on its own.
     #[test]
     fn with_no_section_only_the_gateway_links_remain() {
-        let mut graph = example("minimal");
+        let mut graph = undrawn();
         graph.tcspecial = None;
         assert_eq!(of(&graph), Ok(Vec::new()));
     }

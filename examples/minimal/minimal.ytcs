@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
 
-description: "One payload, its telemetry going to the ground"
+description: "One payload, its telemetry going to the ground through a gateway"
 
 tcspecial:
   # tcspecial sends beacons from the interface the send attribute names, and
@@ -45,13 +45,31 @@ tcspecial:
     recv: "127.0.0.28:4000"
     send: "127.0.0.27:4100"
 
+gateways:
+  - type gateway_radio:
+      # The ground's end of the link. What comes down arrives at ground_base
+      # plus the device id of the node that sent it: the sensor, device id
+      # 1, at 127.0.0.27:5101. What the ground sends goes up to address,
+      # which this node binds aboard.
+      - gateway: ground
+        address: "127.0.0.28:5000"
+        ground_base: "127.0.0.27:5100"
+        world-in: [sensor]
+
 payloads:
   - type network:
-      # Software on this host that sends its readings over UDP.
+      # Software on this host that sends its readings over UDP, each one on
+      # to the ground through the gateway. Up to 16 bytes a reading, which is
+      # what tcs-sim sends for it: bounded, so that what carries a reading
+      # down is sized for it rather than for the largest datum there is.
       - payload: sensor
         address: "127.0.0.28:5001"
         protocol: "udp"
+        world-out-type: "bytes(16)"
+        world-out:
+          - ground.sensor
 
 tcs-cfge:
   nodes:
+    - { node: ground, x: 469, y: 34 }
     - { node: sensor, x: 34, y: 34 }

@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=../../tcsprotocol/schema/tcspecial.schema.json
+
+description: "One payload nothing is drawn from, its telemetry going to the ground over payload_telemetry"
+
+tcspecial:
+  # tcspecial sends beacons from the interface the send attribute names, and
+  # the MOC receives them on the address the recv attribute names.
+  beacon:
+    default_interval: "5 s"
+    recv: "127.0.0.27:5650"
+    reset_interval: "1 s"
+    send: "127.0.0.28:5550"
+  gateway: "radio"
+  interface: "b03f49878bcc9c45e7b854c7da1bce47"
+  log:
+    directory: "/tmp/telemetry/undrawn"
+    segment_size: "65536"
+  max_consolidator_inputs: "32"
+  # Commands to a node are sent from source_base to tcspecial at dest_base: one
+  # link for every node, each command naming its node by its device id, and its
+  # answer going back to source_base.
+  #
+  # Simple payloads, such as this sensor, do not use payload commands: what a
+  # simple payload is configured with is in this file, and it is not changed
+  # while tcspecial is running. At present only applications use the
+  # payload_command values.
+  payload_command:
+    dest_base: "127.0.0.28:4200"
+    source_base: "127.0.0.27:4300"
+  # tcspecial sends telemetry from the network interface source_base names,
+  # plus the payload's device id, and the MOC receives it on the network
+  # interface dest_base names, plus the payload's device id.
+  payload_telemetry:
+    dest_base: "127.0.0.27:6100"
+    source_base: "127.0.0.28:6000"
+  # tcspecial keeps in this file which configuration the next start is to run,
+  # the last one the ground confirmed, and how many starts of it have ended
+  # before a matching CONNECT, so on a vehicle it must be on storage that
+  # survives a power cycle.
+  state_file: "/tmp/tcspecial-undrawn.state"
+  # Commands to tcspecial are sent from the MOC's address, tcs_cmd.send, to
+  # tcspecial at tcs_cmd.recv, and tcspecial sends its responses back to
+  # tcs_cmd.send.
+  tcs_cmd:
+    recv: "127.0.0.28:4000"
+    send: "127.0.0.27:4100"
+
+payloads:
+  - type network:
+      # Software on this host that sends its readings over UDP.
+      - payload: sensor
+        address: "127.0.0.28:5001"
+        protocol: "udp"
+
+tcs-cfge:
+  nodes:
+    - { node: sensor, x: 34, y: 34 }

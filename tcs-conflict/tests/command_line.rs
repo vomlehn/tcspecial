@@ -45,6 +45,7 @@ fn moved(dir: &Path) -> PathBuf {
         .replace("../../tcsprotocol", "../tcsprotocol");
     for port in [
         "5650", "5550", "4200", "4300", "6100", "6000", "4000", "4100", "5001",
+        "5000", "5100",
     ] {
         text = text.replace(&format!(":{port}\""), &format!(":1{port}\""));
     }

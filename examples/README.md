@@ -135,7 +135,7 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 
 | Directory | Description |
 |---|---|
-| `minimal` | The smallest working configuration: one UDP payload whose telemetry goes straight to the ground (MOC). |
+| `minimal` | The smallest working configuration: one UDP payload whose telemetry goes to the ground (MOC) through a gateway. |
 | `beacon` | The one thing a ground station knows without asking: a window showing the spacecraft's beacon, built from the two halves any ground station would use -- `tcsmoc::beacon` to listen and `tcs-ui`'s panel to show it. |
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 | `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
@@ -150,11 +150,12 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 Its configuration, printed by tcs-cfge: [`minimal.pdf`](minimal/minimal.pdf).
 
 The smallest configuration that does anything: one payload, `sensor`, a
-program on this host at `127.0.0.28:5001` that sends its readings over UDP.
-Nothing is drawn from it, so its readings go to the ground over the
-`tcspecial` section's `payload_telemetry`: tcspecial sends each one to
-`dest_base` plus the payload's device id, `127.0.0.27:6100` for `sensor`, which
-is device 0. tcs-sim simulates `sensor`, sending a packet every second.
+program on this host at `127.0.0.28:5001` that sends its readings over UDP,
+and one gateway, `ground`, a `gateway_radio` node that takes them down. The
+sensor's `world-out` link carries each reading to `ground`, which sends it to
+its `ground_base` plus the sensor's device id: `127.0.0.27:5101`, the sensor
+being device 1 and `ground` device 0. tcs-sim simulates `sensor`, sending a
+packet of 16 bytes every second.
 
 ```
 make run-simple

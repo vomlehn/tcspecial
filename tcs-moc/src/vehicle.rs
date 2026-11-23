@@ -4541,6 +4541,15 @@ vehicle:
             .expect("the example reads")
     }
 
+    /// The fixture of a payload nothing is drawn from, which reports to the
+    /// ground over the section's `payload_telemetry`: what the minimal
+    /// example was before it had a gateway.
+    fn undrawn() -> Graph {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        Graph::load(root.join("tests/undrawn/undrawn.ytcs"))
+            .expect("the fixture reads")
+    }
+
     /// A consolidator's panel names its inputs, which it is asked
     /// QUERY_CONSOLIDATOR about, and no other panel does; its inputs, which
     /// reach the ground only in its datum, have no panels of their own.
@@ -4691,10 +4700,10 @@ vehicle:
         assert_eq!(sizes(&graph), said(&[("sensor", "6 bytes")]));
     }
 
-    /// The minimal example's sensor reports over payload_telemetry.
+    /// The undrawn fixture's sensor reports over payload_telemetry.
     #[test]
     fn an_untouched_payload_has_a_panel_too() {
-        let graph = example("minimal");
+        let graph = undrawn();
         let links = telemetry::of(&graph).expect("its links");
         let panels = panels(&graph, &links, &settable_of(&graph));
         assert_eq!(panels.len(), 1);

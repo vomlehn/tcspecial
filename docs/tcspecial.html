@@ -2985,17 +2985,21 @@ the right is the ground.</p>
 <h2><a class="toc-backref" href="#toc-entry-43">The minimal example</a></h2>
 <div class="figure">
 <object data="../examples/minimal/minimal.svg" style="width: 100%;" type="image/svg+xml">The minimal example: one UDP payload, sensor, whose readings
-tcspecial sends to the ground over the sensor's telemetry link.</object>
-<p class="caption"><tt class="docutils literal">examples/minimal</tt>: one payload, and its telemetry going to the ground.</p>
+go to the ground through ground, a radio gateway node.</object>
+<p class="caption"><tt class="docutils literal">examples/minimal</tt>: one payload, and its telemetry going to the ground
+through a gateway.</p>
 </div>
 <p>Its configuration, printed by tcs-cfge:
 <a class="reference external" href="../examples/minimal/minimal.pdf">minimal.pdf</a>.</p>
 <p>The smallest configuration that does something. It has one payload,
-<tt class="docutils literal">sensor</tt>, a UDP socket at <tt class="docutils literal">127.0.0.28:5001</tt>, and no other node: no line is
-drawn from the sensor at all. tcspecial binds the sensor's address and reads
-whatever arrives there, and sends each reading to the ground over the
-sensor's telemetry link -- from <tt class="docutils literal">127.0.0.28:6000</tt> to <tt class="docutils literal">127.0.0.27:6100</tt>, the
-two <tt class="docutils literal">payload_telemetry</tt> bases plus device id 0.</p>
+<tt class="docutils literal">sensor</tt>, a UDP socket at <tt class="docutils literal">127.0.0.28:5001</tt>, and one gateway, <tt class="docutils literal">ground</tt>, a
+<tt class="docutils literal">gateway_radio</tt> node. tcspecial binds the sensor's address and reads
+whatever arrives there, and the sensor's <tt class="docutils literal"><span class="pre">world-out</span></tt> link carries each
+reading to <tt class="docutils literal">ground</tt>, which sends it down to its <tt class="docutils literal">ground_base</tt> plus the
+sensor's device id: <tt class="docutils literal">127.0.0.27:5101</tt>, the sensor being device 1 and
+<tt class="docutils literal">ground</tt> device 0. <tt class="docutils literal">ground</tt> binds <tt class="docutils literal">127.0.0.28:5000</tt>, where what the
+ground sends up would arrive. Each reading is up to 16 bytes, its
+<tt class="docutils literal"><span class="pre">world-out-type</span></tt> says, so that what carries it down is sized for it.</p>
 <p>The comments in its <tt class="docutils literal">tcspecial</tt> section say which end of each link is which,
 and they are worth reading before writing a configuration of your own.
 Payload commands are not used by a simple payload such as this one: what it is

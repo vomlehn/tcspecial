@@ -448,7 +448,7 @@ anything.</p>
 <tr>
 <td><code>minimal</code></td>
 <td>The smallest working configuration: one UDP payload whose telemetry
-goes straight to the ground (MOC).</td>
+goes to the ground (MOC) through a gateway.</td>
 </tr>
 <tr>
 <td><code>beacon</code></td>
@@ -544,13 +544,14 @@ href="cfs/cfs.pdf"><code>cfs.pdf</code></a>.</td>
 href="minimal/minimal.pdf"><code>minimal.pdf</code></a>.</p>
 <p>The smallest configuration that does anything: one payload,
 <code>sensor</code>, a program on this host at
-<code>127.0.0.28:5001</code> that sends its readings over UDP. Nothing
-is drawn from it, so its readings go to the ground over the
-<code>tcspecial</code> section’s <code>payload_telemetry</code>:
-tcspecial sends each one to <code>dest_base</code> plus the payload’s
-device id, <code>127.0.0.27:6100</code> for <code>sensor</code>, which
-is device 0. tcs-sim simulates <code>sensor</code>, sending a packet
-every second.</p>
+<code>127.0.0.28:5001</code> that sends its readings over UDP, and one
+gateway, <code>ground</code>, a <code>gateway_radio</code> node that
+takes them down. The sensor’s <code>world-out</code> link carries each
+reading to <code>ground</code>, which sends it to its
+<code>ground_base</code> plus the sensor’s device id:
+<code>127.0.0.27:5101</code>, the sensor being device 1 and
+<code>ground</code> device 0. tcs-sim simulates <code>sensor</code>,
+sending a packet of 16 bytes every second.</p>
 <pre><code>make run-simple</code></pre>
 <p>That runs tcs-moc on the example, which starts tcspecial and tcs-sim
 itself and shows a panel for <code>sensor</code>: when its last packet

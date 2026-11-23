@@ -423,8 +423,11 @@ mod tests {
             .cloned()
             .map(|mut held| {
                 held.thing = match held.thing {
+                    // Well clear of every port the example has: a step of
+                    // one would land one port on the next, as the gateway's
+                    // 5000 on the sensor's 5001.
                     Thing::Socket(mut socket) => {
-                        socket.port = socket.port.wrapping_add(1);
+                        socket.port = socket.port.wrapping_add(10_000);
                         Thing::Socket(socket)
                     }
                     Thing::File(path) => Thing::File(path.join("other")),

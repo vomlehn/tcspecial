@@ -5,9 +5,10 @@ real tcspecial would bind an example's ports, which a test run beside the
 example itself must not.
 """
 
+import os
+import select
 import subprocess
 import sys
-import time
 import unittest
 from pathlib import Path
 
@@ -66,12 +67,15 @@ class VehicleTest(unittest.TestCase):
             stdout=subprocess.PIPE, text=True)
         pid = int(parent.stdout.readline())
         self.assertTrue(alive(pid))
-
-        parent.kill()
-        parent.wait()
-        deadline = time.monotonic() + 5
-        while alive(pid) and time.monotonic() < deadline:
-            time.sleep(0.02)
+        # Opened while the vehicle runs, so that the pid is the vehicle's
+        # and no later process's: the pidfd is readable once it exits.
+        vehicle = os.pidfd_open(pid)
+        try:
+            parent.kill()
+            parent.wait()
+            select.select([vehicle], [], [], 5)
+        finally:
+            os.close(vehicle)
         self.assertFalse(alive(pid), "the vehicle outlived its ground station")
 
     def test_a_vehicle_nobody_built_is_said_so(self):

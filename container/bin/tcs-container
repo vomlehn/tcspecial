@@ -345,11 +345,10 @@ example() {
 		# The ground stations are Python, run as python3 examples/...
 		pkill -u "$(id -u)" -f "^python3 examples/" || true
 		pkill -u "$(id -u)" -x "$programs|Xvfb" || true
-		for _ in 1 2 3 4 5 6 7 8 9 10; do
-			pgrep -u "$(id -u)" -x "$programs" > /dev/null || exit 0
-			sleep 0.5
-		done
-		pkill -KILL -u "$(id -u)" -x "$programs"
+		# pidwait waits on each one'"'"'s pidfd, returning as the last goes;
+		# what has not gone in 5 seconds is killed outright.
+		timeout 5 pidwait -u "$(id -u)" -x "$programs"
+		[ $? -ne 124 ] || pkill -KILL -u "$(id -u)" -x "$programs"
 		true'
 	# Hidden, the window goes to Xvfb's X display, so the desktop's
 	# Wayland one, which a Wayland client would take first, is not named.

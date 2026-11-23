@@ -8,6 +8,7 @@ own tests are beside them.
 
 import os
 import re
+import select
 import shutil
 import signal
 import socket
@@ -298,7 +299,9 @@ class YamcsDiesWithThisProgramTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as home:
             home = Path(home)
             (home / "bin").mkdir()
+            # A FIFO, so that the fake's pid is waited for, not looked for.
             pid_file = home / "pid"
+            os.mkfifo(pid_file)
             # A yamcsd that ends by becoming something else, as the real
             # one ends by becoming Java.
             yamcsd = home / "bin" / "yamcsd"
@@ -319,24 +322,56 @@ class YamcsDiesWithThisProgramTest(unittest.TestCase):
                 f"Yamcs({str(home)!r}, Path({str(home)!r}), {port}, "
                 "'ping').start()"])
             try:
-                deadline = time.monotonic() + 10
-                while not pid_file.exists() or not pid_file.read_text():
-                    self.assertLess(time.monotonic(), deadline,
-                                    "the fake yamcsd never started")
-                    time.sleep(0.05)
-                yamcs = int(pid_file.read_text())
-                program.send_signal(signal.SIGKILL)
-                program.wait()
-                deadline = time.monotonic() + 5
-                while alive(yamcs):
-                    if time.monotonic() > deadline:
-                        os.kill(yamcs, signal.SIGKILL)
-                        self.fail("Yamcs outlived the program that ran it")
-                    time.sleep(0.05)
+                yamcs = read_within(pid_file, 10)
+                self.assertTrue(yamcs, "the fake yamcsd never started")
+                yamcs = int(yamcs)
+                # Opened while it runs, so that the pid is the fake's and
+                # no later process's: the pidfd is readable once it exits.
+                gone = os.pidfd_open(yamcs)
+                try:
+                    program.send_signal(signal.SIGKILL)
+                    program.wait()
+                    select.select([gone], [], [], 5)
+                finally:
+                    os.close(gone)
+                if alive(yamcs):
+                    os.kill(yamcs, signal.SIGKILL)
+                    self.fail("Yamcs outlived the program that ran it")
             finally:
                 if program.poll() is None:
                     program.kill()
                     program.wait()
+
+
+def read_within(fifo, seconds):
+    """Reads what is written to a FIFO, waiting at most a while for it.
+
+    Opened without blocking, so that a writer that never comes is waited
+    for only as long as ``seconds``; Linux makes such a FIFO readable only
+    once a writer has written, or has come and gone.
+
+    Args:
+        fifo:    The FIFO.
+        seconds: How long to wait for what is written.
+
+    Returns:
+        What was written, stripped: empty if nothing was in time.
+    """
+    reader = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        said = b""
+        deadline = time.monotonic() + seconds
+        while not said.endswith(b"\n"):
+            left = deadline - time.monotonic()
+            if left <= 0 or not select.select([reader], [], [], left)[0]:
+                break
+            got = os.read(reader, 64)
+            if not got:
+                break
+            said += got
+        return said.decode().strip()
+    finally:
+        os.close(reader)
 
 
 def alive(pid):

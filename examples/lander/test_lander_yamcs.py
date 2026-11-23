@@ -9,6 +9,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from pathlib import Path
@@ -329,6 +330,8 @@ class Shown(unittest.TestCase):
         """Restart sends the gateway's command with a count that differs
         each time, from one to 255 and round again."""
         sent = []
+        # Set once every restart is sent: Uplink sends from a thread.
+        all_sent = threading.Event()
 
         class Yamcs:
             """A Yamcs that keeps what it is asked to send."""
@@ -341,16 +344,15 @@ class Shown(unittest.TestCase):
                     args:    Its arguments.
                 """
                 sent.append((command, args))
+                if len(sent) == 256:
+                    all_sent.set()
 
         restarter = lander_yamcs.Restarter(
             lander_yamcs.Uplink(Yamcs(), "/TcsYamcs/gateway", "restart"))
         said = [restarter.restart()["Data"] for _ in range(256)]
         self.assertEqual(said[:2], ["01", "02"])
         self.assertEqual(said[254:], ["ff", "01"])
-        for _ in range(100):
-            if len(sent) == 256:
-                break
-            time.sleep(0.01)
+        self.assertTrue(all_sent.wait(5), "every restart is sent")
         self.assertEqual(sent[0], ("/TcsYamcs/gateway",
                                    {"Data": "01", "DataBits": 8}))
 

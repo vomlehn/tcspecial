@@ -133,9 +133,9 @@ one for each axis, and the ground watches through
 `Yamcs <https://yamcs.org>`__, a mission control system, with everything
 between them delayed 1.3 seconds each way, as light from the Moon is.
 Fly it from the joystick in tcs-sim's window: press in its square and
-drag along an arm. Land on the pad at no more than 3.05 m/s down and
-1.22 m/s across, the Apollo lunar module's limits; then lift off again if
-you like. Autoland flies it for you.
+drag along an arm. Land on the pad at no more than 6.1 m/s down and
+2.44 m/s across, twice the Apollo lunar module's limits; then lift off
+again if you like. Autoland flies it for you.
 
 It needs Yamcs, which runs on Java. Install a Java runtime --
 ``default-jre-headless`` on Ubuntu, ``java-25-openjdk-headless`` on

@@ -716,7 +716,7 @@ it over the pad and another into the drift allowed; along Y, the change that
 lands it at the pad's height, at no more than the landing speed, between
 thrust spent all at the start and all at the end. The least over ``T``, up
 to 600 s, is the bound (``landing_rating``). The autopilot, which is
-cautious, rates about 52 % on the shipped landscape.
+cautious, rates about 48 % on the shipped landscape.
 
 Requirement
     In a web page on a small screen, where the page shows none of the

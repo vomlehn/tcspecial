@@ -55,9 +55,10 @@ world:
               5.25,8.25 3.75,13.5 | -16.5,19.5 -20.25,3 | -13.5,13.5 -20.25,3
               | -22.5,0 -18,0 -20.25,3 -22.5,0 | 16.5,19.5 20.25,3 | 13.5,13.5
               20.25,3 | 22.5,0 18,0 20.25,3 22.5,0 m"
-            # The Apollo lunar module's touchdown limits.
-            landing_speed: "3.05 m/s"
-            landing_drift: "1.22 m/s"
+            # Twice the Apollo lunar module's touchdown limits, 3.05 m/s
+            # down and 1.22 m/s across, so that more visitors land.
+            landing_speed: "6.1 m/s"
+            landing_drift: "2.44 m/s"
             pause: "5 s"
             # How long it stands on the pad after a landing before it
             # starts again, unless it lifts off first.

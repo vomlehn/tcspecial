@@ -137,9 +137,9 @@ Touchdown
 
 The lander touches down the moment any part of its outline first meets a
 line of the terrain or the pad. It has landed if both its feet are on the pad,
-nothing of it touches the terrain, and it is moving no faster than the
-Apollo lunar module's touchdown limits: 3.05 m/s downward and 1.22 m/s
-sideways. Anything else that touches has crashed. A lander that leaves the
+nothing of it touches the terrain, and it is moving no faster than twice
+the Apollo lunar module's touchdown limits: 6.1 m/s downward and 2.44 m/s
+sideways, doubled so that more visitors land. Anything else that touches has crashed. A lander that leaves the
 display flies on out of sight, and has crashed only if it drops below the
 display's bottom line, which goes on indefinitely to the left and right.
 

@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.10.0
+TCS_HELPERS_REQUIRED := 0.12.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcsprotocol/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -344,6 +344,13 @@ tcs-helpers:
 		exit 1; \
 	fi
 	@"$(TCS_HELPERS)/bin/tcs-helpers" --require $(TCS_HELPERS_REQUIRED)
+
+# Fail where the Rust this would be built with is not the newest stable:
+# see "The newest stable Rust" in tcs-helpers' README. rust-toolchain.toml
+# keeps the build on the stable channel; this notices a newer release.
+.PHONY: rust-current
+rust-current: tcs-helpers
+	"$(TCS_HELPERS)/bin/rust-current"
 
 # Run the tcspecial application
 .PHONY: run
@@ -1454,6 +1461,7 @@ endif
 # categories.toml puts every directory in a category.
 .PHONY: check
 check:
+	@$(MAKE) --no-print-directory rust-current
 	@echo "Running cargo check..."
 	cd $(RUST) && cargo check
 	cd $(RUST) && cargo clippy --workspace --all-targets -- -D warnings

@@ -150,7 +150,8 @@ on, the face gone, and may land again or crash. After a crash the lander
 stays down until Restart or until a pause has run, and then starts again
 at the upper left with a full tank; a landed lander that stays on the pad
 for its pad wait, 10 s, starts again the same way. Autoland flies each
-flight that starts by itself.
+flight that starts by itself, unless a hand flew any of the flight before
+it.
 
 The vehicles
 ============

@@ -1061,8 +1061,9 @@ both. From the top:
   flight's first two seconds, the rating says *w/ Autoland*: a flight that
   starts by itself is Autoland's until the joystick is taken, and taking
   it at once is flying it by hand. The rating stays until the lander starts
-  again, and then fades over three seconds into the next flight. A crash
-  is not rated. In a web page on a small screen, while none of the
+  again or lifts off the pad, and then fades over three seconds. A crash
+  is not rated, and nor is anything flown after a lift-off from the pad:
+  rating begins again with the next flight the lander starts. In a web page on a small screen, while none of the
   panels is on the screen and nobody is flying the lander, the top of the
   picture says how to reach them: *Drag up for the MOC's view, 1.3 s late*,
   *Drag left for the Moon's, live*.
@@ -1115,9 +1116,12 @@ At the foot of the pane are two buttons:
 
   The autopilot flies every flight the lander starts again by itself: after a crash, once the lander's pause has run, and
   after a landing, once it has stood on the pad for its pad wait, 10 s,
-  with nobody lifting it off meanwhile. So a booth nobody is at keeps
-  flying itself, and anyone who takes the joystick takes over, Autoland
-  going off. Greyed out where the world has no joystick.
+  with nobody lifting it off meanwhile -- unless a hand flew any of the
+  flight just ended, taking hold of the joystick or switching Autoland
+  off. So a visitor who lets go at touchdown keeps the next flight, a
+  booth nobody is at flies itself again once a flight nobody flew has
+  ended, and anyone who takes the joystick takes over, Autoland going
+  off. Greyed out where the world has no joystick.
 
 Each of the lander's engines shows a plume while it fires -- the bottom
 engine's below its nozzle, a side thruster's out of the body's side, away

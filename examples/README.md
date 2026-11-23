@@ -855,14 +855,16 @@ dropping below the display's bottom line off either side, is a crash.
 Each landing is rated in tcs-sim's picture as *Efficiency N%*: the least
 propellant any pilot could have landed with from where the lander was
 taken over, over what was used, with *w/ Autoland* where Autoland flew it
-after the flight's first two seconds. The
+after the flight's first two seconds; a lift-off from the pad is not
+rated, until the lander starts again. The
 lander has no thrust down, so its joystick has no arm below its middle. A
 landing does not end the flight: the lander stands on the pad, a smiling
 face drawn over it, until thrust greater than its weight lifts it off
 again, or until it has stood there 10 s and starts again. After a crash
 the lander stays down until Restart, or starts again by itself with a full
 tank after a pause. Each flight that starts by itself, tcs-sim's Autoland
-flies, until someone takes the joystick.
+flies, until someone takes the joystick, unless someone flew any of the
+flight before it by hand.
 
 `lander/lander_yamcs.py` is the ground station. It makes a landscape at
 random from a seed -- `--seed N`, or one it chooses and says -- and writes

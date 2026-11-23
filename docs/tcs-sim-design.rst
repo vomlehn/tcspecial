@@ -682,20 +682,25 @@ Requirement
     *Efficiency N%*: the least propellant any pilot could have landed with,
     from the state the lander was taken in, over what was used; and as
     *Efficiency N% w/ Autoland* where Autoland flew it after the flight's
-    first 2 s. It stays whole until the lander starts again and then fades
-    over 3 s of the window's clock, which stops while paused. A crash is not
-    rated.
+    first 2 s. It stays whole until the lander starts again or lifts off the
+    pad, and then fades over 3 s of the window's clock, which stops while
+    paused. A crash is not rated, nor anything flown after a lift-off from
+    the pad, until the lander starts again.
 
 The state a flight is rated from is the lander's place, speeds and mass as a
 hand first took it -- from Autoland as the joystick was taken hold of -- or
 as the flight began where no hand took it, a flight beginning as the lander
-starts or lifts off the pad; so a landing from high and far away is not
+starts; so a landing from high and far away is not
 marked down for where it began. A flight that starts by itself is
 Autoland's until the joystick is taken, so Autoland's first 2 s are not
 counted against it: taken at once, it was flown by hand. Autoland flying it
 from one look at the lander to the next is counted to the second look, so a
 hand taking it at 3 s took it from Autoland that had flown past 2 s
-(``followed``).
+(``followed``). A lift-off after a landing is followed as ``Unrated``
+until the next start, so that a landing is not followed by a second,
+easier one from the pad. A restart chooses who flies before the flight is
+followed, so that a flight Autoland starts is seen as Autoland's from its
+first look, and the hand that takes it later is where it is rated from.
 Propellant is counted as the change of velocity it buys: fuel flows as
 ``|Fx| + |Fy|``, so by the rocket equation the mass falls as ``exp(-D/ve)``,
 ``D`` being the integral of ``|ax| + |ay|``, and what was used is ``ve

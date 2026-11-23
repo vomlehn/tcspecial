@@ -1350,6 +1350,9 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
     // Whether the joystick is held now, by the pointer: a lander that starts
     // again meanwhile is being flown, and the joystick does not beckon.
     let holding = Rc::new(Cell::new(false));
+    // Whether a hand has flown the lander since it last started again: taken
+    // hold of the joystick, or switched Autoland off. See `flown`.
+    let handled = Rc::new(Cell::new(false));
     pane.set_has_joystick_3_4(scene.joystick_3_4.is_some());
     {
         let held = Rc::clone(&scene);
@@ -1373,12 +1376,14 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let flying = Rc::clone(&pilot);
         let weak = ui.as_weak();
         let beckon = Rc::clone(&beckoning);
+        let hand = Rc::clone(&handled);
         pane.on_autoland_clicked(move || {
             beckon.set(false);
             let Some(ui) = weak.upgrade() else { return };
             let mut flying = flying.borrow_mut();
             if flying.take().is_some() {
                 // Let go of, as a pilot letting go would.
+                hand.set(true);
                 hold_stick(&ui, &held, stick, (0.0, 0.0));
             } else {
                 *flying = Some(Autopilot::default());
@@ -1392,6 +1397,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let weak = ui.as_weak();
         let beckon = Rc::clone(&beckoning);
         let hold = Rc::clone(&holding);
+        let hand = Rc::clone(&handled);
         pane.on_stick_moved(move |dx, dy| {
             // Paused, the joystick takes nothing: the window does not take
             // hold of it either.
@@ -1400,6 +1406,7 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             }
             beckon.set(false);
             hold.set(true);
+            hand.set(true);
             // The pilot takes over from the autopilot.
             if flying.borrow_mut().take().is_some() {
                 if let Some(ui) = weak.upgrade() {
@@ -1467,10 +1474,10 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         let had_fuel = Cell::new(f64::INFINITY);
         // The flight being followed, for its landing's rating: see
         // `followed` and landing_rating.rs.
-        let flight: Cell<Option<Flight>> = Cell::new(None);
+        let flight = Cell::new(Followed::Waiting);
         // When, on the window's clock, the last rating began to fade: from
-        // the moment the lander starts again after it. None while it is
-        // shown whole, or not shown.
+        // the moment the lander starts again or lifts off after it. None
+        // while it is shown whole, or not shown.
         let fading_since: Cell<Option<f64>> = Cell::new(None);
         // Whether the page shows none of the panels -- neither those beside
         // the pane nor another window -- as it last said; and whether it
@@ -1500,28 +1507,24 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             let before = was.replace(now);
             let refuelled = out[FUEL] > had_fuel.replace(out[FUEL]) + 1e-9;
             let after_crash = before == Stopped::Crashed && now != before;
-            rate(
-                &ui,
-                &scene,
-                &out,
-                (before, now),
-                pilot.borrow().is_some(),
-                after_crash || refuelled,
-                (&flight, &fading_since),
-                seconds,
-            );
-            if after_crash || refuelled {
+            let restarted = after_crash || refuelled;
+            if restarted {
                 // Started again. After a crash or from the pad, which is how
                 // the lander starts again by itself, the autopilot flies the
                 // next flight, so that a booth nobody is at flies itself;
-                // taking hold of the joystick hands it back.
+                // taking hold of the joystick hands it back. A visitor who
+                // flew any of the last flight by hand keeps the next, even
+                // having let go at touchdown.
                 let idle = pilot.borrow().is_none()
                     && !holding.get()
                     && scene.joystick_3_4.is_some();
-                if flown(before, idle) {
+                if flown(before, idle, handled.get()) {
                     *pilot.borrow_mut() = Some(Autopilot::default());
                     ui.global::<LanderScene>().set_autoland(true);
                 }
+                // The new flight is a hand's from its start only if the
+                // joystick is held as it starts.
+                handled.set(holding.get());
                 // Nobody has done anything since it started again, so the
                 // joystick beckons, whoever flies it, until someone takes
                 // hold of the joystick or presses a button.
@@ -1529,6 +1532,19 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
                     beckoning.set(true);
                 }
             }
+            // Rated after the restart has chosen who flies, so that a flight
+            // Autoland starts is followed as Autoland's from its first look,
+            // and the hand that takes it later is where it is rated from.
+            rate(
+                &ui,
+                &scene,
+                &out,
+                (before, now),
+                pilot.borrow().is_some(),
+                restarted,
+                (&flight, &fading_since),
+                seconds,
+            );
             let pane = ui.global::<LanderScene>();
             pane.set_beckon(beckoning.get());
             pane.set_beckon_lit(beckoning.get() && beckon_lit(seconds));
@@ -1574,8 +1590,7 @@ struct Flight {
     /// What the landing is rated from: the lander as the joystick was
     /// first taken, or as the flight began where nobody has taken it.
     from: rating::State,
-    /// When the flight began, on the window's clock: at the lander's start,
-    /// or as it lifted off the pad.
+    /// When the flight began, on the window's clock: at the lander's start.
     began: f64,
     /// Whether a hand has flown it since it began.
     handed: bool,
@@ -1584,6 +1599,20 @@ struct Flight {
     /// Whether Autoland flew it at the last look: it flew it from then
     /// until this one.
     autoland: bool,
+}
+
+/// What is followed of the lander, for its landing's rating.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Followed {
+    /// Nothing yet: the next flight to begin is followed, as the lander
+    /// starts, or lifts off other than after a landing.
+    Waiting,
+    /// A flight, to rate as it lands.
+    Rated(Flight),
+    /// Nothing until the lander starts again: it has lifted off after a
+    /// landing, whose rating it has begun to fade, and what it does
+    /// until then is not rated.
+    Unrated,
 }
 
 /// A landing to rate: what from, and whether Autoland flew it after its
@@ -1597,13 +1626,14 @@ struct Landing {
 }
 
 /// Follows a flight from one look at the lander to the next: begins one as
-/// the lander starts or lifts off, notes the first hand on the joystick and
-/// Autoland flying past its grace, and ends it as the lander lands, crashes
-/// or starts again.
+/// the lander starts, notes the first hand on the joystick and Autoland
+/// flying past its grace, and ends it as the lander lands, crashes or starts
+/// again. A lift-off after a landing begins nothing: no flight is rated
+/// until the lander starts again.
 ///
 /// # Arguments
 ///
-/// * `flight`        - The flight followed so far, if any.
+/// * `flight`        - What was followed so far.
 /// * `(before, now)` - How the lander was at the last look, and how it is.
 /// * `autoland`      - Whether Autoland flies it now.
 /// * `restarted`     - Whether it has just started again.
@@ -1612,33 +1642,49 @@ struct Landing {
 ///
 /// # Returns
 ///
-/// The flight followed now, and the landing to rate, where it has just
+/// What is followed now, and the landing to rate, where it has just
 /// landed.
 fn followed(
-    flight: Option<Flight>,
+    flight: Followed,
     (before, now): (Stopped, Stopped),
     autoland: bool,
     restarted: bool,
     state: rating::State,
     seconds: f64,
-) -> (Option<Flight>, Option<Landing>) {
-    let flight = flight.filter(|_| !restarted);
-    let landing = flight
-        .filter(|_| before == Stopped::Flying && now == Stopped::Pad)
-        .map(|f| Landing {
-            from: f.from,
-            assisted: f.assisted,
-        });
+) -> (Followed, Option<Landing>) {
+    let flight = if restarted { Followed::Waiting } else { flight };
+    let landing = match flight {
+        Followed::Rated(f)
+            if before == Stopped::Flying && now == Stopped::Pad =>
+        {
+            Some(Landing {
+                from: f.from,
+                assisted: f.assisted,
+            })
+        }
+        _ => None,
+    };
     if now != Stopped::Flying {
-        return (None, landing);
+        let kept = match flight {
+            Followed::Unrated => Followed::Unrated,
+            _ => Followed::Waiting,
+        };
+        return (kept, landing);
     }
-    let mut f = flight.unwrap_or(Flight {
-        from: state,
-        began: seconds,
-        handed: !autoland,
-        assisted: false,
-        autoland,
-    });
+    let mut f = match flight {
+        Followed::Rated(f) => f,
+        Followed::Unrated => return (Followed::Unrated, None),
+        Followed::Waiting if before == Stopped::Pad && !restarted => {
+            return (Followed::Unrated, None);
+        }
+        Followed::Waiting => Flight {
+            from: state,
+            began: seconds,
+            handed: !autoland,
+            assisted: false,
+            autoland,
+        },
+    };
     if !autoland && !f.handed {
         f.from = state;
         f.handed = true;
@@ -1649,18 +1695,18 @@ fn followed(
         f.assisted = true;
     }
     f.autoland = autoland;
-    (Some(f), landing)
+    (Followed::Rated(f), landing)
 }
 
-/// Rates each landing, and fades the rating once the lander starts again:
-/// see landing_rating.rs.
+/// Rates each landing, and fades the rating once the lander starts again or
+/// lifts off: see landing_rating.rs.
 ///
 /// A landing is rated from the moment a hand first took the lander --
 /// from Autoland, as the joystick was taken hold of, or as it started with
-/// Autoland off -- or from the start of the flight where no hand did; a
-/// lift-off from the pad begins another. Where Autoland flew it after its
-/// first [`AUTOLAND_GRACE`] the rating says so: *w/ Autoland*. A crash is
-/// not rated.
+/// Autoland off -- or from the start of the flight where no hand did. Where
+/// Autoland flew it after its first [`AUTOLAND_GRACE`] the rating says so:
+/// *w/ Autoland*. A crash is not rated, and nor is a landing after a
+/// lift-off from the pad: rating begins again with the next start.
 ///
 /// # Arguments
 ///
@@ -1681,7 +1727,7 @@ fn rate(
     states: (Stopped, Stopped),
     autoland: bool,
     restarted: bool,
-    (flight, fade): (&Cell<Option<Flight>>, &Cell<Option<f64>>),
+    (flight, fade): (&Cell<Followed>, &Cell<Option<f64>>),
     seconds: f64,
 ) {
     let pane = ui.global::<LanderScene>();
@@ -1702,7 +1748,11 @@ fn rate(
         pane.set_rating_shown(1.0);
         fade.set(None);
     }
-    if restarted && pane.get_rating_shown() > 0.0 && fade.get().is_none() {
+    let lifted = states == (Stopped::Pad, Stopped::Flying);
+    if (restarted || lifted)
+        && pane.get_rating_shown() > 0.0
+        && fade.get().is_none()
+    {
         fade.set(Some(seconds));
     }
     if let Some(since) = fade.get() {
@@ -1760,19 +1810,23 @@ enum Stopped {
 
 /// Says whether the autopilot flies the lander as it starts again: after a
 /// crash or from the pad, which is how the lander starts again by itself,
-/// and only while nobody flies it.
+/// and only while nobody flies it, nor flew any of the flight just ended:
+/// a visitor who let go at touchdown keeps the next flight, and a booth
+/// left alone flies itself again once a flight nobody flew has ended.
 ///
 /// # Arguments
 ///
-/// * `before` - How it was before it started again.
-/// * `idle`   - Whether nobody flies it now, neither the autopilot nor a
-///              hand on the joystick, and there is a joystick.
+/// * `before`  - How it was before it started again.
+/// * `idle`    - Whether nobody flies it now, neither the autopilot nor a
+///               hand on the joystick, and there is a joystick.
+/// * `handled` - Whether a hand flew any of the flight just ended: took
+///               hold of the joystick, or switched Autoland off.
 ///
 /// # Returns
 ///
 /// Whether the autopilot takes it.
-fn flown(before: Stopped, idle: bool) -> bool {
-    matches!(before, Stopped::Crashed | Stopped::Pad) && idle
+fn flown(before: Stopped, idle: bool, handled: bool) -> bool {
+    matches!(before, Stopped::Crashed | Stopped::Pad) && idle && !handled
 }
 
 /// How far round the joystick a touch is the joystick's, in logical
@@ -2289,11 +2343,15 @@ pub(crate) mod tests {
     #[test]
     fn a_restart_by_itself_is_flown_by_the_autopilot() {
         use Stopped::{Crashed, Flying, Pad};
-        assert!(flown(Crashed, true));
-        assert!(flown(Pad, true));
-        assert!(!flown(Crashed, false));
-        assert!(!flown(Pad, false));
-        assert!(!flown(Flying, true));
+        assert!(flown(Crashed, true, false));
+        assert!(flown(Pad, true, false));
+        assert!(!flown(Crashed, false, false));
+        assert!(!flown(Pad, false, false));
+        assert!(!flown(Flying, true, false));
+        // A visitor who flew any of the last flight keeps the next, though
+        // they let go at touchdown.
+        assert!(!flown(Pad, true, true));
+        assert!(!flown(Crashed, true, true));
     }
 
     /// A paused world's joystick still moves when it is driven by hand, so
@@ -2658,22 +2716,28 @@ pub(crate) mod tests {
         assert!((0.05..1.0).contains(&share), "{share}");
     }
 
-    /// Follows one flight through `followed`, a look at each step: each
-    /// step the window's clock, whether Autoland flies, and how the lander
-    /// is, the lander's place along Y standing for its state.
+    /// Follows flights through `followed`, a look at each step: each step
+    /// the window's clock, whether Autoland flies, whether the lander has
+    /// just started again, and how it is, its place along Y standing for
+    /// the look it was taken at.
     ///
     /// # Arguments
     ///
-    /// * `steps` - Each look: the clock, Autoland, and the lander's state.
+    /// * `steps` - Each look: the clock, Autoland, a restart, and the
+    ///             lander's state.
     ///
     /// # Returns
     ///
-    /// The landing rated, if the flight landed.
-    fn flown_by(steps: &[(f64, bool, Stopped)]) -> Option<Landing> {
-        let mut flight = None;
+    /// Each landing, rated or not: None for one that is not.
+    fn followed_by(
+        steps: &[(f64, bool, bool, Stopped)],
+    ) -> Vec<Option<Landing>> {
+        let mut flight = Followed::Waiting;
         let mut before = Stopped::Flying;
-        let mut landed = None;
-        for (n, &(seconds, autoland, now)) in steps.iter().enumerate() {
+        let mut landings = Vec::new();
+        for (n, &(seconds, autoland, restarted, now)) in
+            steps.iter().enumerate()
+        {
             let state = rating::State {
                 at: (0.0, n as f64),
                 velocity: (0.0, 0.0),
@@ -2683,15 +2747,35 @@ pub(crate) mod tests {
                 flight,
                 (before, now),
                 autoland,
-                false,
+                restarted,
                 state,
                 seconds,
             );
             flight = next;
-            landed = landed.or(landing);
+            if before == Stopped::Flying && now == Stopped::Pad {
+                landings.push(landing);
+            }
             before = now;
         }
-        landed
+        landings
+    }
+
+    /// Follows one flight through `followed`, with no restart in it: see
+    /// [`followed_by`].
+    ///
+    /// # Arguments
+    ///
+    /// * `steps` - Each look: the clock, Autoland, and the lander's state.
+    ///
+    /// # Returns
+    ///
+    /// The first landing's rating, if the flight landed and was rated.
+    fn flown_by(steps: &[(f64, bool, Stopped)]) -> Option<Landing> {
+        let steps: Vec<_> = steps
+            .iter()
+            .map(|&(t, a, now)| (t, a, false, now))
+            .collect();
+        followed_by(&steps).into_iter().flatten().next()
     }
 
     /// A landing is rated from the first hand on the joystick, and as made
@@ -2735,41 +2819,62 @@ pub(crate) mod tests {
         // A crash is not rated.
         let crash = [(0.0, false, Flying), (5.0, false, Crashed)];
         assert_eq!(flown_by(&crash), None);
-        // A lift-off from the pad begins another flight, its grace and its
-        // hand counted afresh: Autoland at 10 s, past the first flight's
-        // start, is within the second's first two seconds.
+    }
+
+    /// A lift-off after a landing is not rated, nor anything until the
+    /// lander starts again, from the pad or after a crash; then the next
+    /// flight is, its grace and its hand counted afresh from its start.
+    #[test]
+    fn a_lift_off_is_not_rated_until_the_next_start() {
+        use Stopped::{Crashed, Flying, Pad};
         let again = [
-            (0.0, false, Flying),
-            (5.0, false, Pad),
-            (9.0, false, Flying),
-            (10.0, true, Flying),
-            (10.5, false, Flying),
-            (14.0, false, Pad),
+            (0.0, false, false, Flying),
+            (5.0, false, false, Pad),
+            // Lifted off by hand, and landed again: not rated.
+            (9.0, false, false, Flying),
+            (12.0, false, false, Pad),
+            // Lifted off again, and crashed: still nothing.
+            (13.0, false, false, Flying),
+            (15.0, false, false, Crashed),
+            // Started again after the crash: rated once more, from the
+            // start, Autoland's at 20 s within its first two seconds.
+            (19.0, false, true, Flying),
+            (20.0, true, false, Flying),
+            (20.5, false, false, Flying),
+            (25.0, false, false, Pad),
+            // Started again from the pad: rated too.
+            (35.0, false, true, Flying),
+            (40.0, false, false, Pad),
         ];
-        let mut flight = None;
-        let mut before = Stopped::Flying;
-        let mut last = None;
-        for (n, &(seconds, autoland, now)) in again.iter().enumerate() {
-            let state = rating::State {
-                at: (0.0, n as f64),
-                velocity: (0.0, 0.0),
-                mass: 1000.0,
-            };
-            let (next, landing) = followed(
-                flight,
-                (before, now),
-                autoland,
-                false,
-                state,
-                seconds,
-            );
-            flight = next;
-            last = landing.or(last);
-            before = now;
-        }
-        let landed = last.expect("the second landing rated");
-        assert!(!landed.assisted, "within the second flight's grace");
-        assert_eq!(landed.from.at.1, 2.0, "from the lift-off");
+        let landings = followed_by(&again);
+        assert_eq!(landings.len(), 4);
+        assert!(landings[0].is_some(), "the first landing");
+        assert_eq!(landings[1], None, "after a lift-off");
+        let third = landings[2].expect("after the crash's restart");
+        assert!(!third.assisted, "within the new flight's grace");
+        assert_eq!(third.from.at.1, 6.0, "from the restart");
+        let fourth = landings[3].expect("after the pad's restart");
+        assert_eq!(fourth.from.at.1, 10.0, "from the restart");
+    }
+
+    /// A flight Autoland starts at a restart is rated from the hand that
+    /// takes it later, not from the start: the restart chooses the pilot
+    /// before the flight is followed, so its first look sees Autoland.
+    #[test]
+    fn a_restart_flown_by_autoland_is_rated_from_the_hand() {
+        use Stopped::{Crashed, Flying, Pad};
+        let taken = [
+            (0.0, false, false, Flying),
+            (4.0, false, false, Crashed),
+            (8.0, true, true, Flying),
+            (9.0, true, false, Flying),
+            (12.0, false, false, Flying),
+            (20.0, false, false, Pad),
+        ];
+        let landings = followed_by(&taken);
+        let landed = landings[0].expect("rated");
+        assert_eq!(landed.from.at.1, 4.0, "from the hand, at 12 s");
+        assert!(landed.assisted, "Autoland flew it past two seconds");
     }
 
     /// A rating fades over three seconds of the window's clock, from whole

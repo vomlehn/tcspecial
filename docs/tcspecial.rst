@@ -2947,7 +2947,7 @@ which starts the lander again. A landed lander stands on the pad until
 thrust greater than its weight lifts it off again. The lander starts
 again by itself, with a full tank, after a pause following a crash, or
 after 10 s on the pad following a landing, and tcs-sim's Autoland flies
-it.
+it, unless a hand flew any of the flight before.
 Each command reaches the lander 1.3 s after it is sent, and is seen 1.3 s
 after that.
 

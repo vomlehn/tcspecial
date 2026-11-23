@@ -532,13 +532,16 @@ Backspace; a right click on it opens a menu whose one item is **Delete**.
 Subdiagrams
 ===========
 
-A configuration's included files are its subdiagrams. On the top page each is
-a box, drawn in the Vehicle pane under the subdiagram's name, whose four
-corner terminals are its edge: what of it the files around it may join, as
-its ``exports`` section says (see `the tcspecial manual <tcspecial.html>`__).
-The ``subdiagram`` entry, under **Pages** in the vehicle list, places a new
-one, which tcs-cfge writes to a file of its own beside the top file, in the top
-file's format, and names in the top file's ``include`` list.
+A configuration's included files are its subdiagrams, and they nest: a
+subdiagram may include subdiagrams of its own. On the page of the file that
+includes it each is a box, drawn in the Vehicle pane under the subdiagram's
+name, whose four corner terminals are its edge: what of it the files around it
+may join, as its ``exports`` section says (see `the tcspecial manual
+<tcspecial.html>`__). A node inside a box, however deep, is drawn at the box,
+and the box counts everything inside it. The ``subdiagram`` entry, under
+**Pages** in the vehicle list, places a new one on the page you are on, which
+tcs-cfge writes to a file of its own beside that page's file, in the top
+file's format, and names in that file's ``include`` list.
 
 **Open** in the box's menu, or the mark in the middle of its bottom edge,
 opens its page in a window like the main one, with the same panes, lists,
@@ -554,8 +557,9 @@ joined to the edge by a line labelled *not joined outside*.
 
 Lines are drawn across the edge with the same three clicks:
 
-* on the top page, clicking a box with a line in hand offers a line to each
-  node its file exports at that terminal, and a line taken from a box's
+* on any page, clicking a box with a line in hand offers a line to each
+  node its file exports at that terminal, a node of a subdiagram inside it
+  among them where its file passes one on, and a line taken from a box's
   terminal offers one from each exported node. A box that exports nothing
   there offers no menu, and the window says to open it and join a node to
   its edge;
@@ -564,7 +568,10 @@ Lines are drawn across the edge with the same three clicks:
   outside there or to hide it again, and a new line to each node outside that
   can take it. Hiding is greyed, saying why, while a line from another file
   joins the node there. Showing, hiding and the line made with a showing are
-  each one edit, and are written into the file's ``exports``.
+  each one edit, and are written into the file's ``exports``. A line to a
+  node outside, from deep inside nested subdiagrams, shows the node at every
+  edge it leaves by, in that one edit; and a node inside other subdiagrams is
+  offered only where each of them shows it.
 
 tcs-cfge writes each node, group and command binding back to the file it was
 read from.

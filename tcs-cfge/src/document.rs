@@ -305,6 +305,18 @@ pub struct Moved {
     pub text: String,
 }
 
+/// Where a node is drawn, seen from a page: see [`Document::seen_on`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Seen {
+    /// On the page itself.
+    Here,
+    /// Inside the box of the subdiagram named, which is on the page; the
+    /// node may be in it or in a subdiagram inside it.
+    InBox(String),
+    /// Outside the page altogether, drawn at its edge.
+    Outside,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Document {
     /// The concerns somebody has decided not to act on, by node and kind.
@@ -726,6 +738,70 @@ impl Document {
         file
     }
 
+    /// Where a node on one page is seen from another: on it, inside one of
+    /// its boxes at any depth, or outside it altogether.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The page the node is on.
+    /// * `page` - The page it is seen from.
+    ///
+    /// # Returns
+    ///
+    /// Where it is drawn on `page`.
+    pub fn seen_on(&self, home: &Home, page: &Home) -> Seen {
+        if home == page {
+            return Seen::Here;
+        }
+        let around = self.subdiagrams_around(home);
+        // The box it is in on this page is the subdiagram just inside the
+        // page on the way out from the node's own: the outermost one, from
+        // the top page.
+        let boxed = match page {
+            None => around.last().cloned(),
+            Some(page) => around
+                .iter()
+                .position(|name| name == page)
+                .and_then(|at| at.checked_sub(1))
+                .map(|at| around[at].clone()),
+        };
+        boxed.map_or(Seen::Outside, Seen::InBox)
+    }
+
+    /// Whether a page is a subdiagram or inside one, at any depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `home`       - The page.
+    /// * `subdiagram` - The subdiagram.
+    ///
+    /// # Returns
+    ///
+    /// `true` where the page is the subdiagram or one inside it.
+    pub fn is_inside(&self, home: &Home, subdiagram: &str) -> bool {
+        self.subdiagrams_around(home)
+            .iter()
+            .any(|name| name == subdiagram)
+    }
+
+    /// A node's absolute name, from its own: a node's name is its own across
+    /// every file, so the name a file writes, in an `exports` list or a link,
+    /// says which node and so which page.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The node's own name, as a file writes it.
+    ///
+    /// # Returns
+    ///
+    /// Its absolute name, or `None` for a name no node has.
+    pub fn absolute_of(&self, name: &str) -> Option<String> {
+        self.nodes
+            .iter()
+            .find(|node| node.name == name && node.node_type != "subdiagram")
+            .map(|node| Qualified::of(&node.name, &node.home).absolute())
+    }
+
     /// The page whose file includes a subdiagram: the page its box is drawn
     /// on.
     ///
@@ -850,7 +926,8 @@ impl Document {
     }
 
     /// What a subdiagram's file says it exports, as it is written: each
-    /// list in order of name, and only the nodes the file has.
+    /// list in order of name, and only the nodes inside it, its own or a
+    /// subdiagram's within it.
     ///
     /// # Arguments
     ///
@@ -864,17 +941,19 @@ impl Document {
         &self,
         home: &Home,
     ) -> Option<tcsprotocol::graph::exports::Exports> {
-        let said = self.exports.get(home.as_ref()?)?;
+        let name = home.as_ref()?;
+        let said = self.exports.get(name)?;
+        // A node of the file, or of a subdiagram inside it at any depth,
+        // which the file passes outwards: what the reader allows.
         let kept = |nodes: &Vec<String>| {
             let mut kept: Vec<String> = nodes
                 .iter()
                 .filter(|node| {
-                    let absolute = Qualified {
-                        in_: home.clone(),
-                        node: (*node).clone(),
-                    }
-                    .absolute();
-                    self.node(&absolute).is_some_and(|n| &n.home == home)
+                    self.nodes.iter().any(|n| {
+                        &n.name == *node
+                            && n.node_type != "subdiagram"
+                            && self.is_inside(&n.home, name)
+                    })
                 })
                 .cloned()
                 .collect();

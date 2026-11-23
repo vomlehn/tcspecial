@@ -1591,6 +1591,19 @@ binding back to the file it was read from. A subdiagram is renamed as a node
 is, its box being its name: its nodes, the lines to them and its exports go
 with the name, and its file stays where its path says.
 
+Subdiagrams nest. A box is drawn on the page of the file that includes it,
+which may be another subdiagram's, and that file's ``include`` list names it,
+with its path from that file's directory; a box placed on a subdiagram's page
+gets a file beside that subdiagram's. Each page draws its own nodes, a node
+inside one of its boxes at that box however deep it is, and a node outside it
+at its edge (``Document::seen_on``). A box is found by its name on whichever
+page it is on, a subdiagram's name being its own across every file, and what
+a box counts is what is inside it at any depth. A box drawn inside its own
+subdiagram, which no file can say and the reader refuses, stops the walk out
+through the pages that include a page where it would come round
+(``Document::subdiagrams_around``), so that nothing walks for ever while
+somebody is still drawing.
+
 A line that crosses into or out of a subdiagram is drawn to the subdiagram's
 edge on both sides of it -- see `Configuration
 <tcspecial-design.html#configuration>`__ for ``exports``, which says what of an
@@ -1608,8 +1621,13 @@ same, its line labelled *not joined outside*, because the edge shows what may
 be joined at it and a node shown there with no line would look like one that
 is not. In the margins rather than over the panes, which are where nodes go:
 an edge drawn over the payload pane's first column would be drawn over the
-payloads in it. A line between two subdiagrams is drawn between their boxes on
-the top page, and to the edge on each page.
+payloads in it. A line is drawn on every page its two ends are drawn apart on:
+between two boxes, between a box and the page's edge, or to a node of the
+page; not between two nodes inside one box, nor wholly outside the page. A
+line crossing several edges is held to every one, as the reader holds it: it
+is offered to a node inside other subdiagrams only where each it would enter
+exports that node, and drawing one out from deep inside shows its node at
+every edge it leaves by, in the same edit.
 
 The Physics pane is inside the edge, left of the payloads, as it is on the top
 page: the left margin is at the page's far left, then the Physics pane, then the
@@ -1992,9 +2010,10 @@ another window draws the main window from the document again meanwhile.
 
 The pages are walked from the top page by the boxes on each, keeping the pages
 printed already, so that a page reached twice, or a loop of pages, is printed
-once. The reader allows neither -- an included file may include no other, and
-no file is included twice -- but a walk that relied on that would print for
-ever were it ever otherwise (``print::pages_of``). A page with nothing on it
+once. The reader allows neither -- subdiagrams nest, but no file is read
+twice, so a file that includes one that includes it is refused -- but a walk
+that relied on that would print for ever were it ever otherwise
+(``print::pages_of``). A page with nothing on it
 is left out.
 
 A page is trimmed to its nodes and lines, with a margin, taken up to the top of

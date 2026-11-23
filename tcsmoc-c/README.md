@@ -247,12 +247,12 @@ header alone is also compiled as C99 and as C++11.
     changed; an answer to a command, whose strings tcsmoc reads as its own;
     and what came down from the ping node that is not an answer, to say why.
 
-`make` in this directory builds `README.html` from this file.
+`make` in this directory builds `index.html` from this file.
 
 ## See also
 
-- [This page as HTML](https://vomlehn.github.io/tcspecial/tcsmoc-c/README.html).
-- [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/README.html), the Rust library this one wraps, and [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/README.html), what the ground and the vehicle share.
+- [This page as HTML](https://vomlehn.github.io/tcspecial/tcsmoc-c/index.html).
+- [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/index.html), the Rust library this one wraps, and [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/index.html), what the ground and the vehicle share.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

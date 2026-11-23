@@ -580,7 +580,7 @@ Where to go next
 * `Writing node types <node-types.html>`__, for what no shipped type does.
 * The `tcs-cfge manual <tcs-cfge.html>`__, for drawing and editing the
   configuration.
-* The `examples <../examples/README.html>`__, which the stages drew on.
+* The `examples <../examples/index.html>`__, which the stages drew on.
 
 How this guide is kept true
 ===========================

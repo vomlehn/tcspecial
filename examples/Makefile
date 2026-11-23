@@ -39,7 +39,7 @@ help:
 	@echo "Makefile for the tcspecial examples"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make README.html     - Build README.html from README.md"
+	@echo "  make index.html     - Build index.html from README.md"
 	@echo "  make run-simple      - Run tcs-moc on the minimal example"
 	@echo "  make run-thermostat  - Run tcs-moc on the thermostat example"
 	@echo "  make run-battery     - Run tcs-moc on the battery example:" \
@@ -129,16 +129,16 @@ run-simple: docs
 	$(call runexample_on,minimal)
 
 .PHONY: docs
-docs: README.html
+docs: index.html
 
-# README.html, with style.html in its head: see that file for what is in it
+# index.html, with style.html in its head: see that file for what is in it
 # and why it is not in the markdown. README.md's first heading is made the
 # page's title, with a table of contents under it.
-README.html: README.md style.html
+index.html: README.md style.html
 	pandoc --standalone --shift-heading-level-by=-1 --toc --toc-depth=3 \
 		--metadata toc-title="Table of Contents" \
 		--metadata pagetitle=Examples -H style.html \
-		README.md -o README.html
+		README.md -o index.html
 
 # Run tcs-moc on the thermostat example.
 .PHONY: run-thermostat
@@ -363,4 +363,4 @@ check-python3:
 
 .PHONY: clean
 clean:
-	rm -f README.html
+	rm -f index.html

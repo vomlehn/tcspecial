@@ -15,7 +15,7 @@ in tcspecial's checkout.
 - `Makefile` -- `make container` builds both images, `make kubuntu` and
   `make fedora` one each, and the `container-` targets below use the
   container; `make help` lists them.
-- `README.html` -- this page as HTML, made from `README.md` with
+- `index.html` -- this page as HTML, made from `README.md` with
   `make html`, which tcspecial's manual links.
 
 In the container, three commands use what is installed: `tcsx` runs one

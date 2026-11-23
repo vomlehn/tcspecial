@@ -153,9 +153,9 @@ Operational code
     license.
 
 The TCSpecial libraries
-    `tcsmoc <../tcsmoc/README.html>`__, the TCSpecial MOC Correspondent, in
-    the MOC, in Rust, and `tcsmoc-c <../tcsmoc-c/README.html>`__, its C
-    interface; `tcsprotocol <../tcsprotocol/README.html>`__, TCS Link
+    `tcsmoc <../tcsmoc/index.html>`__, the TCSpecial MOC Correspondent, in
+    the MOC, in Rust, and `tcsmoc-c <../tcsmoc-c/index.html>`__, its C
+    interface; `tcsprotocol <../tcsprotocol/index.html>`__, TCS Link
     Support, used aboard and in the MOC.
 
 `The tcslog manual <../../tcslog/docs/manual.html>`__
@@ -211,7 +211,7 @@ Verification tools
     The simulated operations center. tcs-moc shows what the vehicle sends
     the ground, panel by panel and in plots, and sends it commands.
 
-`The TCS test container <../container/README.html>`__
+`The TCS test container <../container/index.html>`__
     A Kubuntu or Fedora system in a container, in which the TCS packages are
     installed and tried as an administrator would, without touching the
     machine it runs on: ``container/bin/start`` starts it, made from
@@ -229,7 +229,7 @@ Analysis tools
 Infrastructure
 --------------
 
-`The tcs-helpers README <../../tcs-helpers/README.html>`__
+`The tcs-helpers README <../../tcs-helpers/index.html>`__
     The make rules and scripts the TCS projects share to build their
     packages, check their names and categories and keep their pages up to
     date.
@@ -309,9 +309,9 @@ Other documents
     The plan for making the tcs projects work with NASA's core Flight
     System (cFS) and JPL's F´ (F Prime). Work in progress.
 
-`Examples <../examples/README.html>`__
+`Examples <../examples/index.html>`__
     The shipped example configurations, and what each one shows; and `the
-    tcs-xtce examples <../../tcs-xtce/examples/README.html>`__.
+    tcs-xtce examples <../../tcs-xtce/examples/index.html>`__.
 
 The categories of TCS software
 ==============================
@@ -358,5 +358,5 @@ operational-names`` holds its names and its ``categories.toml`` to each
 other. See `Operational code and its names
 <tcspecial-design.html#operational-code-and-its-names>`__ in the tcspecial
 design for the requirements, and `Code categories
-<../../tcs-helpers/README.html#code-categories>`__ in tcs-helpers' README,
+<../../tcs-helpers/index.html#code-categories>`__ in tcs-helpers' README,
 which defines the categories for every TCS project.

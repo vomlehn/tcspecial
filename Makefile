@@ -58,7 +58,7 @@ include $(CURDIR)/beside.mk
 # unless TCS_HELPERS names another, used where it is rather than installed.
 # Installing and packaging check it first: see the tcs-helpers target.
 TCS_HELPERS ?= $(BESIDE)/tcs-helpers
-TCS_HELPERS_REQUIRED := 0.12.0
+TCS_HELPERS_REQUIRED := 0.13.0
 # tcs-xtce, whose Python package generates the link's codecs and holds the
 # runtime python/tcsprotocol/_xtce links to: a checkout of
 # https://github.com/vomlehn/tcs-xtce beside this one, always, since a link
@@ -214,6 +214,8 @@ help:
 		"again, drawn in memory"
 	@echo "  make example-pdfs - Print every example's configuration to" \
 		"examples/NAME/NAME.pdf"
+	@echo "  make html        - Write index.html, the site's top page," \
+		"from README.md"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
 		"behind its source, or a link leads nowhere"
 	@echo "  make hooks       - Have git run tcs-helpers' pre-commit" \
@@ -934,7 +936,7 @@ LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 # -common directory, and is installed as the same link. A program's
 # #!/usr/bin/env python3 is installed as #!/usr/bin/python3, where Debian
 # and Fedora both put it and as both want an installed script to say.
-EXAMPLE_FILES = examples/README.html $(shell git ls-files \
+EXAMPLE_FILES = examples/index.html $(shell git ls-files \
 		'examples/*/*.ytcs' 'examples/*/*.xtcs' 'examples/*/*.xtce' \
 		'examples/*/*-sim.yaml' 'examples/*/*.svg' 'examples/*/*.pdf' \
 		'examples/*/*.py' \
@@ -1139,7 +1141,7 @@ install-tcsmoc: install-schemas tcs-helpers tcs-xtce
 	$(THIRD_PARTY_NOTICES) . \
 		$(DESTDIR)$(DOCDIR)/tcsmoc/THIRD-PARTY-NOTICES \
 		tcsmoc $(MOC_CRATES)
-	install -m 644 tcsmoc-c/README.html \
+	install -m 644 tcsmoc-c/index.html \
 		$(DESTDIR)$(DOCDIR)/tcsmoc/tcsmoc-c
 	install -m 644 python/README.md \
 		$(DESTDIR)$(DOCDIR)/tcsmoc/python
@@ -1638,7 +1640,20 @@ screenshots: screenshots-tcs-cfge screenshots-tcs-moc screenshots-tcs-sim
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.
-HTML_DIRS = $(DOCS_DIR) examples tcsmoc tcsmoc-c tcsprotocol container
+HTML_DIRS = . $(DOCS_DIR) examples tcsmoc tcsmoc-c tcsprotocol container
+
+# The top page, index.html, made from README.md: what the project's site
+# gives at its top, which GitHub Pages serves from this directory. Here the
+# html target makes only this page, each directory's Makefile making its
+# own, since html-pages check makes a directory's pages with its html
+# target, and this Makefile's default target builds everything.
+.PHONY: html
+html: index.html
+
+index.html: README.md
+	pandoc --standalone --shift-heading-level-by=-1 --toc --toc-depth=3 \
+		--metadata toc-title="Table of Contents" \
+		--metadata pagetitle=tcspecial README.md -o index.html
 
 # Fail where a committed page has fallen behind its source, naming it, having
 # made every page again in place: tcs-helpers' html-pages check, which also

@@ -388,11 +388,11 @@ manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html):
 * [The tcspecial design](https://vomlehn.github.io/tcspecial/docs/design.html): the specification, and why
   each rule is what it is.
 
-* [The examples](https://vomlehn.github.io/tcspecial/examples/README.html): working configurations, each
+* [The examples](https://vomlehn.github.io/tcspecial/examples/index.html): working configurations, each
   with a diagram.
 
-* [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/README.html), [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/README.html) and
-  [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/README.html): the libraries a ground station is
+* [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/index.html), [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/index.html) and
+  [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/index.html): the libraries a ground station is
   built on, and what the ground and the vehicle share: the TCSpecial MOC
   Correspondent, TCS Link Support, and the Correspondent for C and C++.
 

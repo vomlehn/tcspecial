@@ -12,20 +12,20 @@ help:
 	@echo "Makefile for the tcsmoc-c README"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make README.html     - Build README.html from README.md"
-	@echo "  make clean           - Remove README.html"
+	@echo "  make index.html     - Build index.html from README.md"
+	@echo "  make clean           - Remove index.html"
 
 .PHONY: docs
-docs: README.html
+docs: index.html
 
 # A page of its own, so pandoc's --standalone: it carries its own head and
 # styling, and reads the same wherever it is copied to. README.md's first
 # heading is made the page's title, with a table of contents under it.
-README.html: README.md
+index.html: README.md
 	pandoc --standalone --shift-heading-level-by=-1 --toc --toc-depth=3 \
 		--metadata toc-title="Table of Contents" \
-		--metadata pagetitle=tcsmoc-c README.md -o README.html
+		--metadata pagetitle=tcsmoc-c README.md -o index.html
 
 .PHONY: clean
 clean:
-	rm -f README.html
+	rm -f index.html

@@ -4228,7 +4228,7 @@ what was done in it. The first time, or with ``--rebuild``, it is made
 from scratch, with the newest packages built here and in the TCS
 checkouts beside this one installed in it. It uses Podman, and ``make
 container`` in ``container/`` builds both images. See `The TCS test
-container <../container/README.html>`__.
+container <../container/index.html>`__.
 
 .. code-block:: console
 

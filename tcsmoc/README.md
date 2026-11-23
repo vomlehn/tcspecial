@@ -84,13 +84,13 @@ cargo test -p tcsmoc
 cargo doc -p tcsmoc --open
 ```
 
-`make` in this directory builds `README.html` from this file, and
+`make` in this directory builds `index.html` from this file, and
 `make clean` removes it.
 
 ## See also
 
-- [This page as HTML](https://vomlehn.github.io/tcspecial/tcsmoc/README.html).
-- [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/README.html), what the ground and the vehicle share, and [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/README.html), this library for C and C++.
+- [This page as HTML](https://vomlehn.github.io/tcspecial/tcsmoc/index.html).
+- [tcsprotocol](https://vomlehn.github.io/tcspecial/tcsprotocol/index.html), what the ground and the vehicle share, and [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/index.html), this library for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

@@ -100,13 +100,13 @@ cargo test -p tcsprotocol
 cargo doc -p tcsprotocol --open
 ```
 
-`make` in this directory builds `README.html` from this file, and
+`make` in this directory builds `index.html` from this file, and
 `make clean` removes it.
 
 ## See also
 
-- [This page as HTML](https://vomlehn.github.io/tcspecial/tcsprotocol/README.html).
-- [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/README.html), what a ground station is built on, and [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/README.html), the same for C and C++.
+- [This page as HTML](https://vomlehn.github.io/tcspecial/tcsprotocol/index.html).
+- [tcsmoc](https://vomlehn.github.io/tcspecial/tcsmoc/index.html), what a ground station is built on, and [tcsmoc-c](https://vomlehn.github.io/tcspecial/tcsmoc-c/index.html), the same for C and C++.
 - [The tcspecial
 manual](https://vomlehn.github.io/tcspecial/docs/tcspecial.html) and
 [design](https://vomlehn.github.io/tcspecial/docs/design.html).

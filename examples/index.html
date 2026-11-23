@@ -232,7 +232,7 @@
     code span.vs { color: #4070a0; } /* VerbatimString */
     code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
   </style>
-  <!-- What README.html looks like, over pandoc's own styling.
+  <!-- What index.html looks like, over pandoc's own styling.
 
        Table cells sit at the top of their row. Markdown has no way to say this:
        a pipe table's colons settle which way a column is aligned across the page
@@ -243,7 +243,7 @@
        belonging to that line. At the top, it reads as the heading of the
        paragraph beside it, which is what it is.
 
-       Included in the head by pandoc's -H, so README.html carries it and is one
+       Included in the head by pandoc's -H, so index.html carries it and is one
        file: a style sheet beside it would be a page that looks different
        wherever it is copied to without its neighbour. -->
   <style>
@@ -399,7 +399,7 @@ against <code>tcspecial.xsd</code>, checks each YAML key against
 <code>tcspecial.schema.json</code>, and checks that every file names its
 schema (<code>../../tcsprotocol/schema/...</code>).</li>
 </ul>
-<p><code>make</code> in this directory builds <code>README.html</code>
+<p><code>make</code> in this directory builds <code>index.html</code>
 from this file, with <code>style.html</code> in its head – which is
 where the tables’ cells are told to sit at the top of their row,
 markdown having no way to say so. <code>make help</code> lists the

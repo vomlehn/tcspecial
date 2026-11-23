@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>tcspecial</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">TCSpecial</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<h2 id="toc-title">Table of Contents</h2>
+<ul>
+<li><a href="#the-other-tcs-projects"
+id="toc-the-other-tcs-projects">The other TCS projects</a></li>
+</ul>
+</nav>
+<p>TCSpecial: flight software that relays commands and telemetry between
+an operation center and payloads</p>
+<p>This is TCSpecial. Its TCSpecial Flight Executive is flight software
+for devices that relay data between a set of payloads and a remote
+operations center (OC). It was designed for spacecraft several light
+seconds away, such as at the Moon, which shaped it to work over
+unreliable communication links. However, it works over any distance, and
+can be extended to use reliable links.</p>
+<p>TCSpecial runs as a process of its own, so the kernel keeps it in a
+fault domain apart from the rest of the vehicle’s software. Because it
+reaches the operations center, an F´ flight computer or cFS’s software
+bus over UDP, it can also run on a processor of its own, isolating
+faults further still. And a vehicle may run several TCSpecials, each
+with its own group of payloads, so that one that fails leaves the rest
+running.</p>
+<blockquote>
+<p><strong>Warning:</strong> TCSpecial is an alpha release. It is not
+fully tested, it is not feature complete, and it is subject to rapid
+change. Until 1.0, any change to its API changes the minor version
+number (0.1 to 0.2), so a release that changes only the patch number
+never breaks code built against it. Feedback is welcome, even at this
+stage: open an issue at https://github.com/vomlehn/tcspecial/issues.</p>
+</blockquote>
+<p>Work is under way on integrating TCSpecial, with its telemetry log,
+the TCS Onboard Log <a
+href="https://github.com/vomlehn/tcslog">tcslog</a>, and its packet
+compiler <a href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>,
+with NASA’s core Flight System (cFS) and JPL’s F´ (F Prime): see
+docs/third-party.rst.</p>
+<p>TCSpecial is the hub of the TCS software: tcs-xtce, tcslog,
+tcslog-tools and tcs-helpers are the libraries and tools it is built
+from and works with, and docs/manual.rst links to their documents.</p>
+<blockquote>
+<p><strong>Note:</strong> integration with cFS and F´ is a work in
+progress, and the plan may change as it is. A vehicle can answer to an
+F´ flight computer through the bridge component in fprime/
+(<code>make fprime-test</code> tests it), and to cFS’s software bus
+through SBN (<code>make cfs-test</code> flies the cfs example against a
+real cFS).</p>
+</blockquote>
+<p>Quick start</p>
+<p><a href="docs/getting-started.rst">Getting started</a> takes you from
+nothing to a vehicle, a simulator of its hardware and a ground station
+running on your desk, in about fifteen minutes, from the released
+packages: no build. On Ubuntu 22.04 or later, or Debian 12 or later:</p>
+<pre><code> release=https://github.com/vomlehn/tcspecial/releases/download/v0.3.1
+ for p in tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-examples
+ do curl -fLO &quot;$release/${p}_0.3.1-1_amd64.deb&quot;; done
+ sudo apt update &amp;&amp; sudo apt install ./*.deb
+ export PATH=/opt/tcs/bin:$PATH
+ tcsx --no-memlock thermostat</code></pre>
+<p>Then press <code>Connect</code> in tcs-moc’s window. The guide also
+covers Fedora, the lander through Yamcs, and a container for older
+systems.</p>
+<p>Building from a checkout</p>
+<p>This is an alpha release: it is not fully tested and not feature
+complete. There is a design document for each program, listed in
+docs/design.rst, a manual for each, listed in docs/manual.rst, and a
+plan for integration with cFS and F´ in docs/third-party.rst. The
+manual’s “Installing” section, in docs/tcspecial.rst, says all of what
+follows at greater length.</p>
+<p>First the tools, then the two checkouts every build needs beside this
+one: <a href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a>,
+the make rules and packaging scripts the TCS projects share, and <a
+href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a>, whose Python
+package generates the link’s codecs. <code>make install-tools</code>
+installs, with apt-get or dnf under sudo, everything building, testing,
+checking, documenting and packaging need (<code>DRY_RUN=1</code> shows
+the commands, <code>PACKAGING=0</code> leaves out the packaging tools),
+and says what it cannot: a Rust older than 1.92, a Python older than
+3.11, and the checkouts. tcslog, the telemetry log, comes from
+crates.io, so it needs no checkout.</p>
+<pre><code> git clone https://github.com/vomlehn/tcspecial.git
+ git clone https://github.com/vomlehn/tcs-helpers.git
+ git clone https://github.com/vomlehn/tcs-xtce.git
+ make -C tcs-xtce python/tcs_xtce/generated.py
+ cd tcspecial
+ make install-tools</code></pre>
+<p>Then build, and run:</p>
+<pre><code> make                 # build tcspecial, then run every test
+ cargo build --workspace   # every program and library: tcs-moc,
+                      # tcs-sim, tcs-cfge, tcs-verify, tcsmoc-c, ...
+ make buildmoc        # tcs-moc alone; buildsim, buildgui (tcs-cfge) too
+ make test            # every test; tcs-sim&#39;s opens a window
+ make check           # cargo check, clippy, rustfmt, and the rest
+ make docs            # every page under docs/, with rst2html
+ make runmocy         # run tcs-moc on example.ytcs, which starts
+                      # tcspecial and tcs-sim; runmocx on example.xtcs
+ make run             # run tcspecial alone
+ make clean           # and make distclean</code></pre>
+<p><code>make help</code> lists the rest. A tcspecial for a vehicle is
+built with only the payload types it flies: see “Building tcspecial for
+a vehicle” in docs/tcspecial.rst. The examples build and run from
+examples/, as <a href="examples/README.md">its README</a> says, and the
+Python, the C library and the packages as <em>Installing</em>, below,
+says.</p>
+<p>The cFS and F´ sides are built from their own projects’ trees, which
+this one does not hold:</p>
+<pre><code> make fprime-build FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
+ make fprime-test  FPRIME_FRAMEWORK=$HOME/fprime FPRIME_VENV=$HOME/fprime-venv
+ make cfs-build CFS_PRISTINE=$HOME/cFS SBN_SRC=$HOME/sbn
+ make cfs-test  CFS_PRISTINE=$HOME/cFS SBN_SRC=$HOME/sbn</code></pre>
+<p>The F´ side needs an F´ checkout, v4.4.1 or later, and a Python
+environment holding F´’s tools; the cFS side a cFS checkout and a git
+checkout of SBN v7.0.1. Left out, each is looked for beside this
+checkout: see “The fprime example” and “The cfs example” in
+docs/tcspecial.rst. <a href="container/README.md">container/</a> builds
+and tries a checkout, and the packages, in a Podman container of its
+own.</p>
+<h1 id="the-other-tcs-projects">The other TCS projects</h1>
+<p>Each is built from its own checkout, beside this one, as its README
+says:</p>
+<ul>
+<li><a href="https://github.com/vomlehn/tcs-xtce#building">tcs-xtce</a>,
+the XTCE library, packet compiler and editor: its README’s “Building”,
+with <code>make install-tools</code> of its own.</li>
+<li><a href="https://github.com/vomlehn/tcslog#building">tcslog</a>, the
+telemetry log and its C and Python bindings: its README’s “Building”,
+with <code>make install-tools</code> of its own.</li>
+<li><a
+href="https://github.com/vomlehn/tcslog-tools#building-from-a-checkout">tcslog-tools</a>,
+the log readers <code>tcslog-dump</code> and
+<code>tcslog-dumphdr</code>: its README’s “Building from a checkout”,
+built beside a tcslog checkout.</li>
+<li><a href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a>,
+the shared make rules and packaging scripts: nothing to build, used
+where it is checked out.</li>
+<li><a href="https://github.com/vomlehn/tcswebasm">tcswebasm</a>, the
+examples in a web page: built from this checkout, beside it, for
+WebAssembly, with nightly Rust, the <code>wasm32-unknown-unknown</code>
+target and <code>wasm-bindgen-cli</code>, as its manual,
+docs/manual.rst, says.</li>
+</ul>
+<p>Installing</p>
+<p>Everything installs under <code>/opt/tcs</code>, as six packages,
+each built as a .deb and as an RPM. A package with operational code
+holds nothing else:</p>
+<ul>
+<li><code>tcspecial</code>, operational code, what flies:
+<code>bin/tcspecial</code>, with its README, licences and notices, and a
+systemd unit, <code>tcspecial.service</code>, installed but not
+enabled.</li>
+<li><code>tcsmoc</code>, operational code, what a ground station is
+built on: <code>libtcsmoc-c</code> for C and C++
+(<code>lib/libtcsmoc-c.so.4</code>, <code>lib/libtcsmoc-c.a</code>,
+<code>include/tcsmoc-c.h</code>,
+<code>lib/pkgconfig/tcsmoc-c.pc</code>), the Python packages
+<code>tcsprotocol</code> and <code>tcsmoc</code>, and the configuration
+schemas. It was <code>tcspecial-moc</code>, which it replaces.</li>
+<li><code>tcs-tools</code>, software tools: <code>bin/tcs-cfge</code>
+with its data, <code>bin/tcs-verify</code>, and the Python
+<code>tcs_ui</code>.</li>
+<li><code>tcspecial-test</code>, verification tools: the test ground
+station and simulator, <code>bin/tcs-moc</code> and
+<code>bin/tcs-sim</code>; <code>bin/segsend</code>, the test one, which
+deletes each telemetry log segment; and the five test app programs in
+<code>libexec/</code>. A vehicle that keeps a log puts its own segsend
+in <code>/opt/tcs/bin</code> instead.</li>
+<li><code>tcspecial-doc</code>, the manuals and designs.</li>
+<li><code>tcspecial-examples</code>, the examples: every one’s
+configurations and the programs it runs, its own ground stations among
+them, in <code>share/examples/tcspecial</code>, and
+<code>bin/tcsx</code>, which runs one: <code>tcsx</code> lists them, and
+<code>tcsx thermostat</code> runs one. The manuals’ figures are the
+examples’ diagrams, so <code>tcspecial-doc</code> depends on it.</li>
+</ul>
+<p>Building them needs checkouts of <a
+href="https://github.com/vomlehn/tcs-helpers">tcs-helpers</a> and <a
+href="https://github.com/vomlehn/tcs-xtce">tcs-xtce</a> beside this one,
+the second with its <code>python/tcs_xtce/generated.py</code> made;
+<code>make tcs-helpers</code> and <code>make tcs-xtce</code> say what is
+missing. To build them, install them, or install without them:</p>
+<pre><code> make deb                                # build/packages/*.deb
+ make rpm                                # build/packages/*.rpm
+ make install                            # with apt-get, dnf or zypper
+ make install DRY_RUN=1                  # what that would do
+ make uninstall                          # remove the packages
+ make install-build &amp;&amp; sudo make install-files HOOKS=1
+ make install-files PREFIX=$HOME/tcs     # no hooks outside the prefix
+ pip install ./python                    # the Python alone
+ pip install ./tcs-ui/python             # and tcs_ui, which needs it
+ cargo install --path tcs-verify --root /opt/tcs
+ cc station.c $(pkg-config --cflags --libs tcsmoc-c)</code></pre>
+<p><code>HOOKS=1</code>, which the packages have, also installs what
+puts <code>/opt/tcs</code> on the search paths:
+<code>/etc/profile.d/&lt;package&gt;.sh</code>,
+<code>/etc/ld.so.conf.d/tcsmoc.conf</code> and a <code>.pth</code> file
+for python3. Each .deb also carries what Debian expects of every
+package: <code>/usr/share/doc/&lt;package&gt;/copyright</code> and
+<code>changelog.Debian.gz</code>, made as it is built, and lintian’s
+overrides in <code>/usr/share/lintian/overrides</code>.
+<code>make lint-packages</code> checks the packages with lintian and
+rpmlint, and their shell scripts with shellcheck, and fails on any
+finding that is not overridden with its reason.</p>
+<p>The profile.d scripts put <code>/opt/tcs/bin</code> on
+<code>PATH</code> for login shells only: sudo, cron and other minimal
+environments do not see it. To make a package’s programs available
+everywhere, link them into <code>/usr/local/bin</code>, and to undo it,
+take the links away:</p>
+<pre><code> sudo /opt/tcs/sbin/tcspecial-links          # likewise tcs-tools-links,
+                                             # tcspecial-test-links and
+                                             # tcspecial-examples-links
+ sudo /opt/tcs/sbin/tcspecial-links --remove
+ sudo make links                         # after make install-files
+ sudo make unlinks</code></pre>
+<p>Each script links only its own package’s programs, leaves alone a
+name something else already has, and takes <code>--dir DIR</code> for a
+directory other than <code>/usr/local/bin</code>. Removing a package
+takes its links away.</p>
+<p>Everything installed is stripped (<code>--strip-unneeded</code> for
+programs and <code>libtcsmoc-c.so.4</code>, <code>--strip-debug</code>
+for <code>libtcsmoc-c.a</code>), which takes a fifth to a quarter off
+what each package installs. <code>STRIP=0</code> keeps everything as
+cargo built it: <code>make packages STRIP=0</code>.</p>
+<p>See “Installing” in docs/tcspecial.rst for where everything goes and
+why.</p>
+<p>Where things are</p>
+<p>Each top-level directory, by the category of TCS code it holds, as
+<code>categories.toml</code> lists them: see “Operational code and its
+names” in <a href="docs/tcspecial-design.rst">the design</a>, and “Code
+categories” in <a
+href="https://github.com/vomlehn/tcs-helpers#code-categories">tcs-helpers’
+README</a>.</p>
+<p>Operational code, which a mission depends on while it operates:</p>
+<ul>
+<li><a href="tcspecial/"><code>tcspecial/</code></a>: the flight
+software, the TCSpecial Flight Executive.</li>
+<li><a href="tcsprotocol/"><code>tcsprotocol/</code></a>: TCS Link
+Support, what the vehicle and the ground share: the protocol, and how
+every configuration is read and checked.</li>
+<li><a href="tcsmoc/"><code>tcsmoc/</code></a> and <a
+href="tcsmoc-c/"><code>tcsmoc-c/</code></a>: the TCSpecial MOC
+Correspondent, what a ground station is built on, in Rust and for C and
+C++.</li>
+<li><a href="tcsverify/"><code>tcsverify/</code></a>: the configuration
+checker as a library, which tcspecial and every program that reads a
+configuration asks.</li>
+<li><a href="tcsapp/"><code>tcsapp/</code></a>: the file interfaces an
+app node’s program runs with.</li>
+<li><a href="tcsos/"><code>tcsos/</code></a>: what tcspecial and the
+rest ask of the operating system – files, sockets, processes, time – on
+Linux, and in a web page the browser’s substitutes for them, which
+tcswebasm runs on.</li>
+<li><a href="python/"><code>python/</code></a>: the Python spellings of
+tcsprotocol and tcsmoc, for ground stations written in Python.</li>
+</ul>
+<p>Software tools, which make or check what operational code is built
+from or loads:</p>
+<ul>
+<li><a href="tcs-cfge/"><code>tcs-cfge/</code></a>: the graphical
+configuration editor.</li>
+<li><a href="tcs-verify/"><code>tcs-verify/</code></a>: the
+configuration checker as a program.</li>
+<li><a href="tcs-conflict/"><code>tcs-conflict/</code></a>: whether two
+configurations can be run at once.</li>
+<li><a href="tcs-diagram/"><code>tcs-diagram/</code></a>: how a
+configuration is drawn, for tcs-cfge and tcspecial’s visual window,
+which never flies.</li>
+<li><a href="tcs-ui/"><code>tcs-ui/</code></a>: the window pieces
+tcs-moc and the desk tools share: the beacon and ping panels, fonts and
+colours, in Rust and Slint, and in Python, <code>tcs-ui/python</code>, a
+distribution of its own.</li>
+<li><a href="tools/"><code>tools/</code></a>:
+<code>tools/convert-format.py</code>, which rewrites a configuration
+from the old shape into the new.</li>
+</ul>
+<p>Verification tools, used only to test:</p>
+<ul>
+<li><a href="tcs-moc/"><code>tcs-moc/</code></a>: the test ground
+station.</li>
+<li><a href="tcs-sim/"><code>tcs-sim/</code></a>: the payload
+simulator.</li>
+<li><a href="app_pl/"><code>app_pl/</code></a>, <a
+href="app_all_pl/"><code>app_all_pl/</code></a>, <a
+href="app_payload_veh/"><code>app_payload_veh/</code></a>, <a
+href="app_gateway_veh/"><code>app_gateway_veh/</code></a> and <a
+href="app_all_veh/"><code>app_all_veh/</code></a>: the five test apps,
+one for each app node type.</li>
+<li><a href="tests/"><code>tests/</code></a>: the configurations the
+tests read – the ids, the refused ones, the simulated devices – and
+<code>tests/manual/</code>, the editor’s example.</li>
+<li><a href="cfs/"><code>cfs/</code></a> and <a
+href="fprime/"><code>fprime/</code></a>: NASA’s cFS and JPL’s F´
+software, generated or written for them, that tcspecial is tested
+beside; see <a href="docs/third-party.rst">docs/third-party.rst</a>. It
+is not TCS software, and <code>make ntss</code> does not count it.</li>
+<li><a href="bin/"><code>bin/</code></a>: scripts for a desk, such as
+those that make and remove the kernel’s dummy devices
+(<code>bin/mk-kernel-dummies</code>).</li>
+</ul>
+<p>Infrastructure, which builds, packages, documents and checks the
+rest:</p>
+<ul>
+<li><a href="docs/"><code>docs/</code></a>: every manual and design
+document.</li>
+<li><a href="packaging/"><code>packaging/</code></a>: what the
+<code>.deb</code> and <code>.rpm</code> packages are made from: their
+control files, specs and install hooks.</li>
+<li><a href="container/"><code>container/</code></a>: the test
+container, in which the packages are installed and a checkout built
+without touching the machine.</li>
+<li><code>bin/install-tools</code>, which
+<code>make install-tools</code> runs, and <code>tools/ntss.py</code>,
+which <code>make ntss</code> runs: it counts the non-test source
+statements of every tcs project checked out beside this one, by
+category, subproject and language, as tables or, with
+<code>CSV=1</code>, comma-separated values.</li>
+<li><code>.cargo/</code>, <code>.claude/</code> and
+<code>.github/</code>: settings for cargo, Claude Code and GitHub’s
+workflows.</li>
+</ul>
+<p>Examples:</p>
+<ul>
+<li><a href="examples/"><code>examples/</code></a>: working
+configurations and the programs they run; see <a
+href="examples/README.md">its README</a>.</li>
+<li><a
+href="docs/building-a-vehicle/"><code>docs/building-a-vehicle/</code></a>:
+the guide’s lander, built a stage at a time.</li>
+</ul>
+<p>Stuff</p>
+<p>TCSpecial supports standard network protocols and devices for
+communication, as well as allowing custom protocols. So, it would be
+possible to implement your own SLIP over COBS[#] implementation.</p>
+<p>.. [#] COBS is the appreviation for “Constant Overhead Byte
+Stuffing”, a protocol that does byte stuffing with a predictable and
+constant overhead.</p>
+<p>Key TCSpecial features are:</p>
+<ul>
+<li><p>On-Board</p>
+<ul>
+<li><p>Centralized control facility (the Command Interface or CI) that
+takes commands from the operations center (OC) and sends back telemetry.
+Telemetry includes an automatic beaconing message</p></li>
+<li><p>Data handlers (DHs) that pass payload command and telemetry data
+to OC using a wide variety of interfaces and protocols.</p>
+<ul>
+<li><p>Supports standard Linux networking protocols</p></li>
+<li><p>Works standard Linux devices, such as RS-422, SPI,</p></li>
+<li><p>Custom stackable DHs allow implementation of custom
+protocols</p></li>
+</ul></li>
+<li><p>Extensible in any language. A node can be a program of its own –
+in Python, C, a shell script, Rust, or anything else the vehicle can
+execute – that tcspecial starts from the configuration and connects into
+the graph: on the vehicle’s side (<code>app_payload_veh</code>,
+<code>app_gateway_veh</code>, <code>app_all_veh</code>) or as a payload
+that is a program (<code>app_pl</code>, <code>app_all_pl</code>). The
+program talks to tcspecial over file descriptors carrying
+length-prefixed packets, so it links against nothing of tcspecial’s; the
+<code>tcsapp</code> crate speaks that for Rust, and
+<code>examples/simple-app</code> has a payload written in Python 3 with
+nothing outside its standard library. A <code>process</code> computation
+likewise hands what arrives to any program, a line at a time, and takes
+back what it writes. A capability added this way needs no change to the
+flight software and no rebuild of it.</p></li>
+<li><p>Per payload and overall TCSpecial statistics include:</p>
+<ul>
+<li>Byte counts in both directions</li>
+<li>I/O counts in both directions</li>
+</ul></li>
+<li><p>“Memory allocation before main loop” philosophy. All TCSpecial
+memory allocatons are done on CI and DH startup. As long as CI and DHs
+are started before the main loop, and any custom DHs allocate memory
+before the main loop, runtime memory exhaustion will not occur.</p></li>
+<li><p>If necessary, DHs can be created and terminated at will with
+configurations either built in or specified as in a CI command. DHs may
+require memory allocation, so they will normally be started before the
+main loop. If not, they will still allocate all required memory on DH
+start up.</p></li>
+</ul></li>
+<li><p>Operations Center</p>
+<ul>
+<li>The TCSpecial MOC Correspondent (tcsmoc) is used to send commands
+and receive telemetry from the spacecraft. This can be integrated with
+mission control software such Yamcs.</li>
+</ul></li>
+<li><p>Test Software</p>
+<ul>
+<li>The TCSpecial test interface (tcstest) provides simulated payload
+devices and uses tcsmoc to verify the behavior of TCSpecial.</li>
+</ul></li>
+</ul>
+<p>To Do</p>
+<ul>
+<li><p>Implement SPI interface</p></li>
+<li><p>Implement I2C interface.</p></li>
+<li><p>Create HTML and/or YAML interfaces so TCSpecialTest can read them
+and dynamically create network, device, and, eventually, stackable DHs.
+The later part has to consider how to dynamically load code.</p></li>
+</ul>
+<p>See also</p>
+<ul>
+<li><p><a
+href="https://vomlehn.github.io/tcspecial/docs/manual.html">TCS Design
+and Documentation</a>: every TCS manual and design document, by the
+category of the code it is about, of which TCSpecial is the
+hub.</p></li>
+<li><p><a
+href="https://vomlehn.github.io/tcspecial/docs/tcspecial.html">The
+tcspecial manual</a>: how to write a configuration, and how to run the
+flight software and the programs that test it. tcs-cfge, tcs-moc,
+tcs-sim and tcs-verify each have a manual of their own, beside
+it.</p></li>
+<li><p><a
+href="https://vomlehn.github.io/tcspecial/docs/design.html">The
+tcspecial design</a>: the specification, and why each rule is what it
+is.</p></li>
+<li><p><a
+href="https://vomlehn.github.io/tcspecial/examples/index.html">The
+examples</a>: working configurations, each with a diagram.</p></li>
+<li><p><a
+href="https://vomlehn.github.io/tcspecial/tcsmoc/index.html">tcsmoc</a>,
+<a
+href="https://vomlehn.github.io/tcspecial/tcsprotocol/index.html">tcsprotocol</a>
+and <a
+href="https://vomlehn.github.io/tcspecial/tcsmoc-c/index.html">tcsmoc-c</a>:
+the libraries a ground station is built on, and what the ground and the
+vehicle share: the TCSpecial MOC Correspondent, TCS Link Support, and
+the Correspondent for C and C++.</p></li>
+<li><p><a
+href="https://vomlehn.github.io/tcspecial/docs/third-party.html">Third-party
+integration</a>: how tcspecial would work with cFS and F´.</p></li>
+</ul>
+<p>License</p>
+<p>Licensed under either of the Apache License, Version 2.0 (<a
+href="LICENSE-APACHE">LICENSE-APACHE</a> or <a
+href="http://www.apache.org/licenses/LICENSE-2.0"
+class="uri">http://www.apache.org/licenses/LICENSE-2.0</a>) or the MIT
+license (<a href="LICENSE-MIT">LICENSE-MIT</a> or <a
+href="http://opensource.org/licenses/MIT"
+class="uri">http://opensource.org/licenses/MIT</a>), at your option.</p>
+<p>Unless you explicitly state otherwise, any contribution intentionally
+submitted for inclusion in the work by you, as defined in the Apache-2.0
+license, shall be dual licensed as above, without any additional terms
+or conditions.</p>
+<p>Each package lists the Rust crates compiled into its programs and
+libraries, with their licences and the notices those require, in
+<code>/opt/tcs/share/doc/&lt;package&gt;/THIRD-PARTY-NOTICES</code>.</p>
+<p>The graphical programs – tcs-cfge, tcs-moc, tcs-sim and tcspecial’s
+visual window – are built with <a href="https://slint.dev">Slint</a>,
+under its royalty-free licence for desktop applications, which asks for
+this attribution:</p>
+<p><a href="https://slint.dev"><img
+src="https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png"
+alt="Made with Slint" /></a></p>
+<p>That licence does not cover embedded systems, which is one more
+reason the visual window is never in a tcspecial that flies.</p>
+<p>Mandatory Note About the Name</p>
+<p>The TCSpecial name indicates that it is a central process for
+handling telemetry and commands. Yet, it is strangely similar to the TC
+Special on the menu of Jose Arrendo’s Uptown Enchilada Bar, an item
+which brings back very fond memories even after 30 years.</p>
+</body>
+</html>

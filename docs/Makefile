@@ -19,9 +19,14 @@ DESIGNS = design.html tcs-cfge-design.html tcs-moc-design.html \
 	lander-design.html
 
 .PHONY: all
-all:	tcspecial-design.html $(DESIGNS) $(MANUALS) third-party.html \
-	node-types.html building-a-vehicle.html desk-to-flight.html \
-	getting-started.html
+all:	index.html tcspecial-design.html $(DESIGNS) $(MANUALS) \
+	third-party.html node-types.html building-a-vehicle.html \
+	desk-to-flight.html getting-started.html
+
+# The page the site gives at docs/: what each document here is, made from
+# README.rst, which GitHub shows when the directory is browsed.
+index.html: README.rst
+	rst2html README.rst index.html
 
 # The first page to read: the released packages installed, and an example
 # run, in about fifteen minutes.

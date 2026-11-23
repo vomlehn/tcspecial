@@ -97,7 +97,7 @@ list in the tests to update:
   checks each YAML key against `tcspecial.schema.json`, and checks that every
   file names its schema (`../../tcsprotocol/schema/...`).
 
-`make` in this directory builds `README.html` from this file, with
+`make` in this directory builds `index.html` from this file, with
 `style.html` in its head -- which is where the tables' cells are told to sit
 at the top of their row, markdown having no way to say so. `make help` lists
 the targets, including the ones that run tcspecial on each example. Each

@@ -40,23 +40,29 @@ fn here() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-/// Finds where cargo puts `libtcsmoc_c.a`: the directory above this test's
-/// own.
+/// The path cargo says it built a file at, from what `cargo build
+/// --message-format=json` wrote: the quoted path among its artifacts that
+/// ends in the file's name.
+///
+/// Asked of cargo rather than worked out from where this test is, which is
+/// a guess about cargo's layout: cargo 1.100 moved the tests out of the
+/// directory the static library is in, and the guess named a directory the
+/// library was never in.
+///
+/// # Arguments
+///
+/// * `json` - What cargo wrote.
+/// * `file` - The file's name, such as `libtcsmoc_c.a`.
 ///
 /// # Returns
 ///
-/// The library's path, whether or not it has been built.
-///
-/// # Panics
-///
-/// If this test's own path cannot be found.
-fn library() -> PathBuf {
-    let test = std::env::current_exe().expect("where this test is");
-    let target = test
-        .parent()
-        .and_then(Path::parent)
-        .expect("the target directory");
-    target.join("libtcsmoc_c.a")
+/// Its path; none where cargo reported no such file.
+fn reported(json: &str, file: &str) -> Option<PathBuf> {
+    let end = format!("/{file}\"");
+    json.match_indices(&end).find_map(|(at, _)| {
+        let start = json[..at].rfind('"')? + 1;
+        Some(PathBuf::from(&json[start..at + end.len() - 1]))
+    })
 }
 
 /// Builds `libtcsmoc_c.a` from the source as it is now, and says where it
@@ -66,7 +72,10 @@ fn library() -> PathBuf {
 /// static library as the last `cargo build` left it, so a test that linked
 /// whatever was there could pass against a library older than the change
 /// it was meant to test. Built here, with the cargo and the profile running
-/// this test, it is this source's.
+/// this test, it is this source's; and found where cargo says it put it.
+///
+/// The profile is release where this test was built without debug
+/// assertions, which only the release profile leaves out.
 ///
 /// # Returns
 ///
@@ -74,18 +83,19 @@ fn library() -> PathBuf {
 ///
 /// # Panics
 ///
-/// If cargo cannot be run, the library does not build, or it is not where
-/// [`library`] says.
+/// If cargo cannot be run, the library does not build, or cargo reports
+/// no library, or one that is not there.
 fn fresh_library() -> PathBuf {
-    let library = library();
-    let profile = library
-        .parent()
-        .and_then(Path::file_name)
-        .and_then(|name| name.to_str())
-        .unwrap_or("debug");
     let mut build = Command::new(env!("CARGO"));
-    build.args(["build", "--quiet", "-p", "tcsmoc-c", "--lib"]);
-    if profile == "release" {
+    build.args([
+        "build",
+        "--quiet",
+        "-p",
+        "tcsmoc-c",
+        "--lib",
+        "--message-format=json",
+    ]);
+    if !cfg!(debug_assertions) {
         build.arg("--release");
     }
     let built = build.output().expect("cargo runs");
@@ -94,9 +104,12 @@ fn fresh_library() -> PathBuf {
         "the library does not build:\n{}",
         String::from_utf8_lossy(&built.stderr)
     );
+    let library =
+        reported(&String::from_utf8_lossy(&built.stdout), "libtcsmoc_c.a")
+            .expect("cargo says where it put libtcsmoc_c.a");
     assert!(
         tcsos::fs::is_file(&library),
-        "{} is not where cargo put it",
+        "{} is not where cargo said it put it",
         library.display()
     );
     library

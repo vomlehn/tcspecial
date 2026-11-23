@@ -309,25 +309,55 @@ fn the_datum_carries_defaults_then_readings() {
     );
 }
 
-/// Builds `libtcsmoc_c.a` from the source as it is now, as tcsmoc-c's own
-/// tests do (`tcsmoc-c/tests/c_and_cpp.rs`), and says where it is.
+/// The path cargo says it built a file at, from what `cargo build
+/// --message-format=json` wrote: the quoted path among its artifacts that
+/// ends in the file's name.
+///
+/// Asked of cargo rather than worked out from where this test is, which is
+/// a guess about cargo's layout: cargo 1.100 moved the tests out of the
+/// directory the static library is in, and the guess named a directory the
+/// library was never in.
+///
+/// # Arguments
+///
+/// * `json` - What cargo wrote.
+/// * `file` - The file's name, such as `libtcsmoc_c.a`.
 ///
 /// # Returns
 ///
-/// The library's path: in the directory above this test's own.
+/// Its path; none where cargo reported no such file.
+fn reported(json: &str, file: &str) -> Option<PathBuf> {
+    let end = format!("/{file}\"");
+    json.match_indices(&end).find_map(|(at, _)| {
+        let start = json[..at].rfind('"')? + 1;
+        Some(PathBuf::from(&json[start..at + end.len() - 1]))
+    })
+}
+
+/// Builds `libtcsmoc_c.a` from the source as it is now, as tcsmoc-c's own
+/// tests do (`tcsmoc-c/tests/c_and_cpp.rs`), and says where it is: where
+/// cargo says it put it. Release where this test was built without debug
+/// assertions, which only the release profile leaves out.
+///
+/// # Returns
+///
+/// The library's path.
 ///
 /// # Panics
 ///
-/// If cargo cannot be run or the library does not build.
+/// If cargo cannot be run, the library does not build, or cargo reports
+/// no library.
 fn tcsmoc_c_library() -> PathBuf {
-    let test = tcsos::env::current_exe().expect("where this test is");
-    let target = test
-        .parent()
-        .and_then(Path::parent)
-        .expect("the target directory");
     let mut build = Command::new(env!("CARGO"));
-    build.args(["build", "--quiet", "-p", "tcsmoc-c", "--lib"]);
-    if target.file_name().and_then(|name| name.to_str()) == Some("release") {
+    build.args([
+        "build",
+        "--quiet",
+        "-p",
+        "tcsmoc-c",
+        "--lib",
+        "--message-format=json",
+    ]);
+    if !cfg!(debug_assertions) {
         build.arg("--release");
     }
     let built = build.output().expect("cargo runs");
@@ -336,7 +366,8 @@ fn tcsmoc_c_library() -> PathBuf {
         "tcsmoc-c does not build:\n{}",
         String::from_utf8_lossy(&built.stderr)
     );
-    target.join("libtcsmoc_c.a")
+    reported(&String::from_utf8_lossy(&built.stdout), "libtcsmoc_c.a")
+        .expect("cargo says where it put libtcsmoc_c.a")
 }
 
 /// Compiles the C ground station against `tcsmoc-c.h` and the library.

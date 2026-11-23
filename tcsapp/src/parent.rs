@@ -289,12 +289,12 @@ impl End {
                 let room = (wanted - self.got.len()).min(byte.len());
                 match self.socket.read(&mut byte[..room]) {
                     Ok(0) => {
-                        // The far end has gone: every copy of its socket is
-                        // closed. Not at once, always, when the program
-                        // closes it: a program forked meanwhile holds a copy
-                        // until its exec closes it, so the end may arrive a
-                        // read or two later, as nothing first. That costs a
-                        // round of the fabric, nothing more.
+                        // The far end has gone: its stream was shut down, or
+                        // every copy of its socket closed. A program that
+                        // only closes it is not gone while a program forked
+                        // meanwhile holds a copy, until its exec closes it,
+                        // so its end can come a round of the fabric later,
+                        // as nothing first; nothing here waits for it.
                         //
                         // Part of a packet left behind
                         // is a program that died between writing a length and
@@ -1090,10 +1090,11 @@ mod tests {
     /// closed, and a program forked meanwhile -- by another test, or by
     /// tcspecial starting another app -- holds a copy from its fork to its
     /// exec, where the socket's close-on-exec flag closes it. A test that
-    /// read the near end in that moment and wanted the end at once saw
-    /// nothing yet: rarely, in a run of every test, and never alone. This
-    /// makes the moment come round, so that a test that assumes the end is
-    /// seen at once fails every time rather than now and then.
+    /// dropped its far end and read the near end in that moment saw nothing
+    /// yet: rarely, in a run of every test, and never alone. This makes the
+    /// moment come round, so that a test that ends a stream by dropping it
+    /// fails every time rather than now and then, and one that ends it by
+    /// [`end`] is seen to be right.
     ///
     /// # Arguments
     ///
@@ -1118,36 +1119,23 @@ mod tests {
         starting.join().expect("the starting thread");
     }
 
-    /// Reads an end whose far end has just been dropped until something
-    /// other than nothing arrives: the end, or a failure.
+    /// Ends a far end's stream, as a program that has finished with an
+    /// interface ends it, and lets it go.
     ///
-    /// Nothing is what a read in the moment before the last copy of the far
-    /// end closes answers -- see [`while_programs_start`] -- and the end
-    /// follows it, at the latest when the program forked meanwhile reaches
-    /// its exec. Five seconds is far longer than that ever takes, and an end
-    /// that has not come by then is a failure of the test.
+    /// By `shutdown` and not by the drop alone. Dropping closes this
+    /// descriptor of the socket, and the stream ends only when every
+    /// descriptor of it is closed -- a program forked meanwhile holds one
+    /// until its exec, so a read in that moment sees nothing yet. `shutdown`
+    /// ends the stream at the socket, whatever descriptors of it there are,
+    /// so the next read sees the end at once: decided by the call, not by
+    /// waiting for it to arrive. See [`while_programs_start`].
     ///
     /// # Arguments
     ///
-    /// * `end` - The near end.
-    ///
-    /// # Returns
-    ///
-    /// What the read answered that was not nothing.
-    ///
-    /// # Errors
-    ///
-    /// What the read failed with: `UnexpectedEof` for a packet cut short.
-    fn after_the_far_end_goes(end: &mut End) -> io::Result<Arrived> {
-        let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            match end.read_now() {
-                Ok(Arrived::Nothing) if Instant::now() < deadline => {
-                    std::thread::yield_now();
-                }
-                said => return said,
-            }
-        }
+    /// * `theirs` - The far end.
+    fn end(theirs: UnixStream) {
+        theirs.shutdown(Shutdown::Write).expect("the stream ended");
+        drop(theirs);
     }
 
     /// An interface whose far end has gone has ended, while programs are
@@ -1155,12 +1143,9 @@ mod tests {
     #[test]
     fn an_interface_whose_far_end_has_gone_has_ended() {
         while_programs_start(|| {
-            let (mut end, theirs) = pair();
-            drop(theirs);
-            assert_eq!(
-                after_the_far_end_goes(&mut end).expect("the end"),
-                Arrived::Ended
-            );
+            let (mut near, theirs) = pair();
+            end(theirs);
+            assert_eq!(near.read_now().expect("the end"), Arrived::Ended);
         });
     }
 
@@ -1173,14 +1158,13 @@ mod tests {
     #[test]
     fn a_far_end_that_goes_mid_packet_is_a_failure() {
         while_programs_start(|| {
-            let (mut end, mut theirs) = pair();
+            let (mut near, mut theirs) = pair();
             theirs.write_all(&6u32.to_ne_bytes()).expect("a length");
             theirs.write_all(b"293").expect("half the bytes");
-            assert_eq!(end.read_now().expect("not yet"), Arrived::Nothing);
+            assert_eq!(near.read_now().expect("not yet"), Arrived::Nothing);
 
-            drop(theirs);
-            let said = after_the_far_end_goes(&mut end)
-                .expect_err("a packet cut short");
+            end(theirs);
+            let said = near.read_now().expect_err("a packet cut short");
             assert_eq!(said.kind(), io::ErrorKind::UnexpectedEof);
             assert!(said.to_string().contains("3 bytes into"), "{said}");
         });

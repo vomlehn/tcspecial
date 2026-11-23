@@ -23,6 +23,9 @@ tcsprotocol = { path = "../tcsprotocol" }
 # What the tests ask of the file system: see tcsos.
 tcsos = { path = "../tcsos" }
 tempfile = "3"
+# Ports for the programs the tests start, never the same twice: see
+# tcs-testing.
+tcs-testing = { path = "../tcs-testing" }
 
 [lints]
 workspace = true

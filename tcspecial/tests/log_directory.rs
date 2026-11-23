@@ -4,24 +4,13 @@
 //! What it said was tcslog's "invalid path name", which named neither the
 //! directory nor the setting.
 
-use tcsos::net::UdpSocket;
 use tcsos::process::Command;
 
-/// Finds a loopback port nothing holds: the configuration check refuses
-/// port 0, a link nobody can predict the port of.
-///
-/// # Returns
-///
-/// The port.
-///
-/// # Panics
-///
-/// If no port can be bound.
+/// A port nothing holds, for a program to bind, never given twice in this
+/// test's process: see `tcs_testing`, which says why a port let go is not
+/// enough.
 fn free() -> u16 {
-    UdpSocket::bind("127.0.0.1:0")
-        .and_then(|socket| socket.local_addr())
-        .expect("a port")
-        .port()
+    tcs_testing::free()
 }
 
 #[test]

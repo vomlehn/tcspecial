@@ -1217,17 +1217,14 @@ mod tests {
         }
     }
 
-    /// A port nothing holds, for the bus to bind.
+    /// A port nothing holds, for the bus to bind, never given twice in
+    /// this test's process: see `tcs_testing`.
     ///
     /// # Returns
     ///
-    /// The port's number, free when it was found.
+    /// The port's number.
     fn free() -> u16 {
-        UdpSocket::bind("127.0.0.1:0")
-            .expect("a port")
-            .local_addr()
-            .expect("its address")
-            .port()
+        tcs_testing::free()
     }
 
     /// Opens the bus the cfs example states, its peer this test.

@@ -17,6 +17,9 @@ thiserror = "1.0"
 
 [dev-dependencies]
 tempfile = "3"
+# Ports for the programs the tests start, never the same twice: see
+# tcs-testing.
+tcs-testing = { path = "../tcs-testing" }
 
 [lints]
 workspace = true

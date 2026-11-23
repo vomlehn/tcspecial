@@ -1,0 +1,16 @@
+[package]
+name = "tcs-testing"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+publish = false
+description = """\
+What the tests of TCSpecial's crates share: ports for the programs they \
+start to bind, never the same port twice"""
+
+[dependencies]
+# The sockets: see tcsos.
+tcsos = { path = "../tcsos" }
+
+[lints]
+workspace = true

@@ -267,7 +267,7 @@ fn a_vehicle_answering_to_cfs_is_a_peer_of_cfs_itself() {
 
     // A reading, from the thermometer to fsw, published as its tlm_base
     // plus its device id.
-    let sensor = UdpSocket::bind("127.0.0.1:0").expect("a socket");
+    let sensor = tcs_testing::bound();
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut reading = None;
     while reading.is_none() && Instant::now() < deadline {

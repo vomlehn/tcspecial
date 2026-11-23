@@ -3709,6 +3709,7 @@ dependencies = [
 name = "ping_example"
 version = "0.1.0"
 dependencies = [
+ "tcs-testing",
  "tcsprotocol",
  "tempfile",
 ]
@@ -4921,6 +4922,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "tcs-testing"
+version = "0.1.0"
+dependencies = [
+ "tcsos",
+]
+
+[[package]]
 name = "tcs-ui"
 version = "0.1.0"
 dependencies = [
@@ -4961,6 +4969,7 @@ name = "tcsmoc"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tcs-testing",
  "tcsos",
  "tcsprotocol",
  "tempfile",
@@ -4971,6 +4980,7 @@ dependencies = [
 name = "tcsmoc-c"
 version = "0.1.0"
 dependencies = [
+ "tcs-testing",
  "tcsmoc",
  "tcsos",
  "tcsprotocol",
@@ -5001,6 +5011,7 @@ dependencies = [
  "slint-build",
  "socket2",
  "tcs-diagram",
+ "tcs-testing",
  "tcsapp",
  "tcslog",
  "tcsmoc",

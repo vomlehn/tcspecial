@@ -7,25 +7,14 @@
 //! directory should hold no more than the segment being written and the
 //! one, perhaps, that `segsend` is dealing with.
 
-use tcsos::net::UdpSocket;
 use tcsos::process::{Child, Command, Stdio};
 use tcsos::time::{Duration, Instant};
 
-/// Finds a loopback port nothing holds: the configuration check refuses
-/// port 0, a link nobody can predict the port of.
-///
-/// # Returns
-///
-/// The port.
-///
-/// # Panics
-///
-/// If no port can be bound.
+/// A port nothing holds, for a program to bind, never given twice in this
+/// test's process: see `tcs_testing`, which says why a port let go is not
+/// enough.
 fn free() -> u16 {
-    UdpSocket::bind("127.0.0.1:0")
-        .and_then(|socket| socket.local_addr())
-        .expect("a port")
-        .port()
+    tcs_testing::free()
 }
 
 /// tcspecial, stopped however the test ends: a vehicle left running would

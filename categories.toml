@@ -35,6 +35,7 @@ software-tools = [
 # listed here only so that every directory is in a category.
 verification-tools = [
 	"tcs-sim",
+	"tcs-testing",
 	"tcs-moc",
 	"app_pl",
 	"app_all_pl",

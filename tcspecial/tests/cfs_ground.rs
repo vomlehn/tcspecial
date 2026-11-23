@@ -9,7 +9,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tcsos::net::{SocketAddr, UdpSocket};
+use tcsos::net::SocketAddr;
 use tcsos::process::{Child, Command as Process, Stdio};
 use tcsos::time::{Duration, Instant};
 
@@ -22,17 +22,11 @@ use tcsprotocol::graph::Graph;
 
 mod common;
 
-/// Finds a port nothing holds, for something to bind.
-///
-/// # Returns
-///
-/// The port, free when it was looked at.
+/// A port nothing holds, for a program to bind, never given twice in this
+/// test's process: see `tcs_testing`, which says why a port let go is not
+/// enough.
 fn free() -> u16 {
-    UdpSocket::bind("127.0.0.1:0")
-        .expect("a port")
-        .local_addr()
-        .expect("its address")
-        .port()
+    tcs_testing::free()
 }
 
 /// tcspecial, stopped however the test ends.
@@ -160,7 +154,7 @@ fn a_ground_station_commands_a_vehicle_on_a_cfs_bus() {
 
     // A reading, through the gateway node it is drawn into.
     let mut fsw = GatewayReceiver::open(&graph, "fsw").expect("fsw opens");
-    let sensor = UdpSocket::bind("127.0.0.1:0").expect("the sensor");
+    let sensor = tcs_testing::bound();
     let to: SocketAddr = format!("127.0.0.1:{thermometer}").parse().unwrap();
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut reading = None;

@@ -3356,12 +3356,8 @@ vehicle:
     #[test]
     fn under_yamcs_the_uplink_and_a_downlink_are_framed() {
         use tcsprotocol::ccsds::{read_header, PacketType, Sender};
-        let free = || {
-            tcsos::net::UdpSocket::bind("127.0.0.1:0")
-                .and_then(|socket| socket.local_addr())
-                .expect("a free port")
-                .port()
-        };
+        // Never the same port twice in this process: see `tcs_testing`.
+        let free = tcs_testing::free;
         // The ping node is device id 1, so it sends to ground_base plus 1.
         let ground = tcsos::net::UdpSocket::bind("127.0.0.1:0").expect("bound");
         ground

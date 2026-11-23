@@ -28,20 +28,23 @@ mod common;
 ///
 /// If no port can be bound or the timeout cannot be set.
 fn bound() -> UdpSocket {
-    let socket = UdpSocket::bind("127.0.0.1:0").expect("a port of its own");
+    let socket = tcs_testing::bound();
     socket
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
     socket
 }
 
+/// The port a socket is bound to.
 fn port(socket: &UdpSocket) -> u16 {
-    socket.local_addr().expect("its address").port()
+    tcs_testing::port(socket)
 }
 
-/// A port nothing holds, for tcspecial to bind.
+/// A port nothing holds, for a program to bind, never given twice in this
+/// test's process: see `tcs_testing`, which says why a port let go is not
+/// enough.
 fn free() -> u16 {
-    port(&bound())
+    tcs_testing::free()
 }
 
 /// tcspecial, stopped however the test ends: a vehicle left running would

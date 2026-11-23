@@ -31,16 +31,18 @@ mod common;
 ///
 /// If no port can be bound or the timeout cannot be set.
 fn socket() -> UdpSocket {
-    let socket = UdpSocket::bind("127.0.0.1:0").expect("a socket");
+    let socket = tcs_testing::bound();
     socket
         .set_read_timeout(Some(Duration::from_secs(5)))
         .expect("a timeout");
     socket
 }
 
-/// A port nothing holds: the configuration check refuses port 0.
+/// A port nothing holds, for a program to bind, never given twice in this
+/// test's process: the configuration check refuses port 0. See
+/// `tcs_testing`, which says why a port let go is not enough.
 fn free() -> u16 {
-    socket().local_addr().expect("a port").port()
+    tcs_testing::free()
 }
 
 /// tcspecial, stopped however the test ends.

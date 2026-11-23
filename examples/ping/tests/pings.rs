@@ -22,18 +22,21 @@ use tcsprotocol::config_digest::{digest_of_file, ConfigVersion};
 use tcsprotocol::node::vehicle::ping;
 use tcsprotocol::Beacon;
 
-/// A socket on a port nothing holds.
+/// A socket on a port nothing holds, and no test here has been given.
 fn bound() -> UdpSocket {
-    UdpSocket::bind("127.0.0.1:0").expect("a port of its own")
+    tcs_testing::bound()
 }
 
+/// The port a socket is bound to.
 fn port(socket: &UdpSocket) -> u16 {
-    socket.local_addr().expect("its address").port()
+    tcs_testing::port(socket)
 }
 
-/// A port nothing holds, for the ground station to bind.
+/// A port nothing holds, for a program to bind, never given twice in this
+/// test's process: see `tcs_testing`, which says why a port let go is not
+/// enough.
 fn free() -> u16 {
-    port(&bound())
+    tcs_testing::free()
 }
 
 #[test]

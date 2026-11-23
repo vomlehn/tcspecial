@@ -196,13 +196,8 @@ mod tests {
     ///
     /// The configuration.
     fn graph(vehicle: u16) -> Graph {
-        let free = || {
-            UdpSocket::bind("127.0.0.1:0")
-                .unwrap()
-                .local_addr()
-                .unwrap()
-                .port()
-        };
+        // Never the same port twice in this process: see `tcs_testing`.
+        let free = tcs_testing::free;
         let dir = tempfile::tempdir().expect("a directory");
         let path = dir.path().join("listening.ytcs");
         tcsos::fs::write(

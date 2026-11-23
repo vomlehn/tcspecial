@@ -14,6 +14,9 @@ Python to the Rust it is written after"""
 [dev-dependencies]
 tcsprotocol = { path = "../../tcsprotocol" }
 tempfile = "3"
+# Ports for the programs the tests start, never the same twice: see
+# tcs-testing.
+tcs-testing = { path = "../../tcs-testing" }
 
 [lints]
 workspace = true

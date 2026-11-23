@@ -110,7 +110,7 @@ pub fn connect_unless(
 /// If no port can be bound or the timeout cannot be set.
 #[allow(dead_code)]
 pub fn bound() -> UdpSocket {
-    let socket = UdpSocket::bind("127.0.0.1:0").expect("a port of its own");
+    let socket = tcs_testing::bound();
     socket
         .set_read_timeout(Some(Duration::from_millis(100)))
         .expect("a timeout");
@@ -123,10 +123,12 @@ pub fn port(socket: &UdpSocket) -> u16 {
     socket.local_addr().expect("its address").port()
 }
 
-/// A port nothing holds, for tcspecial to bind.
+/// A port nothing holds, for tcspecial to bind, never given twice in this
+/// test's process: see `tcs_testing`, which says why a port let go is not
+/// enough.
 #[allow(dead_code)]
 pub fn free() -> u16 {
-    port(&bound())
+    tcs_testing::free()
 }
 
 /// tcspecial, stopped however the test ends: a vehicle left running would

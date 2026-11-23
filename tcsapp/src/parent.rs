@@ -289,7 +289,14 @@ impl End {
                 let room = (wanted - self.got.len()).min(byte.len());
                 match self.socket.read(&mut byte[..room]) {
                     Ok(0) => {
-                        // The far end has gone. Part of a packet left behind
+                        // The far end has gone: every copy of its socket is
+                        // closed. Not at once, always, when the program
+                        // closes it: a program forked meanwhile holds a copy
+                        // until its exec closes it, so the end may arrive a
+                        // read or two later, as nothing first. That costs a
+                        // round of the fabric, nothing more.
+                        //
+                        // Part of a packet left behind
                         // is a program that died between writing a length and
                         // writing its bytes, which is not an end: half a datum
                         // is not a datum, and passing it on would pass on
@@ -1070,30 +1077,113 @@ mod tests {
         assert_eq!(end.read_now().expect("no more"), Arrived::Nothing);
     }
 
-    /// An interface whose far end has gone has ended.
-    #[test]
-    fn an_interface_whose_far_end_has_gone_has_ended() {
-        let (mut end, theirs) = pair();
-        drop(theirs);
-        assert_eq!(end.read_now().expect("the end"), Arrived::Ended);
+    /// How many times each test of a far end going runs, while programs
+    /// are started beside it: enough that the moment the race needs comes
+    /// round many times, which once was a failure in several hundred.
+    const ROUNDS: usize = 20_000;
+
+    /// Runs `round` again and again while another thread starts programs as
+    /// tcspecial starts an app's, by fork and exec, and returns once it has
+    /// run `ROUNDS` times.
+    ///
+    /// A far end dropped is gone only once every copy of its socket is
+    /// closed, and a program forked meanwhile -- by another test, or by
+    /// tcspecial starting another app -- holds a copy from its fork to its
+    /// exec, where the socket's close-on-exec flag closes it. A test that
+    /// read the near end in that moment and wanted the end at once saw
+    /// nothing yet: rarely, in a run of every test, and never alone. This
+    /// makes the moment come round, so that a test that assumes the end is
+    /// seen at once fails every time rather than now and then.
+    ///
+    /// # Arguments
+    ///
+    /// * `round` - One round of the test.
+    fn while_programs_start(mut round: impl FnMut()) {
+        let stop =
+            std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let starting = {
+            let stop = stop.clone();
+            std::thread::spawn(move || {
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    let mut command = tcsos::process::Command::new("true");
+                    super::unblocking(&mut command);
+                    let _ = command.status();
+                }
+            })
+        };
+        for _ in 0..ROUNDS {
+            round();
+        }
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        starting.join().expect("the starting thread");
     }
 
-    /// But one that goes away mid-packet is a failure, not an end.
+    /// Reads an end whose far end has just been dropped until something
+    /// other than nothing arrives: the end, or a failure.
+    ///
+    /// Nothing is what a read in the moment before the last copy of the far
+    /// end closes answers -- see [`while_programs_start`] -- and the end
+    /// follows it, at the latest when the program forked meanwhile reaches
+    /// its exec. Five seconds is far longer than that ever takes, and an end
+    /// that has not come by then is a failure of the test.
+    ///
+    /// # Arguments
+    ///
+    /// * `end` - The near end.
+    ///
+    /// # Returns
+    ///
+    /// What the read answered that was not nothing.
+    ///
+    /// # Errors
+    ///
+    /// What the read failed with: `UnexpectedEof` for a packet cut short.
+    fn after_the_far_end_goes(end: &mut End) -> io::Result<Arrived> {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            match end.read_now() {
+                Ok(Arrived::Nothing) if Instant::now() < deadline => {
+                    std::thread::yield_now();
+                }
+                said => return said,
+            }
+        }
+    }
+
+    /// An interface whose far end has gone has ended, while programs are
+    /// being started beside it.
+    #[test]
+    fn an_interface_whose_far_end_has_gone_has_ended() {
+        while_programs_start(|| {
+            let (mut end, theirs) = pair();
+            drop(theirs);
+            assert_eq!(
+                after_the_far_end_goes(&mut end).expect("the end"),
+                Arrived::Ended
+            );
+        });
+    }
+
+    /// But one that goes away mid-packet is a failure, not an end, while
+    /// programs are being started beside it.
     ///
     /// Half a datum is not a datum: a program killed between writing a length
     /// and writing its bytes has left something nobody wrote, and passing it
     /// on as a short packet would pass that on.
     #[test]
     fn a_far_end_that_goes_mid_packet_is_a_failure() {
-        let (mut end, mut theirs) = pair();
-        theirs.write_all(&6u32.to_ne_bytes()).expect("a length");
-        theirs.write_all(b"293").expect("half the bytes");
-        assert_eq!(end.read_now().expect("not yet"), Arrived::Nothing);
+        while_programs_start(|| {
+            let (mut end, mut theirs) = pair();
+            theirs.write_all(&6u32.to_ne_bytes()).expect("a length");
+            theirs.write_all(b"293").expect("half the bytes");
+            assert_eq!(end.read_now().expect("not yet"), Arrived::Nothing);
 
-        drop(theirs);
-        let said = end.read_now().expect_err("a packet cut short");
-        assert_eq!(said.kind(), io::ErrorKind::UnexpectedEof);
-        assert!(said.to_string().contains("3 bytes into"), "{said}");
+            drop(theirs);
+            let said = after_the_far_end_goes(&mut end)
+                .expect_err("a packet cut short");
+            assert_eq!(said.kind(), io::ErrorKind::UnexpectedEof);
+            assert!(said.to_string().contains("3 bytes into"), "{said}");
+        });
     }
 
     /// A waiting read gives up, and what arrived is still there afterwards.

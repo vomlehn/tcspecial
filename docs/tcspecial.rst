@@ -2628,6 +2628,9 @@ The minimal example
 
    ``examples/minimal``: one payload, and its telemetry going to the ground.
 
+Its configuration, printed by tcs-cfge:
+`minimal.pdf <../examples/minimal/minimal.pdf>`__.
+
 The smallest configuration that does something. It has one payload,
 ``sensor``, a UDP socket at ``127.0.0.28:5001``, and no other node: no line is
 drawn from the sensor at all. tcspecial binds the sensor's address and reads
@@ -2657,6 +2660,9 @@ The thermostat example
 
    ``examples/thermostat``: a trio of sensors, a vote, a thermostat, its two
    heaters, and the lines that say what the heaters are doing.
+
+Its configuration, printed by tcs-cfge:
+`thermostat.pdf <../examples/thermostat/thermostat.pdf>`__.
 
 The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- ``temp_1``, ``temp_2`` and ``temp_3`` -- are read
@@ -2804,6 +2810,9 @@ The battery example
    ``examples/battery``: a power bus through an orbit, its charge counted
    aboard and its science load shed in eclipse.
 
+Its configuration, printed by tcs-cfge:
+`battery.pdf <../examples/battery/battery.pdf>`__.
+
 A spacecraft's power system, and the example of a payload that is asked, of
 a computation that is a program, and of physics with events in it.
 
@@ -2861,6 +2870,9 @@ The descent example
    ``examples/descent``: a lander flown down from five hundred metres by a
    program, and a switch that says when it is down.
 
+Its configuration, printed by tcs-cfge:
+`descent.pdf <../examples/descent/descent.pdf>`__.
+
 A lander's terminal descent over the Moon, and the example of a computation
 that drives a device with a value, and of a device that speaks the moment
 something happens.
@@ -2903,6 +2915,11 @@ and the rest after.
 
 The lander example
 ------------------
+
+Its two configurations, printed by tcs-cfge:
+`lander-a.pdf <../examples/lander-a/lander-a.pdf>`__ and
+`lander-b.pdf <../examples/lander-b/lander-b.pdf>`__.
+
 A lunar landing in two dimensions, flown by hand: two tcspecials, one for
 each axis, read a joystick in tcs-sim's window and drive the
 lander's thrust with it, and send its position, velocity and acceleration
@@ -2980,6 +2997,9 @@ The simple-app example
    ``examples/simple-app``: a payload that is a program, and a ground station
    that prints what it sends.
 
+Its configuration, printed by tcs-cfge:
+`simple-app.pdf <../examples/simple-app/simple-app.pdf>`__.
+
 A payload need not be a device. ``lorem`` is an ``app_pl`` node: a program,
 ``lorem_pl.py``, written in Python 3, that tcspecial starts from the
 configuration with the argument
@@ -3024,6 +3044,9 @@ The beacon example
    :width: 100%
 
    ``examples/beacon``: a beacon, and a window watching it.
+
+Its configuration, printed by tcs-cfge:
+`beacon.pdf <../examples/beacon/beacon.pdf>`__.
 
 What a ground station knows about a spacecraft without asking it anything.
 tcspecial sends a beacon from ``beacon.send`` to ``beacon.recv`` for as long
@@ -3124,6 +3147,9 @@ The ping example
    :width: 100%
 
    ``examples/ping``: a ping, answered by the vehicle and timed by the ground.
+
+Its configuration, printed by tcs-cfge:
+`ping.pdf <../examples/ping/ping.pdf>`__.
 
 The one exchange that shows how long the link takes each way, and how far the
 two ends' clocks are apart. The ground station sends ``ping #<count> <time>``
@@ -3234,6 +3260,9 @@ The ping-yamcs example
    ``examples/ping-yamcs``: the ping example with Yamcs between the ground
    station and the vehicle, over CCSDS packets.
 
+Its configuration, printed by tcs-cfge:
+`ping-yamcs.pdf <../examples/ping-yamcs/ping-yamcs.pdf>`__.
+
 The ping example with Yamcs (https://yamcs.org) at the ground end. The
 vehicle is the same -- a ``ping`` node that answers each ping with its time
 on the end -- and so are the three times. What differs is the configuration's
@@ -3323,6 +3352,9 @@ The memusage example
    ``examples/memusage``: how much memory tcspecial has, and how deep each
    of its threads has been into its stack, watched through Yamcs.
 
+Its configuration, printed by tcs-cfge:
+`memusage.pdf <../examples/memusage/memusage.pdf>`__.
+
 A vehicle to watch the memory of: a ``gateway_yamcs`` node and three ping
 nodes, ``ping1``, ``ping2`` and ``ping3``, each a thread of its own, answering
 to Yamcs. Nothing is pinged. ``examples/memusage/memusage.py`` has Yamcs send
@@ -3386,6 +3418,9 @@ The thermostat-yamcs example
 
    ``examples/thermostat-yamcs``: the thermostat example with Yamcs
    between the ground station and the vehicle, over CCSDS packets.
+
+Its configuration, printed by tcs-cfge:
+`thermostat-yamcs.pdf <../examples/thermostat-yamcs/thermostat-yamcs.pdf>`__.
 
 The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
@@ -3473,6 +3508,9 @@ The tees example
    ``examples/tees``: a command copied back to the ground, a reading copied
    aboard, and data dropped.
 
+Its configuration, printed by tcs-cfge:
+`tees.pdf <../examples/tees/tees.pdf>`__.
+
 The four nodes that do nothing to what passes, each taking one stream. What
 the ground sends goes up to the gateway node ``moc``, which binds
 ``127.0.0.34:8600`` aboard, and leaves it for ``echo``, a ``tee-gateway``. The
@@ -3510,6 +3548,9 @@ The consolidator example
 
    ``examples/consolidator``: three sensors' readings and the battery's
    age sent down as one datum, a structure of them.
+
+Its configuration, printed by tcs-cfge:
+`consolidator.pdf <../examples/consolidator/consolidator.pdf>`__.
 
 Three sensors, each reporting at its own pace and in its own type: ``sun``, a
 ``u16``, every second; ``wheel``, an ``i32``, four times a second; and
@@ -3578,6 +3619,9 @@ The fprime example
    :width: 100%
 
    ``examples/fprime``: a vehicle that answers to an F´ flight computer.
+
+Its configuration, printed by tcs-cfge:
+`fprime.pdf <../examples/fprime/fprime.pdf>`__.
 
 The vehicle answers to an F´ flight computer rather than to the ground, so the
 ``tcspecial`` section says ``gateway: "fprime"`` and the one gateway node,
@@ -3736,6 +3780,9 @@ The cfs example
    :width: 100%
 
    ``examples/cfs``: a vehicle that answers to a cFS flight computer.
+
+Its configuration, printed by tcs-cfge:
+`cfs.pdf <../examples/cfs/cfs.pdf>`__.
 
 The vehicle answers to a cFS flight computer rather than to the ground, so the
 ``tcspecial`` section says ``gateway: "cfs"`` and the one gateway node,
@@ -3900,6 +3947,9 @@ The can example
 
    ``examples/can``: a motor controller on a CAN bus.
 
+Its configuration, printed by tcs-cfge:
+`can.pdf <../examples/can/can.pdf>`__.
+
 A motor controller on the CAN bus ``vcan0``, which sends its status in frames
 carrying the identifier ``0x123`` and takes commands in frames carrying
 ``0x124``. Two identifiers make two payloads: each opens a socket of its own
@@ -3931,6 +3981,9 @@ The gpio example
 
    ``examples/gpio``: a switch read, and a lamp driven.
 
+Its configuration, printed by tcs-cfge:
+`gpio.pdf <../examples/gpio/gpio.pdf>`__.
+
 Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. ``switch`` watches line 0
 and twice a second reports it, as the ``u8`` the line is bit 0 of, by its
@@ -3958,6 +4011,9 @@ The iio example
    :width: 100%
 
    ``examples/iio``: a sensor's sample buffer.
+
+Its configuration, printed by tcs-cfge:
+`iio.pdf <../examples/iio/iio.pdf>`__.
 
 A sensor's buffer, which hands over whole sample sets as they are taken.
 ``sensor`` reads it and each read's sets go by its ``world-out`` to

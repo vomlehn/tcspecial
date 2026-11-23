@@ -2988,6 +2988,8 @@ the right is the ground.</p>
 tcspecial sends to the ground over the sensor's telemetry link.</object>
 <p class="caption"><tt class="docutils literal">examples/minimal</tt>: one payload, and its telemetry going to the ground.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/minimal/minimal.pdf">minimal.pdf</a>.</p>
 <p>The smallest configuration that does something. It has one payload,
 <tt class="docutils literal">sensor</tt>, a UDP socket at <tt class="docutils literal">127.0.0.28:5001</tt>, and no other node: no line is
 drawn from the sensor at all. tcspecial binds the sensor's address and reads
@@ -3014,6 +3016,8 @@ dummy chip, which tcs-sim watches.</object>
 <p class="caption"><tt class="docutils literal">examples/thermostat</tt>: a trio of sensors, a vote, a thermostat, its two
 heaters, and the lines that say what the heaters are doing.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/thermostat/thermostat.pdf">thermostat.pdf</a>.</p>
 <p>The worked example of computing aboard, and of surviving a part that fails.
 Three temperature sensors -- <tt class="docutils literal">temp_1</tt>, <tt class="docutils literal">temp_2</tt> and <tt class="docutils literal">temp_3</tt> -- are read
 together once a second as the group <tt class="docutils literal">zone_temps</tt>, which is what a
@@ -3146,6 +3150,8 @@ Everything goes to the ground and to a log.</object>
 <p class="caption"><tt class="docutils literal">examples/battery</tt>: a power bus through an orbit, its charge counted
 aboard and its science load shed in eclipse.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/battery/battery.pdf">battery.pdf</a>.</p>
 <p>A spacecraft's power system, and the example of a payload that is asked, of
 a computation that is a program, and of physics with events in it.</p>
 <p><tt class="docutils literal">monitor</tt> is a power monitor on a serial line, <tt class="docutils literal"><span class="pre">/tmp/tcs-battery-monitor</span></tt>.
@@ -3196,6 +3202,8 @@ switch. Everything goes to the ground and to a log.</object>
 <p class="caption"><tt class="docutils literal">examples/descent</tt>: a lander flown down from five hundred metres by a
 program, and a switch that says when it is down.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/descent/descent.pdf">descent.pdf</a>.</p>
 <p>A lander's terminal descent over the Moon, and the example of a computation
 that drives a device with a value, and of a device that speaks the moment
 something happens.</p>
@@ -3234,6 +3242,9 @@ and the rest after.</p>
 </div>
 <div class="section" id="the-lander-example">
 <h2><a class="toc-backref" href="#toc-entry-47">The lander example</a></h2>
+<p>Its two configurations, printed by tcs-cfge:
+<a class="reference external" href="../examples/lander-a/lander-a.pdf">lander-a.pdf</a> and
+<a class="reference external" href="../examples/lander-b/lander-b.pdf">lander-b.pdf</a>.</p>
 <p>A lunar landing in two dimensions, flown by hand: two tcspecials, one for
 each axis, read a joystick in tcs-sim's window and drive the
 lander's thrust with it, and send its position, velocity and acceleration
@@ -3299,6 +3310,8 @@ to the ground station program lorem_gateway.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">examples/simple-app</span></tt>: a payload that is a program, and a ground station
 that prints what it sends.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/simple-app/simple-app.pdf">simple-app.pdf</a>.</p>
 <p>A payload need not be a device. <tt class="docutils literal">lorem</tt> is an <tt class="docutils literal">app_pl</tt> node: a program,
 <tt class="docutils literal">lorem_pl.py</tt>, written in Python 3, that tcspecial starts from the
 configuration with the argument
@@ -3339,6 +3352,8 @@ the ground station beacon, which shows it on the beacon panel
 -- an indicator, the time the last one arrived, and what it said.</object>
 <p class="caption"><tt class="docutils literal">examples/beacon</tt>: a beacon, and a window watching it.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/beacon/beacon.pdf">beacon.pdf</a>.</p>
 <p>What a ground station knows about a spacecraft without asking it anything.
 tcspecial sends a beacon from <tt class="docutils literal">beacon.send</tt> to <tt class="docutils literal">beacon.recv</tt> for as long
 as it runs, over a socket of its own and whether or not anything has connected
@@ -3429,6 +3444,8 @@ answer comes back down through the gateway node to the ground, beside
 the beacon panel.</object>
 <p class="caption"><tt class="docutils literal">examples/ping</tt>: a ping, answered by the vehicle and timed by the ground.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/ping/ping.pdf">ping.pdf</a>.</p>
 <p>The one exchange that shows how long the link takes each way, and how far the
 two ends' clocks are apart. The ground station sends <tt class="docutils literal">ping #&lt;count&gt; &lt;time&gt;</tt>
 up to the gateway node, which binds <tt class="docutils literal">address:port</tt> aboard and hands it by its
@@ -3528,6 +3545,8 @@ both.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">examples/ping-yamcs</span></tt>: the ping example with Yamcs between the ground
 station and the vehicle, over CCSDS packets.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/ping-yamcs/ping-yamcs.pdf">ping-yamcs.pdf</a>.</p>
 <p>The ping example with Yamcs (<a class="reference external" href="https://yamcs.org">https://yamcs.org</a>) at the ground end. The
 vehicle is the same -- a <tt class="docutils literal">ping</tt> node that answers each ping with its time
 on the end -- and so are the three times. What differs is the configuration's
@@ -3607,6 +3626,8 @@ runs an instance for each tcspecial it is given.</object>
 <p class="caption"><tt class="docutils literal">examples/memusage</tt>: how much memory tcspecial has, and how deep each
 of its threads has been into its stack, watched through Yamcs.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/memusage/memusage.pdf">memusage.pdf</a>.</p>
 <p>A vehicle to watch the memory of: a <tt class="docutils literal">gateway_yamcs</tt> node and three ping
 nodes, <tt class="docutils literal">ping1</tt>, <tt class="docutils literal">ping2</tt> and <tt class="docutils literal">ping3</tt>, each a thread of its own, answering
 to Yamcs. Nothing is pinged. <tt class="docutils literal">examples/memusage/memusage.py</tt> has Yamcs send
@@ -3662,6 +3683,8 @@ where each is a temperature in kelvin or a switch on or off.</object>
 <p class="caption"><tt class="docutils literal"><span class="pre">examples/thermostat-yamcs</span></tt>: the thermostat example with Yamcs
 between the ground station and the vehicle, over CCSDS packets.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/thermostat-yamcs/thermostat-yamcs.pdf">thermostat-yamcs.pdf</a>.</p>
 <p>The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
 simulator file, with the physics model tcs-sim joins its simulated payloads
@@ -3739,6 +3762,8 @@ null-payload.</object>
 <p class="caption"><tt class="docutils literal">examples/tees</tt>: a command copied back to the ground, a reading copied
 aboard, and data dropped.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/tees/tees.pdf">tees.pdf</a>.</p>
 <p>The four nodes that do nothing to what passes, each taking one stream. What
 the ground sends goes up to the gateway node <tt class="docutils literal">moc</tt>, which binds
 <tt class="docutils literal">127.0.0.34:8600</tt> aboard, and leaves it for <tt class="docutils literal">echo</tt>, a <tt class="docutils literal"><span class="pre">tee-gateway</span></tt>. The
@@ -3773,6 +3798,8 @@ defaults until they have reported, down through gateway to
 <p class="caption"><tt class="docutils literal">examples/consolidator</tt>: three sensors' readings and the battery's
 age sent down as one datum, a structure of them.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/consolidator/consolidator.pdf">consolidator.pdf</a>.</p>
 <p>Three sensors, each reporting at its own pace and in its own type: <tt class="docutils literal">sun</tt>, a
 <tt class="docutils literal">u16</tt>, every second; <tt class="docutils literal">wheel</tt>, an <tt class="docutils literal">i32</tt>, four times a second; and
 <tt class="docutils literal">battery</tt>, a <tt class="docutils literal">u8</tt>, every five seconds. <tt class="docutils literal">housekeeping</tt>, a
@@ -3835,6 +3862,8 @@ device id; a command from the bridge goes up to fsw and on to the
 heater.</object>
 <p class="caption"><tt class="docutils literal">examples/fprime</tt>: a vehicle that answers to an F´ flight computer.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/fprime/fprime.pdf">fprime.pdf</a>.</p>
 <p>The vehicle answers to an F´ flight computer rather than to the ground, so the
 <tt class="docutils literal">tcspecial</tt> section says <tt class="docutils literal">gateway: &quot;fprime&quot;</tt> and the one gateway node,
 <tt class="docutils literal">fsw</tt>, is a <tt class="docutils literal">gateway_fprime</tt>. Its far end is a component of the F´
@@ -3976,6 +4005,8 @@ plus the thermometer's device id; a command the bus publishes as
 fsw's cmd_msgid goes to fsw and on to the heater.</object>
 <p class="caption"><tt class="docutils literal">examples/cfs</tt>: a vehicle that answers to a cFS flight computer.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/cfs/cfs.pdf">cfs.pdf</a>.</p>
 <p>The vehicle answers to a cFS flight computer rather than to the ground, so the
 <tt class="docutils literal">tcspecial</tt> section says <tt class="docutils literal">gateway: &quot;cfs&quot;</tt> and the one gateway node,
 <tt class="docutils literal">fsw</tt>, is a <tt class="docutils literal">gateway_cfs</tt>. tcspecial joins the computer's software bus as
@@ -4130,6 +4161,8 @@ leaves it for motor_command, which puts it on the bus as a frame
 carrying 0x124.</object>
 <p class="caption"><tt class="docutils literal">examples/can</tt>: a motor controller on a CAN bus.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/can/can.pdf">can.pdf</a>.</p>
 <p>A motor controller on the CAN bus <tt class="docutils literal">vcan0</tt>, which sends its status in frames
 carrying the identifier <tt class="docutils literal">0x123</tt> and takes commands in frames carrying
 <tt class="docutils literal">0x124</tt>. Two identifiers make two payloads: each opens a socket of its own
@@ -4158,6 +4191,8 @@ to the MOC; a 1 or 0 the MOC sends up to ground leaves it for lamp,
 which drives line 1 to it.</object>
 <p class="caption"><tt class="docutils literal">examples/gpio</tt>: a switch read, and a lamp driven.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/gpio/gpio.pdf">gpio.pdf</a>.</p>
 <p>Two lines of one chip, each a payload of its own because one is read and the
 other driven, and a payload's lines all go one way. <tt class="docutils literal">switch</tt> watches line 0
 and twice a second reports it, as the <tt class="docutils literal">u8</tt> the line is bit 0 of, by its
@@ -4183,6 +4218,8 @@ software trigger, is read by sensor, and its sample sets go to
 ground, a gateway_radio node, and down to the MOC.</object>
 <p class="caption"><tt class="docutils literal">examples/iio</tt>: a sensor's sample buffer.</p>
 </div>
+<p>Its configuration, printed by tcs-cfge:
+<a class="reference external" href="../examples/iio/iio.pdf">iio.pdf</a>.</p>
 <p>A sensor's buffer, which hands over whole sample sets as they are taken.
 <tt class="docutils literal">sensor</tt> reads it and each read's sets go by its <tt class="docutils literal"><span class="pre">world-out</span></tt> to
 <tt class="docutils literal">moc</tt> and down to the MOC at <tt class="docutils literal">127.0.0.21:3741</tt>. Nothing goes up: a

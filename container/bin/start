@@ -5,6 +5,7 @@
 # every TCS package installed in it.
 #
 #   bin/start [-f | --fedora] [-r | --rebuild] [DIR...]
+#   bin/start [-f | --fedora] [-r | --rebuild] tcsx [NAME [ARGUMENT...]]
 #
 # The container is the kubuntu one, for the .debs, or with -f or --fedora
 # the fedora one, for the RPMs. Where it exists, it is started as it was
@@ -30,12 +31,22 @@
 # first there of x-terminal-emulator, konsole, gnome-terminal and xterm.
 # Without a display or a terminal, it says so and stops before starting
 # anything, the window being where what is done in the container is seen.
+#
+# With tcsx, in place of the DIRs, it opens no window: it starts the
+# container as above, the packages, if it is made, from each TCS checkout,
+# and runs tcs-container example in this terminal, which lists tcspecial's
+# examples, or with NAME runs that one, its window on the desktop, until
+# the window is closed or Ctrl+C, the ARGUMENTs going to its ground
+# station. Then it stops the container, unless it was running already, as
+# under another bin/start's window, which keeps it.
 
 set -eu
 
 # Prints how to call this command.
 usage() {
 	echo "usage: bin/start [-f | --fedora] [-r | --rebuild] [DIR...]"
+	echo "       bin/start [-f | --fedora] [-r | --rebuild]" \
+		"tcsx [NAME [ARGUMENT...]]"
 }
 
 # Says what is wrong and stops.
@@ -157,20 +168,40 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-# The container is made, and the packages are wanted, only where there is
-# none or it is to be rebuilt.
-make=$rebuild
-"$here/tcs-container" --distro "$distro" exists || make=1
-if [ -n "$make" ] && [ $# -eq 0 ]; then
-	for dir in "$here"/../../../tcs*/; do
-		if [ -d "$dir/.git" ]; then
-			set -- "$@" "${dir%/}"
-		fi
-	done
+# With tcsx, what follows it is tcsx's, and the packages are each TCS
+# checkout's.
+tcsx=
+if [ "${1:-}" = tcsx ]; then
+	tcsx=1
+	shift
 fi
 
-# From each directory, the files at the version of its newest one.
-newest=$(if [ -n "$make" ]; then
+# The container is made, and the packages are wanted, only where there is
+# none or it is to be rebuilt; and with tcsx, stopped afterwards only if it
+# was not running already.
+make=$rebuild
+"$here/tcs-container" --distro "$distro" exists || make=1
+# One made afresh was not: the one there is thrown away.
+was_up=
+if [ -z "$make" ] && "$here/tcs-container" --distro "$distro" up; then
+	was_up=1
+fi
+
+# Prints each TCS checkout: this tcspecial and those beside it.
+checkouts() {
+	for dir in "$here"/../../../tcs*/; do
+		if [ -d "$dir/.git" ]; then
+			echo "${dir%/}"
+		fi
+	done
+}
+
+# Prints, from each directory's build/packages, the files at the version
+# of its newest one.
+#
+# Arguments:
+#   $@  The directories.
+newest_of() {
 	for dir in "$@"; do
 		[ -d "$dir" ] || die "no directory $dir"
 		files=$(for file in "$dir"/build/packages/*."$kind"; do
@@ -186,18 +217,40 @@ newest=$(if [ -n "$make" ]; then
 			fi
 		done
 	done
-fi)
-[ -z "$make" ] || [ -n "$newest" ] \
-	|| die "no .$kind files in build/packages of $*:" \
+}
+
+# With tcsx, "$@" is tcsx's, so the checkouts are given to newest_of
+# directly.
+newest=
+if [ -n "$make" ]; then
+	if [ -n "$tcsx" ]; then
+		dirs=$(checkouts | tr '\n' ' ')
+		# shellcheck disable=SC2086 # one checkout a word; no spaces
+		newest=$(newest_of $dirs)
+	else
+		if [ $# -eq 0 ]; then
+			# shellcheck disable=SC2046 # one checkout a word; no spaces
+			set -- $(checkouts)
+		fi
+		dirs=$*
+		newest=$(newest_of "$@")
+	fi
+	[ -n "$newest" ] || die "no .$kind files in build/packages of $dirs:" \
 		"build them with make packages there"
+fi
+
 
 # The window is where the container is used, so there must be one to open
-# before anything is started.
-[ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ] \
-	|| die "no display to open the container's window on"
-terminal=$(terminal) || die "no terminal to open the container's window" \
-	"with: x-terminal-emulator, konsole, gnome-terminal or xterm, or" \
-	"one TERMINAL names"
+# before anything is started; tcsx is used from this terminal, and opens
+# none.
+if [ -z "$tcsx" ]; then
+	[ -n "${WAYLAND_DISPLAY:-}" ] || [ -n "${DISPLAY:-}" ] \
+		|| die "no display to open the container's window on"
+	terminal=$(terminal) \
+		|| die "no terminal to open the container's window with:" \
+			"x-terminal-emulator, konsole, gnome-terminal or" \
+			"xterm, or one TERMINAL names"
+fi
 
 if [ -n "$rebuild" ]; then
 	echo "Building the $distro image from scratch"
@@ -213,6 +266,19 @@ else
 	echo "Starting the $distro container as it was left:" \
 		"bin/start --rebuild makes it again"
 	"$here/tcs-container" --distro "$distro" start
+fi
+
+if [ -n "$tcsx" ]; then
+	# Ctrl+C ends the example, which says so; this goes on, to stop the
+	# container, rather than ending with it.
+	trap : INT HUP TERM
+	status=0
+	"$here/tcs-container" --distro "$distro" example "$@" || status=$?
+	if [ -z "$was_up" ]; then
+		echo "Stopping the $distro container"
+		"$here/tcs-container" --distro "$distro" stop
+	fi
+	exit "$status"
 fi
 open_window "$terminal" "$distro"
 

@@ -61,7 +61,8 @@ bin/start -f                            # the RPMs, in fedora
 bin/start --rebuild                     # kubuntu, from scratch
 ```
 
-`bin/start [-f | --fedora] [-r | --rebuild] [DIR...]` takes these:
+`bin/start [-f | --fedora] [-r | --rebuild] [DIR... | tcsx [NAME
+[ARGUMENT...]]]` takes these:
 
 - `-f`, `--fedora` -- the Fedora container, for the RPMs, rather than the
   Kubuntu one, for the `.deb` files.
@@ -78,6 +79,13 @@ bin/start --rebuild                     # kubuntu, from scratch
   its newest one are installed, so that an older build left beside them,
   or a package since renamed, is not. Given to a container that is
   started as it was left, they say nothing.
+- `tcsx [NAME [ARGUMENT...]]`, in place of the DIRs -- no window: the
+  container started as above, the packages each TCS checkout's if it is
+  made, and then, in this terminal, tcspecial's examples listed, or with
+  NAME that one run, as `bin/tcs-container-example` runs it (see
+  [Running tcspecial's examples](#running-tcspecials-examples)), until
+  its window is closed or Ctrl+C. Then the container is stopped, unless
+  it was running already, as under another `bin/start`'s window.
 - `-h`, `--help` -- how to call it.
 
 It then opens a new terminal window with a login shell in the container,
@@ -100,6 +108,7 @@ its name, such as `bin/tcs-container-fresh`:
 fresh             # throw the container away, start anew
 start             # start it as it was left, or make it
 exists            # succeed if it exists
+up                # succeed if it is running
 install FILE...   # install .deb or .rpm files
 installed         # the TCS packages it has
 shell             # a login shell in it, as tcs
@@ -129,6 +138,24 @@ bin/tcs-container-installed --distro fedora
 the container starts it. A package installed again at the same version is
 reinstalled, so that a package rebuilt without a new version is the one
 tested.
+
+What is fetched is kept, so that making the container again fetches only
+what has changed since the last time, while everything is still
+installed afresh:
+
+- **Building an image**, even with `--no-cache`, keeps what apt or dnf
+  fetches, and the Yamcs release, in Podman's build caches, which the
+  image does not hold: `tcs-kubuntu-apt` and `tcs-kubuntu-lists`,
+  `tcs-fedora-dnf`, and `tcs-yamcs`, which both share. A Yamcs kept is
+  checked against its digest, and fetched again if it does not match.
+- **The container** keeps what its apt or dnf fetches, as `install`
+  fetching what a package depends on, in the volume
+  `tcs-kubuntu-packages` or `tcs-fedora-packages`, which outlasts it, so
+  that the next `fresh` one finds it there.
+
+To fetch everything again, remove them: `podman volume rm
+tcs-kubuntu-packages` for a container's, and `buildah prune` for the
+build caches.
 
 `make container-install` builds the packages of the project checked out
 in `PROJECT`, this tcspecial checkout unless it names another, and
@@ -165,6 +192,15 @@ and, in another terminal on the host, while `bin/start` waits:
 ```sh
 bin/tcs-container-example               # list the examples
 bin/tcs-container-example thermostat    # run one, until its window closes
+```
+
+or, with no shell window at all, `bin/start tcsx`, which starts the
+container, lists the examples or runs one, and stops it again:
+
+```sh
+bin/start tcsx                          # list the examples
+bin/start tcsx thermostat               # run one, until its window closes
+bin/start -f tcsx thermostat            # in the fedora container
 ```
 
 The window `bin/start` opens says how to run them there: `tcsx` lists

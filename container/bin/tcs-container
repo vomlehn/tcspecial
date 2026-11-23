@@ -11,8 +11,10 @@
 #                      made
 #   fresh              throw the container away, with all that was done in
 #                      it, and start a new one from the image, building the
-#                      image first if there is none
+#                      image first if there is none; what its apt or dnf
+#                      fetches is kept, in the volume tcs-DISTRO-packages
 #   exists             succeed if the container exists, and fail if not
+#   up                 succeed if it is running, and fail if not
 #   start              start it, as it was left, making it first if there
 #                      is none
 #   shell [COMMAND...] a login shell in it as the user tcs, or COMMAND;
@@ -52,7 +54,7 @@ set -eu
 # Prints how to call this command.
 usage() {
 	echo "usage: tcs-container [--distro kubuntu|fedora]"
-	echo "       build [--no-cache] | fresh | exists | start |"
+	echo "       build [--no-cache] | fresh | exists | up | start |"
 	echo "       shell [--root] [COMMAND...] | install FILE... |"
 	echo "       remove PACKAGE... | installed | copy DIR... |"
 	echo "       example [--hidden] [NAME [ARGUMENT...]] |"
@@ -132,18 +134,36 @@ fresh() {
 		fi
 	fi
 	[ ! -d /dev/dri ] || set -- "$@" --device /dev/dri
+	# What apt or dnf fetches is kept in a volume of its own, which
+	# outlasts the container, so that the next fresh one fetches only
+	# what has changed: the images keep what they fetch, as their
+	# Containerfiles say. Podman makes it the first time, from what the
+	# image has there.
+	case $distro in
+	kubuntu) cache=/var/cache/apt/archives ;;
+	fedora) cache=/var/cache/libdnf5 ;;
+	esac
+	set -- "$@" -v "tcs-$distro-packages:$cache"
 	"$podman" run -d --name "$name" --hostname "$name" \
 		--systemd=always --userns=keep-id --user root "$@" "$image" \
 		> /dev/null
 	echo "[OK] $name is new and running"
 }
 
+# Says whether the container is running.
+#
+# Returns:
+#   0 if it is, 1 if not, or if there is none.
+up() {
+	exists && [ "$("$podman" container inspect -f '{{.State.Running}}' \
+		"$name")" = true ]
+}
+
 # Starts the container, making it first if there is none.
 running() {
 	if ! exists; then
 		fresh
-	elif [ "$("$podman" container inspect -f '{{.State.Running}}' \
-		"$name")" != true ]; then
+	elif ! up; then
 		"$podman" start "$name" > /dev/null
 	fi
 }
@@ -382,6 +402,7 @@ case $command in
 build) build "$@" ;;
 fresh) fresh ;;
 exists) exists ;;
+up) up ;;
 start) running ;;
 shell) shell "$@" ;;
 install) install "$@" ;;

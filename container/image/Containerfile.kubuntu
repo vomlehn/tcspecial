@@ -11,6 +11,13 @@
 # as tcspecial.service behave as they do on a real system. The package lists
 # are kept out of the image and fetched when packages are installed, so that
 # the image does not go stale.
+#
+# What apt fetches is kept between builds, in caches of the build's that
+# the image does not hold, so that a build from scratch fetches only what
+# has changed since the last: everything is still installed afresh.
+# Ubuntu's image has apt delete each package once installed, so that
+# setting goes, and the container keeps what it fetches too, in the volume
+# tcs-container gives it.
 
 FROM docker.io/library/ubuntu:26.04
 
@@ -21,15 +28,19 @@ ENV DEBIAN_FRONTEND=noninteractive
 # and sudo for the user the tests run as. What a TCS package needs it
 # brings with it, and what building a project needs its make install-tools
 # installs.
-RUN apt-get update \
+RUN \
+	--mount=type=cache,id=tcs-kubuntu-apt,dst=/var/cache/apt \
+	--mount=type=cache,id=tcs-kubuntu-lists,dst=/var/lib/apt/lists \
+	rm -f /etc/apt/apt.conf.d/docker-clean \
+ && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+	> /etc/apt/apt.conf.d/keep-downloaded \
+ && apt-get update \
  && apt-get install -y --no-install-recommends \
 	bash-completion ca-certificates curl dbus file findutils gawk git \
 	gzip iproute2 iputils-ping less lsof make nano netcat-openbsd procps \
 	psmisc python3 strace sudo systemd systemd-sysv tar vim-tiny xauth \
 	xvfb xz-utils default-jre-headless \
- && apt-get install -y --no-install-recommends kde-plasma-desktop \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends kde-plasma-desktop
 
 # Yamcs, which tcspecial's examples through it start, unpacked where
 # tcs-profile.sh, which each login shell reads, says it is; the Java it
@@ -37,13 +48,20 @@ RUN apt-get update \
 # digest GitHub gives it.
 ARG YAMCS_VERSION=5.14.0
 ARG YAMCS_SUM=35004954a65021a06182928bbc344adfb09b11599dd009863745010e98527356
-RUN release=https://github.com/yamcs/yamcs/releases/download \
- && curl -fsSL -o /tmp/yamcs.tar.gz \
+# The release is kept between builds, both images', in a cache of the
+# build's, so that it is fetched only once for each version, and fetched
+# again only where the one kept does not match its digest.
+RUN --mount=type=cache,id=tcs-yamcs,target=/var/cache/tcs-yamcs \
+	release=https://github.com/yamcs/yamcs/releases/download \
+ && tarball=/var/cache/tcs-yamcs/yamcs-$YAMCS_VERSION.tar.gz \
+ && if ! echo "$YAMCS_SUM  $tarball" | sha256sum -c --quiet - \
+	2> /dev/null; then \
+	curl -fsSL -o "$tarball.part" \
 	"$release/yamcs-$YAMCS_VERSION/yamcs-$YAMCS_VERSION-linux-x86_64.tar.gz" \
- && echo "$YAMCS_SUM  /tmp/yamcs.tar.gz" | sha256sum -c --quiet - \
+	&& mv "$tarball.part" "$tarball"; fi \
+ && echo "$YAMCS_SUM  $tarball" | sha256sum -c --quiet - \
  && mkdir /opt/yamcs \
- && tar xzf /tmp/yamcs.tar.gz -C /opt/yamcs --strip-components=1 \
- && rm /tmp/yamcs.tar.gz
+ && tar xzf "$tarball" -C /opt/yamcs --strip-components=1
 COPY tcs-profile.sh /etc/profile.d/tcs-profile.sh
 
 # xtcee, which opens a file or one of tcs-xtce's examples in its editor,

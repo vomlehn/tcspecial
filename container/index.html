@@ -311,7 +311,7 @@ installed in it the first time, and as you left it after that:</p>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span>                               <span class="co"># the .debs, in kubuntu</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span> <span class="at">-f</span>                            <span class="co"># the RPMs, in fedora</span></span>
 <span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span> <span class="at">--rebuild</span>                     <span class="co"># kubuntu, from scratch</span></span></code></pre></div>
-<p><code>bin/start [-f | --fedora] [-r | --rebuild] [DIR...]</code>
+<p><code>bin/start [-f | --fedora] [-r | --rebuild] [DIR... | tcsx [NAME [ARGUMENT...]]]</code>
 takes these:</p>
 <ul>
 <li><code>-f</code>, <code>--fedora</code> – the Fedora container, for
@@ -331,6 +331,14 @@ TCS checkout, this tcspecial and those beside it
 its newest one are installed, so that an older build left beside them,
 or a package since renamed, is not. Given to a container that is started
 as it was left, they say nothing.</li>
+<li><code>tcsx [NAME [ARGUMENT...]]</code>, in place of the DIRs – no
+window: the container started as above, the packages each TCS checkout’s
+if it is made, and then, in this terminal, tcspecial’s examples listed,
+or with NAME that one run, as <code>bin/tcs-container-example</code>
+runs it (see <a href="#running-tcspecials-examples">Running tcspecial’s
+examples</a>), until its window is closed or Ctrl+C. Then the container
+is stopped, unless it was running already, as under another
+<code>bin/start</code>’s window.</li>
 <li><code>-h</code>, <code>--help</code> – how to call it.</li>
 </ul>
 <p>It then opens a new terminal window with a login shell in the
@@ -353,19 +361,20 @@ on the host while it waits.</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">fresh</span>             <span class="co"># throw the container away, start anew</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">start</span>             <span class="co"># start it as it was left, or make it</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="ex">exists</span>            <span class="co"># succeed if it exists</span></span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="fu">install</span> FILE...   <span class="co"># install .deb or .rpm files</span></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="ex">installed</span>         <span class="co"># the TCS packages it has</span></span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span>             <span class="co"># a login shell in it, as tcs</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> tcslog-dump <span class="co"># or a command</span></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> tcs-cfge    <span class="co"># one with a window, on your desktop</span></span>
-<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> <span class="at">--root</span> CMD  <span class="co"># a command as root</span></span>
-<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="ex">remove</span> PACKAGE... <span class="co"># remove packages, configuration too</span></span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ex">copy</span> DIR...       <span class="co"># copy checkouts in, without their builds</span></span>
-<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="ex">example</span> <span class="pp">[</span><span class="ss">NAME</span><span class="pp">]</span>    <span class="co"># run a tcspecial example, or list them</span></span>
-<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="bu">wait</span>              <span class="co"># wait until it stops</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="ex">stop</span>              <span class="co"># stop it, keeping what was done in it</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="ex">build</span>             <span class="co"># build its image; --no-cache from scratch</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="ex">destroy</span> <span class="pp">[--</span><span class="ss">image</span><span class="pp">]</span> <span class="co"># remove it, and with --image its image</span></span></code></pre></div>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="ex">up</span>                <span class="co"># succeed if it is running</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="fu">install</span> FILE...   <span class="co"># install .deb or .rpm files</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="ex">installed</span>         <span class="co"># the TCS packages it has</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span>             <span class="co"># a login shell in it, as tcs</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> tcslog-dump <span class="co"># or a command</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> tcs-cfge    <span class="co"># one with a window, on your desktop</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="ex">shell</span> <span class="at">--root</span> CMD  <span class="co"># a command as root</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ex">remove</span> PACKAGE... <span class="co"># remove packages, configuration too</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="ex">copy</span> DIR...       <span class="co"># copy checkouts in, without their builds</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="ex">example</span> <span class="pp">[</span><span class="ss">NAME</span><span class="pp">]</span>    <span class="co"># run a tcspecial example, or list them</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="bu">wait</span>              <span class="co"># wait until it stops</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="ex">stop</span>              <span class="co"># stop it, keeping what was done in it</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="ex">build</span>             <span class="co"># build its image; --no-cache from scratch</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="ex">destroy</span> <span class="pp">[--</span><span class="ss">image</span><span class="pp">]</span> <span class="co"># remove it, and with --image its image</span></span></code></pre></div>
 <p>Each takes <code>--distro fedora</code> first for the Fedora
 container, kubuntu being the default:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-copy</span> ..</span>
@@ -376,6 +385,26 @@ container, kubuntu being the default:</p>
 command that needs the container starts it. A package installed again at
 the same version is reinstalled, so that a package rebuilt without a new
 version is the one tested.</p>
+<p>What is fetched is kept, so that making the container again fetches
+only what has changed since the last time, while everything is still
+installed afresh:</p>
+<ul>
+<li><strong>Building an image</strong>, even with
+<code>--no-cache</code>, keeps what apt or dnf fetches, and the Yamcs
+release, in Podman’s build caches, which the image does not hold:
+<code>tcs-kubuntu-apt</code> and <code>tcs-kubuntu-lists</code>,
+<code>tcs-fedora-dnf</code>, and <code>tcs-yamcs</code>, which both
+share. A Yamcs kept is checked against its digest, and fetched again if
+it does not match.</li>
+<li><strong>The container</strong> keeps what its apt or dnf fetches, as
+<code>install</code> fetching what a package depends on, in the volume
+<code>tcs-kubuntu-packages</code> or <code>tcs-fedora-packages</code>,
+which outlasts it, so that the next <code>fresh</code> one finds it
+there.</li>
+</ul>
+<p>To fetch everything again, remove them:
+<code>podman volume rm tcs-kubuntu-packages</code> for a container’s,
+and <code>buildah prune</code> for the build caches.</p>
 <p><code>make container-install</code> builds the packages of the
 project checked out in <code>PROJECT</code>, this tcspecial checkout
 unless it names another, and installs them in the container;
@@ -406,6 +435,12 @@ packages:</p>
 waits:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span>               <span class="co"># list the examples</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span> thermostat    <span class="co"># run one, until its window closes</span></span></code></pre></div>
+<p>or, with no shell window at all, <code>bin/start tcsx</code>, which
+starts the container, lists the examples or runs one, and stops it
+again:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span> tcsx                          <span class="co"># list the examples</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span> tcsx thermostat               <span class="co"># run one, until its window closes</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/start</span> <span class="at">-f</span> tcsx thermostat            <span class="co"># in the fedora container</span></span></code></pre></div>
 <p>The window <code>bin/start</code> opens says how to run them there:
 <code>tcsx</code> lists them, and <code>tcsx NAME</code> runs one.
 There, as from <code>bin/tcs-container-example</code>, <code>tcsx</code>
@@ -416,7 +451,7 @@ example’s own ground station, <code>-v</code> making it say what it is
 doing. Yamcs 5.14.0, which the examples through Yamcs start, is in each
 image, in <code>/opt/yamcs</code>, with the Java it runs on, and the
 login shells’ <code>YAMCS_HOME</code> says so:</p>
-<div class="sourceCode" id="cb7"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span> ping-yamcs</span></code></pre></div>
+<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-example</span> ping-yamcs</span></code></pre></div>
 <p><code>can</code>, <code>gpio</code> and <code>iio</code> drive the
 kernel’s dummy devices, which a rootless container cannot make, so they
 run only on the host. The logs the examples write are in the container’s
@@ -431,9 +466,9 @@ with Xvfb, in the container, where nobody sees it, so that a test, or a
 check run while you work, opens no window on your desktop. Such a run
 has no window to close, so it is given a time to last, and what it did
 is read from its output and its log afterwards:</p>
-<div class="sourceCode" id="cb8"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">timeout</span> 30 bin/tcs-container-example <span class="at">--hidden</span> battery <span class="op">&gt;</span> battery.out <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span></span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-c</span> ERROR battery.out                       <span class="co"># 0: nothing went wrong</span></span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-shell</span> ls /tmp/telemetry/battery  <span class="co"># the log it wrote</span></span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">timeout</span> 30 bin/tcs-container-example <span class="at">--hidden</span> battery <span class="op">&gt;</span> battery.out <span class="dv">2</span><span class="op">&gt;&amp;</span><span class="dv">1</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">grep</span> <span class="at">-c</span> ERROR battery.out                       <span class="co"># 0: nothing went wrong</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-shell</span> ls /tmp/telemetry/battery  <span class="co"># the log it wrote</span></span></code></pre></div>
 <p>The next run stops what the timeout left running in the
 container.</p>
 <h1 id="editing-configurations">Editing configurations</h1>
@@ -447,9 +482,10 @@ edit as it is made, so the first <code>-e</code> copies the installed
 examples to <code>~/tcspecial-examples</code>, and every <code>-e</code>
 edits the copy there. Remove the copy to start again from what is
 installed.</p>
-<div class="sourceCode" id="cb9"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> vehicle.ytcs               <span class="co"># opens vehicle.ytcs, or begins it</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> <span class="at">-e</span>                         <span class="co"># lists the examples</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> <span class="at">-e</span> thermostat              <span class="co"># edits thermostat.xtcs, and its sim file</span></span></code></pre></div>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> vehicle.ytcs               <span class="co"># opens vehicle.ytcs, or begins it</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> <span class="at">-e</span>                         <span class="co"># lists the examples</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">cfge</span> <span class="at">-e</span> thermostat              <span class="co"># edits thermostat.xtcs, and its sim file</span></span></code></pre></div>
 <p>An example has both spellings, <code>.xtcs</code> and
 <code>.ytcs</code>, and the editor writes every edit to both, so editing
 one keeps the other the same.</p>
@@ -462,17 +498,17 @@ which has the XTCE of the vehicle it configures; <code>xtcee -e</code>
 lists them, the two sets apart. An example of several documents, such as
 <code>split-mission</code>, opens all of them together, as one mission.
 The window <code>bin/start</code> opens says how to use it:</p>
-<div class="sourceCode" id="cb10"><pre
-class="sourceCode sh"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> FILE                      <span class="co"># opens FILE</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span>                        <span class="co"># lists the examples</span></span>
-<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span> housekeeping           <span class="co"># opens tcs-xtce&#39;s housekeeping.xtce</span></span>
-<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span> thermostat             <span class="co"># opens tcspecial&#39;s thermostat.xtce</span></span>
-<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">--example</span> split-mission   <span class="co"># opens its three documents</span></span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> FILE                      <span class="co"># opens FILE</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span>                        <span class="co"># lists the examples</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span> housekeeping           <span class="co"># opens tcs-xtce&#39;s housekeeping.xtce</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">-e</span> thermostat             <span class="co"># opens tcspecial&#39;s thermostat.xtce</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="ex">xtcee</span> <span class="at">--example</span> split-mission   <span class="co"># opens its three documents</span></span></code></pre></div>
 <h1 id="tcs-container">tcs-container</h1>
 <p>Every command above is one of <code>bin/tcs-container</code>’s; the
 scripts named for them run it:</p>
-<div class="sourceCode" id="cb11"><pre
-class="sourceCode sh"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container</span> [--distro kubuntu<span class="kw">|</span><span class="ex">fedora]</span> COMMAND <span class="pp">[</span><span class="ss">ARGUMENT...</span><span class="pp">]</span></span></code></pre></div>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode sh"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container</span> [--distro kubuntu<span class="kw">|</span><span class="ex">fedora]</span> COMMAND <span class="pp">[</span><span class="ss">ARGUMENT...</span><span class="pp">]</span></span></code></pre></div>
 <p><code>TCS_CONTAINER_DISTRO</code> names the distribution too, when
 <code>--distro</code> does not, and <code>PODMAN</code> another program
 to run in Podman’s place. The container is

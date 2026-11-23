@@ -1826,7 +1826,8 @@ component Surface inherits Rectangle {
                             && event.text != Key.Backspace) {
                             return reject;
                         }
-                        if (Session.read-only || root.joining != "") {
+                        if (Session.read-only || root.joining != ""
+                            || root.printing) {
                             return reject;
                         }
                         if (root.selected-link >= 0) {
@@ -2418,7 +2419,9 @@ export component MainWindow inherits Window {
     callback node-dragging(string, length, length);
     // Whether the window is taking commands about a configuration: not
     // while it is inert, and not with none open.
-    property <bool> working: !root.inert && !root.closed;
+    // Nor while Print is drawing the configuration's pages in it, one after
+    // another, which is no time to edit the one it happens to be showing.
+    property <bool> working: !root.inert && !root.closed && !root.printing;
     // The view at a place on the sheet, and where it is: Print's, forwarded
     // to the Surface's own.
     public function show-at(left: length, top: length, chosen: float) {
@@ -2460,7 +2463,7 @@ export component MainWindow inherits Window {
             // owes nothing -- the offer to save first where it does. Not
             // while a question about the one open is waiting.
             MenuItem {
-                enabled: !root.inert;
+                enabled: !root.inert && !root.printing;
                 title: "Open...";
                 shortcut: @keys(Control + O);
                 activated => { root.open-clicked(); }
@@ -2547,7 +2550,7 @@ export component MainWindow inherits Window {
             }
             MenuSeparator { }
             MenuItem {
-                enabled: !root.inert;
+                enabled: !root.inert && !root.printing;
                 title: "Exit";
                 activated => { root.exit-requested(); }
             }
@@ -2743,6 +2746,11 @@ export component MainWindow inherits Window {
         node-edit(n) => { root.node-edit(n); }
         node-delete(n) => { root.node-delete(n); }
     }
+
+    // While Print draws the pages, nothing under the pointer takes a press:
+    // clear, because what is under it is being printed, and a veil would
+    // be printed with it. The menus are greyed, and the keys refused.
+    if root.printing: TouchArea { }
 
     // With no configuration open, what the window is for now: one sentence
     // over the whole of it, which takes the presses, so that nothing of the

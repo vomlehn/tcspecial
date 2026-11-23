@@ -212,6 +212,8 @@ help:
 		"category"
 	@echo "  make screenshots - Make the GUI manuals' screenshots" \
 		"again, drawn in memory"
+	@echo "  make example-pdfs - Print every example's configuration to" \
+		"examples/NAME/NAME.pdf"
 	@echo "  make html-check  - Fail where a committed HTML page is" \
 		"behind its source, or a link leads nowhere"
 	@echo "  make hooks       - Have git run tcs-helpers' pre-commit" \
@@ -924,7 +926,8 @@ LIBTCS_SONAME := libtcsmoc-c.so.$(LIBTCS_ABI)
 # and Fedora both put it and as both want an installed script to say.
 EXAMPLE_FILES = examples/README.html $(shell git ls-files \
 		'examples/*/*.ytcs' 'examples/*/*.xtcs' 'examples/*/*.xtce' \
-		'examples/*/*-sim.yaml' 'examples/*/*.svg' 'examples/*/*.py' \
+		'examples/*/*-sim.yaml' 'examples/*/*.svg' 'examples/*/*.pdf' \
+		'examples/*/*.py' \
 		'examples/*/*.kwinrule' \
 		| grep -v '/test_[^/]*\.py$$')
 
@@ -1591,6 +1594,30 @@ screenshots-tcs-cfge:
 screenshots-tcs-moc:
 	cd $(RUST) && cargo test -p tcs-moc --lib -- --ignored --exact \
 		vehicle::screenshots::screenshots
+
+# Print every example's configuration to a PDF beside it,
+# examples/NAME/NAME.pdf: every page, the top page and each subdiagram's, as
+# tcs-cfge's File > Print prints them, by tcs-cfge --print, which draws in
+# memory with Slint's software renderer and the panes divided as they are
+# until somebody moves them, so that no window opens and nothing but the PDFs
+# is written. An example is a directory with a configuration of its own name,
+# printed with its simulator file where it has one. Each PDF records a digest
+# of the files it was printed from -- the configuration in both spellings,
+# each file it includes, the simulator file -- and only one whose files have
+# changed since is printed again, so that the fonts of the machine running
+# this change no picture that is current. A test in tcs-cfge fails while any
+# example's PDF is out of date, saying to run this.
+.PHONY: example-pdfs
+example-pdfs:
+	cd $(RUST) && cargo build -q --bin tcs-cfge
+	cd $(RUST) && for top in $$(git ls-files 'examples/*/*.ytcs'); do \
+		dir=$${top%/*}; name=$${dir##*/}; \
+		[ "$$top" = "$$dir/$$name.ytcs" ] || continue; \
+		sim=$$dir/$$name-sim.yaml; [ -e "$$sim" ] || sim=; \
+		cargo run -q --bin tcs-cfge -- \
+			--print "$$dir/$$name.pdf" --if-changed "$$top" $$sim \
+			|| exit 1; \
+	done
 
 # Make every manual's screenshots again, one program after another, each in
 # a process of its own; the pages that show them are made again by the

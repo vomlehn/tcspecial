@@ -1,6 +1,6 @@
 # Examples
 
-Each example is a directory holding four files:
+Each example is a directory holding these files:
 
 - `<name>.ytcs` is a tcspecial configuration.
 - `<name>.xtcs` is the same configuration in XML.
@@ -9,6 +9,9 @@ Each example is a directory holding four files:
   from the configuration (`make xtce` writes every example's), and nobody
   edits it.
 - `<name>-sim.yaml` is the tcs-sim configuration that simulates its payloads.
+- `<name>.pdf` is the configuration as tcs-cfge prints it: its top page, and
+  then each subdiagram's page, each headed by which page it is. `make
+  example-pdfs`, in the top directory, prints every example's again.
 
 An example whose payload is a program of its own holds that program too,
 beside those files: `simple-app` does, with a Python 3 payload and a Rust
@@ -137,12 +140,14 @@ the vehicle saying it is alive, the vehicle answering a ping. Start with
 | `ping` | The ground pings a `ping` vehicle node and times the answer: the round trip, and the two halves of it. The ground station is Python 3, with the beacon panel and the halves it is built from written again in Python under `python/`, and tests that hold them to the Rust. |
 | `ping-yamcs` | The ping example with Yamcs between the ground station and the vehicle: a `gateway_yamcs` gateway puts a CCSDS primary header on every packet to and from the ground, the beacon included, and `ping_yamcs.py` runs Yamcs on tcspecial's own XTCE and pings through it from the ping example's window. Needs a Yamcs release unpacked somewhere. |
 | `memusage` | How much memory tcspecial has, and how deep each of its threads has been into its stack, watched through Yamcs: `memusage.py` has Yamcs send QUERY_THREADS and prints the answer, and given several configurations watches a tcspecial on each in one Yamcs, an instance each. Needs a Yamcs release unpacked somewhere. |
-| `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. |
-| `consolidator` | Three sensors' readings -- a `u16`, an `i32` and a `u8`, each at its own pace -- put together by a `consolidator` computation into one datum, a structure of the three, and sent down when all three are new or every two seconds. Each sensor's default goes in its place until it reports -- 255 for the battery, a charge no reading can be -- and its latest reading, held, after. A held reading looks like a new one, so `battery_age.py`, an `app_all_veh` program, sends how many seconds since the battery last reported, a fourth input beside the charge it is about. The datum arrives as the consolidator's own, which the configuration's own XTCE describes member by member, and the consolidator's `Configuration` in tcs-moc, after a Query, says how often each input went in held or with its default. `make run-consolidator` runs it, its sensors sending from the start, and needs Python 3; `tcspecial/tests/consolidator.rs` flies it. |
-| `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `thermostat` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. |
-| `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcs-moc on it, tcs-sim simulating the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcsmoc. |
+| `tees` | The four nodes that do nothing to what passes: a `tee-gateway` sends each command on to a heater and back to the ground, a `tee-payload` sends each reading to the ground and on aboard, and a `null-gateway` and a `null-payload` drop what they are sent. `tcspecial/tests/tees.rs` flies it. Printed by tcs-cfge: [`tees.pdf`](tees/tees.pdf). |
+| `consolidator` | Three sensors' readings -- a `u16`, an `i32` and a `u8`, each at its own pace -- put together by a `consolidator` computation into one datum, a structure of the three, and sent down when all three are new or every two seconds. Each sensor's default goes in its place until it reports -- 255 for the battery, a charge no reading can be -- and its latest reading, held, after. A held reading looks like a new one, so `battery_age.py`, an `app_all_veh` program, sends how many seconds since the battery last reported, a fourth input beside the charge it is about. The datum arrives as the consolidator's own, which the configuration's own XTCE describes member by member, and the consolidator's `Configuration` in tcs-moc, after a Query, says how often each input went in held or with its default. `make run-consolidator` runs it, its sensors sending from the start, and needs Python 3; `tcspecial/tests/consolidator.rs` flies it. Printed by tcs-cfge: [`consolidator.pdf`](consolidator/consolidator.pdf). |
+| `fprime` | A vehicle that answers to an F´ flight computer rather than to the ground: a `gateway_fprime` node sends each reading, the temperature a `to_kelvin` node makes of it and what a `thermostat` node decides of that, to the deployment's bridge component at its `bridge_base`, and takes the bridge's commands on to a heater. `tcspecial/tests/fprime.rs` flies it, and `make fprime-test` runs the bridge itself, in `fprime/`, against it. Printed by tcs-cfge: [`fprime.pdf`](fprime/fprime.pdf). |
+| `cfs` | A vehicle that answers to a cFS flight computer: tcspecial joins its software bus as an SBN peer, a `gateway_cfs` node publishes each reading as its `tlm_base` plus the reading's device id, and a command published as its `cmd_msgid` goes on to a heater. Every link is carried over the one peer, as message IDs. `make run-cfs` runs tcs-moc on it, tcs-sim simulating the cFS side; `tcspecial/tests/cfs.rs` flies it against a test playing the cFS side, and `tcspecial/tests/cfs_ground.rs` commands it from tcsmoc. Printed by tcs-cfge: [`cfs.pdf`](cfs/cfs.pdf). |
 
 ### minimal
+
+Its configuration, printed by tcs-cfge: [`minimal.pdf`](minimal/minimal.pdf).
 
 The smallest configuration that does anything: one payload, `sensor`, a
 program on this host at `127.0.0.28:5001` that sends its readings over UDP.
@@ -166,6 +171,8 @@ Languages:
 - Payload: Rust -- tcs-sim simulates `sensor`, a network payload.
 
 ### beacon
+
+Its configuration, printed by tcs-cfge: [`beacon.pdf`](beacon/beacon.pdf).
 
 What a ground station can know about a spacecraft without asking it anything.
 tcspecial sends a beacon every `beacon.default_interval` for as long as it
@@ -255,6 +262,8 @@ Languages:
 
 ### ping
 
+Its configuration, printed by tcs-cfge: [`ping.pdf`](ping/ping.pdf).
+
 The ground sends a ping up to the gateway node, which hands it to the `ping`
 node; the `ping` node answers with the vehicle's time on the end, and the
 answer comes back down. What a ping and its answer say is
@@ -332,6 +341,8 @@ Languages:
   simulated.
 
 ### ping-yamcs
+
+Its configuration, printed by tcs-cfge: [`ping-yamcs.pdf`](ping-yamcs/ping-yamcs.pdf).
 
 The ping example with [Yamcs](https://yamcs.org) at the ground end. The
 vehicle and what is timed are the same; what differs is the configuration's
@@ -465,6 +476,8 @@ Nothing either does survives a reboot.
 
 ### can
 
+Its configuration, printed by tcs-cfge: [`can.pdf`](can/can.pdf).
+
 `vcan0` is the kernel's virtual CAN bus: a bus with no wire, whose members are
 the sockets bound to it. tcspecial joins it as two of them, one for each
 identifier, and tcs-sim joins it as the motor, sending a status frame a second
@@ -476,6 +489,8 @@ make run-can
 ```
 
 ### gpio
+
+Its configuration, printed by tcs-cfge: [`gpio.pdf`](gpio/gpio.pdf).
 
 The switch is a `gpio_in`, whose line is watched, and the lamp a `gpio_out`,
 whose line is driven: see "A GPIO Payload" in the manual. The chip is one of
@@ -491,6 +506,8 @@ make run-gpio
 ```
 
 ### iio
+
+Its configuration, printed by tcs-cfge: [`iio.pdf`](iio/iio.pdf).
 
 The sensor is one of the kernel's `iio_dummy`, whose buffer a software
 trigger fills a hundred times a second: the dummy device is the whole payload,
@@ -527,6 +544,8 @@ with it aboard and on the ground.
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 
 ### thermostat
+
+Its configuration, printed by tcs-cfge: [`thermostat.pdf`](thermostat/thermostat.pdf).
 
 A control loop, aboard. Three temperature sensors are read together, once a
 second, as the group `zone_temps`: `temp_1`, `temp_2` and `temp_3`. Each
@@ -599,6 +618,8 @@ Languages:
 
 ### memusage
 
+Its configuration, printed by tcs-cfge: [`memusage.pdf`](memusage/memusage.pdf).
+
 A vehicle to watch the memory of: a `gateway_yamcs` node and three ping
 nodes, each a thread of its own, answering to Yamcs. Nothing is pinged.
 `memusage.py` has Yamcs send QUERY_THREADS, on the node command link, every
@@ -632,6 +653,8 @@ Languages:
 - Vehicle: Rust -- tcspecial.
 
 ### thermostat-yamcs
+
+Its configuration, printed by tcs-cfge: [`thermostat-yamcs.pdf`](thermostat-yamcs/thermostat-yamcs.pdf).
 
 The thermostat example with [Yamcs](https://yamcs.org) at the ground end,
 as ping-yamcs is the ping example with it. The vehicle is the thermostat's
@@ -721,6 +744,8 @@ Languages:
 
 ### battery
 
+Its configuration, printed by tcs-cfge: [`battery.pdf`](battery/battery.pdf).
+
 A spacecraft's power bus through an orbit: the example of a payload that is
 asked, of a computation that is a program, and of physics with events in it.
 
@@ -761,6 +786,8 @@ Languages:
 
 ### descent
 
+Its configuration, printed by tcs-cfge: [`descent.pdf`](descent/descent.pdf).
+
 A lander's terminal descent over the Moon: the example of a computation that
 drives a device with a value, and of a device that speaks the moment
 something happens.
@@ -798,6 +825,9 @@ Languages:
   switch and the engine.
 
 ### lander
+
+Its two configurations, printed by tcs-cfge: [`lander-a.pdf`](lander-a/lander-a.pdf)
+and [`lander-b.pdf`](lander-b/lander-b.pdf).
 
 A lunar landing in two dimensions, flown by hand, watched from the Earth
 through [Yamcs](https://yamcs.org): the example of two tcspecials sharing
@@ -893,6 +923,8 @@ Languages:
   draws the window the lander is flown from.
 
 ### simple-app
+
+Its configuration, printed by tcs-cfge: [`simple-app.pdf`](simple-app/simple-app.pdf).
 
 The one example that runs end to end on one host, and the one to look at to
 see what an app node is. Two programs, both in `examples/simple-app`:

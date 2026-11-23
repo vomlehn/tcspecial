@@ -456,7 +456,8 @@ itself; see the <a class="reference external" href="tcs-verify.html">tcs-verify 
 <div class="section" id="the-command-line">
 <h2><a class="toc-backref" href="#toc-entry-3">The command line</a></h2>
 <pre class="code text literal-block">
-tcs-cfge [-h | --help] [-r | --read-only] [&lt;configuration file&gt; [&lt;simulator file&gt;]]
+tcs-cfge [-h | --help] [-r | --read-only] [--print &lt;PDF file&gt; [--if-changed]]
+         [&lt;configuration file&gt; [&lt;simulator file&gt;]]
 </pre>
 <p>With no file named, the window opens with no configuration in it, and
 <strong>File -&gt; Open...</strong> chooses one (see <a class="reference internal" href="#opening-and-closing">Opening and closing</a>). A configuration
@@ -472,6 +473,18 @@ yet.</p>
 and it may go anywhere on the line: see <a class="reference internal" href="#read-only-sessions">Read-only sessions</a>. Any other word
 starting with a dash is refused, so that a mistyped flag is not taken for the
 name of a configuration to create. More than two files are refused too.</p>
+<p><tt class="docutils literal"><span class="pre">--print</span> &lt;PDF file&gt;</tt> opens no window: it prints the configuration named --
+every page of it, as <strong>File -&gt; Print...</strong> does -- to the PDF, and writes
+nothing else. The configuration must be there, and the PDF's name must end in
+<tt class="docutils literal">.pdf</tt>, so that a name forgotten is not taken for the configuration's. The
+panes are divided as they are until somebody moves them, whatever your
+settings say, so that the print is the same whoever makes it.</p>
+<p>The PDF records a digest of the files it was printed from: the configuration
+in both its spellings, each file it includes, and the simulator file. With
+<tt class="docutils literal"><span class="pre">--if-changed</span></tt>, a PDF whose digest is still the files' is left as it is, and
+tcs-cfge says it is up to date. <tt class="docutils literal">make <span class="pre">example-pdfs</span></tt> prints every example's
+configuration this way, so only the examples whose files have changed are
+printed again, and a test fails while any example's PDF is out of date.</p>
 <p><tt class="docutils literal"><span class="pre">-h</span></tt> or <tt class="docutils literal"><span class="pre">--help</span></tt> prints the usage, with a line apiece on the files and the
 flags, and exits. Given a command line it does not take, tcs-cfge prints its
 usage on the error output and exits with status 2.</p>
@@ -1129,18 +1142,25 @@ once for each edit that fails the same way.</p>
 </div>
 <div class="section" id="printing">
 <h2><a class="toc-backref" href="#toc-entry-34">Printing</a></h2>
-<p><strong>File -&gt; Print...</strong> prints the working panes -- Physics, Payloads, Vehicle
-and Gateway -- as the window draws them, without the selection lists down the
-left, trimmed to the nodes and the lines between them, with a margin round
-them and the panes' names along the top. The dividers' handles are left out.</p>
+<p><strong>File -&gt; Print...</strong> prints the whole configuration, from the window of any of
+its pages: the top page first, then each subdiagram's page, each once, as
+pages of one PDF. Each page is headed by which it is: the configuration's
+file name, or the subdiagram's name and the file it comes from. A page with
+nothing on it is left out.</p>
+<p>Each page is its working panes -- Physics, Payloads, Vehicle and Gateway --
+as the window draws them, without the selection lists down the left, trimmed
+to the nodes and the lines between them, with a margin round them and the
+panes' names along the top. A subdiagram's page takes in the whole of its
+<em>outside</em> margin where a line reaches it. Nothing is drawn selected, and the
+dividers' handles are left out.</p>
 <p>The picture is made at full size, whatever the window's zoom, by moving the
-view across the drawing a part at a time; the window shows it moving for a
-moment, and the view is put back where it was. The picture is written as a
-PDF of one page, <tt class="docutils literal"><span class="pre">tcs-cfge-print-&lt;name&gt;.pdf</span></tt> in the system's temporary
-directory, and opened in the desktop's PDF viewer -- <tt class="docutils literal"><span class="pre">xdg-open</span></tt> on Linux --
+view across the drawing a part at a time, each page drawn in turn in the main
+window; the window shows it moving for a moment and takes no presses
+meanwhile, and is put back as it was. The pages are written as one
+PDF, <tt class="docutils literal"><span class="pre">tcs-cfge-print-&lt;name&gt;.pdf</span></tt> in the system's temporary directory, and opened in the desktop's PDF viewer -- <tt class="docutils literal"><span class="pre">xdg-open</span></tt> on Linux --
 whose Print chooses the printer, the paper and the orientation, and shows
-what will be printed first. The PDF is a picture of the sheet, not text: it
-prints as the window draws, colours and all.</p>
+what will be printed first. Each page is a picture of the sheet, not text,
+its heading apart: it prints as the window draws, colours and all.</p>
 </div>
 <div class="section" id="opening-and-closing">
 <h2><a class="toc-backref" href="#toc-entry-35">Opening and closing</a></h2>

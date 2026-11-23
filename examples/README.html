@@ -289,7 +289,7 @@ id="toc-thermostat-yamcs">thermostat-yamcs</a></li>
 </ul></li>
 </ul>
 </nav>
-<p>Each example is a directory holding four files:</p>
+<p>Each example is a directory holding these files:</p>
 <ul>
 <li><code>&lt;name&gt;.ytcs</code> is a tcspecial configuration.</li>
 <li><code>&lt;name&gt;.xtcs</code> is the same configuration in
@@ -301,6 +301,10 @@ sends. tcs-verify writes it from the configuration
 it.</li>
 <li><code>&lt;name&gt;-sim.yaml</code> is the tcs-sim configuration that
 simulates its payloads.</li>
+<li><code>&lt;name&gt;.pdf</code> is the configuration as tcs-cfge
+prints it: its top page, and then each subdiagram’s page, each headed by
+which page it is. <code>make example-pdfs</code>, in the top directory,
+prints every example’s again.</li>
 </ul>
 <p>An example whose payload is a program of its own holds that program
 too, beside those files: <code>simple-app</code> does, with a Python 3
@@ -485,7 +489,8 @@ each. Needs a Yamcs release unpacked somewhere.</td>
 the ground, a <code>tee-payload</code> sends each reading to the ground
 and on aboard, and a <code>null-gateway</code> and a
 <code>null-payload</code> drop what they are sent.
-<code>tcspecial/tests/tees.rs</code> flies it.</td>
+<code>tcspecial/tests/tees.rs</code> flies it. Printed by tcs-cfge: <a
+href="tees/tees.pdf"><code>tees.pdf</code></a>.</td>
 </tr>
 <tr>
 <td><code>consolidator</code></td>
@@ -504,7 +509,8 @@ consolidator’s <code>Configuration</code> in tcs-moc, after a Query,
 says how often each input went in held or with its default.
 <code>make run-consolidator</code> runs it, its sensors sending from the
 start, and needs Python 3; <code>tcspecial/tests/consolidator.rs</code>
-flies it.</td>
+flies it. Printed by tcs-cfge: <a
+href="consolidator/consolidator.pdf"><code>consolidator.pdf</code></a>.</td>
 </tr>
 <tr>
 <td><code>fprime</code></td>
@@ -515,7 +521,8 @@ temperature a <code>to_kelvin</code> node makes of it and what a
 component at its <code>bridge_base</code>, and takes the bridge’s
 commands on to a heater. <code>tcspecial/tests/fprime.rs</code> flies
 it, and <code>make fprime-test</code> runs the bridge itself, in
-<code>fprime/</code>, against it.</td>
+<code>fprime/</code>, against it. Printed by tcs-cfge: <a
+href="fprime/fprime.pdf"><code>fprime.pdf</code></a>.</td>
 </tr>
 <tr>
 <td><code>cfs</code></td>
@@ -527,11 +534,14 @@ heater. Every link is carried over the one peer, as message IDs.
 <code>make run-cfs</code> runs tcs-moc on it, tcs-sim simulating the cFS
 side; <code>tcspecial/tests/cfs.rs</code> flies it against a test
 playing the cFS side, and <code>tcspecial/tests/cfs_ground.rs</code>
-commands it from tcsmoc.</td>
+commands it from tcsmoc. Printed by tcs-cfge: <a
+href="cfs/cfs.pdf"><code>cfs.pdf</code></a>.</td>
 </tr>
 </tbody>
 </table>
 <h2 id="minimal">minimal</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="minimal/minimal.pdf"><code>minimal.pdf</code></a>.</p>
 <p>The smallest configuration that does anything: one payload,
 <code>sensor</code>, a program on this host at
 <code>127.0.0.28:5001</code> that sends its readings over UDP. Nothing
@@ -553,6 +563,8 @@ arrived, what it said, and how many there have been.</p>
 payload.</li>
 </ul>
 <h2 id="beacon">beacon</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="beacon/beacon.pdf"><code>beacon.pdf</code></a>.</p>
 <p>What a ground station can know about a spacecraft without asking it
 anything. tcspecial sends a beacon every
 <code>beacon.default_interval</code> for as long as it runs, over a
@@ -633,6 +645,8 @@ cargo run --bin beacon -- --xml      # beacon.xtcs</code></pre>
 payload.</li>
 </ul>
 <h2 id="ping">ping</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="ping/ping.pdf"><code>ping.pdf</code></a>.</p>
 <p>The ground sends a ping up to the gateway node, which hands it to the
 <code>ping</code> node; the <code>ping</code> node answers with the
 vehicle’s time on the end, and the answer comes back down. What a ping
@@ -708,6 +722,8 @@ answers.</li>
 nothing is simulated.</li>
 </ul>
 <h2 id="ping-yamcs">ping-yamcs</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="ping-yamcs/ping-yamcs.pdf"><code>ping-yamcs.pdf</code></a>.</p>
 <p>The ping example with <a href="https://yamcs.org">Yamcs</a> at the
 ground end. The vehicle and what is timed are the same; what differs is
 the configuration’s gateway, <code>yamcs</code>, so every packet to and
@@ -902,6 +918,8 @@ up: a buffer is read and never written.</td>
 </tbody>
 </table>
 <h2 id="can">can</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="can/can.pdf"><code>can.pdf</code></a>.</p>
 <p><code>vcan0</code> is the kernel’s virtual CAN bus: a bus with no
 wire, whose members are the sockets bound to it. tcspecial joins it as
 two of them, one for each identifier, and tcs-sim joins it as the motor,
@@ -910,6 +928,8 @@ the interface is the controller’s, such as <code>can0</code>, and
 nothing else changes.</p>
 <pre><code>make run-can</code></pre>
 <h2 id="gpio">gpio</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="gpio/gpio.pdf"><code>gpio.pdf</code></a>.</p>
 <p>The switch is a <code>gpio_in</code>, whose line is watched, and the
 lamp a <code>gpio_out</code>, whose line is driven: see “A GPIO Payload”
 in the manual. The chip is one of the kernel’s <code>gpio-sim</code>,
@@ -923,6 +943,8 @@ number is given as chips appear, so write the one
 <code>bin/mk-kernel-dummies</code> printed.</p>
 <pre><code>make run-gpio</code></pre>
 <h2 id="iio">iio</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="iio/iio.pdf"><code>iio.pdf</code></a>.</p>
 <p>The sensor is one of the kernel’s <code>iio_dummy</code>, whose
 buffer a software trigger fills a hundred times a second: the dummy
 device is the whole payload, and tcs-sim makes nothing. Its buffer is
@@ -999,6 +1021,8 @@ Rust.</td>
 </tbody>
 </table>
 <h2 id="thermostat">thermostat</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="thermostat/thermostat.pdf"><code>thermostat.pdf</code></a>.</p>
 <p>A control loop, aboard. Three temperature sensors are read together,
 once a second, as the group <code>zone_temps</code>:
 <code>temp_1</code>, <code>temp_2</code> and <code>temp_3</code>. Each
@@ -1069,6 +1093,8 @@ they read, and the heaters’ switches, on the kernel’s simulated GPIO
 chip.</li>
 </ul>
 <h2 id="memusage">memusage</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="memusage/memusage.pdf"><code>memusage.pdf</code></a>.</p>
 <p>A vehicle to watch the memory of: a <code>gateway_yamcs</code> node
 and three ping nodes, each a thread of its own, answering to Yamcs.
 Nothing is pinged. <code>memusage.py</code> has Yamcs send
@@ -1100,6 +1126,8 @@ QUERY_THREADS from a port the system chooses.
 <li>Vehicle: Rust – tcspecial.</li>
 </ul>
 <h2 id="thermostat-yamcs">thermostat-yamcs</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="thermostat-yamcs/thermostat-yamcs.pdf"><code>thermostat-yamcs.pdf</code></a>.</p>
 <p>The thermostat example with <a href="https://yamcs.org">Yamcs</a> at
 the ground end, as ping-yamcs is the ping example with it. The vehicle
 is the thermostat’s – the same conversions, vote, thermostat, heaters,
@@ -1222,6 +1250,8 @@ Yamcs (Java)</li>
 <li>payloads: Rust – tcs-sim, as in the thermostat example</li>
 </ul>
 <h2 id="battery">battery</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="battery/battery.pdf"><code>battery.pdf</code></a>.</p>
 <p>A spacecraft’s power bus through an orbit: the example of a payload
 that is asked, of a computation that is a program, and of physics with
 events in it.</p>
@@ -1259,6 +1289,8 @@ the example’s.</li>
 pseudo-terminal at its path, the shunt and the science switch.</li>
 </ul>
 <h2 id="descent">descent</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="descent/descent.pdf"><code>descent.pdf</code></a>.</p>
 <p>A lander’s terminal descent over the Moon: the example of a
 computation that drives a device with a value, and of a device that
 speaks the moment something happens.</p>
@@ -1294,6 +1326,9 @@ example’s.</li>
 switch and the engine.</li>
 </ul>
 <h2 id="lander">lander</h2>
+<p>Its two configurations, printed by tcs-cfge: <a
+href="lander-a/lander-a.pdf"><code>lander-a.pdf</code></a> and <a
+href="lander-b/lander-b.pdf"><code>lander-b.pdf</code></a>.</p>
 <p>A lunar landing in two dimensions, flown by hand, watched from the
 Earth through <a href="https://yamcs.org">Yamcs</a>: the example of two
 tcspecials sharing one simulated world, and of a link with the Moon’s
@@ -1381,6 +1416,8 @@ nodes.</li>
 and draws the window the lander is flown from.</li>
 </ul>
 <h2 id="simple-app">simple-app</h2>
+<p>Its configuration, printed by tcs-cfge: <a
+href="simple-app/simple-app.pdf"><code>simple-app.pdf</code></a>.</p>
 <p>The one example that runs end to end on one host, and the one to look
 at to see what an app node is. Two programs, both in
 <code>examples/simple-app</code>:</p>

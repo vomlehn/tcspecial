@@ -19,22 +19,13 @@
 //! written.
 
 use super::*;
+use crate::headless::{drawn, Headless};
 
-use slint::platform::software_renderer::{
-    MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType,
-};
-use slint::platform::{Key, Platform, PointerEventButton, WindowAdapter};
+use slint::platform::{Key, PointerEventButton};
 use slint::platform::{PointerEventButton::Left, PointerEventButton::Right};
 use slint::platform::{WindowEvent, WindowEvent::PointerMoved};
 use slint::LogicalPosition;
 use std::path::{Path, PathBuf};
-
-thread_local! {
-    /// Every window the editor has made, in the order it made them: what
-    /// [`drawn`] finds a window's buffer by.
-    static MADE: RefCell<Vec<Rc<MinimalSoftwareWindow>>> =
-        const { RefCell::new(Vec::new()) };
-}
 
 /// The markers drawn over a picture: a number in a circle, saying which
 /// step of a sequence a gesture there is.
@@ -65,57 +56,6 @@ mod marker {
 
 /// How wide a marker is, in pixels.
 const MARKER: u32 = 26;
-
-/// A platform with no screen: each window drawn into memory.
-struct Headless;
-
-impl Platform for Headless {
-    fn create_window_adapter(
-        &self,
-    ) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
-        let window = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
-        MADE.with(|made| made.borrow_mut().push(window.clone()));
-        Ok(window)
-    }
-}
-
-/// Draws a window into memory, at a size, after letting whatever was
-/// waiting on a timer run.
-///
-/// # Arguments
-///
-/// * `window` - The window.
-/// * `size`   - Its width and height, in pixels.
-///
-/// # Returns
-///
-/// The pixels, row by row, as red, green, blue and alpha.
-///
-/// # Panics
-///
-/// If the window was not made by [`Headless`].
-fn drawn(window: &slint::Window, size: (u32, u32)) -> Vec<u8> {
-    let (width, height) = size;
-    let adapter = MADE.with(|made| {
-        made.borrow()
-            .iter()
-            .find(|made| std::ptr::eq(made.window(), window))
-            .cloned()
-            .expect("a window the platform made")
-    });
-    adapter.set_size(slint::PhysicalSize::new(width, height));
-    slint::platform::update_timers_and_animations();
-    adapter.request_redraw();
-    let mut pixels =
-        vec![PremultipliedRgbaColor::default(); (width * height) as usize];
-    adapter.draw_if_needed(|renderer| {
-        renderer.render(&mut pixels, width as usize);
-    });
-    pixels
-        .iter()
-        .flat_map(|p| [p.red, p.green, p.blue, p.alpha])
-        .collect()
-}
 
 /// Draws numbered markers over a picture.
 ///
@@ -968,12 +908,35 @@ fn printing() {
         &dir.join("battery-sim.yaml"),
         true,
     );
-    let area = drawing_extent(&session.ui);
-    let (picture, pdf) = print::made_now(&session.ui, area, &|w| {
-        drawn(w.window(), WIDE);
-    })
-    .expect("it prints")
-    .expect("there is something to print");
+    let pages =
+        print::pages_of(session.editor.borrow().document(), "battery.ytcs");
+    let printed = print::made_now(
+        &session.ui,
+        &pages,
+        &|window: &MainWindow, home: &Home| {
+            let views = session.views.borrow();
+            show_page(
+                window,
+                &session.editor.borrow(),
+                home,
+                views.divider.get(),
+                views.lists.get(),
+            )
+        },
+        &|_: &MainWindow| {
+            session.views.borrow().refresh(&session.editor.borrow());
+        },
+        &|w: &MainWindow| {
+            drawn(w.window(), WIDE);
+        },
+    )
+    .expect("it prints");
+    let picture = printed
+        .first()
+        .expect("there is something to print")
+        .picture
+        .clone();
+    let pdf = print::pdf_of(&printed, "battery.ytcs", None);
     std::fs::create_dir_all(&out).expect("the directory");
     std::fs::write(out.join("battery.pdf"), pdf).expect("the PDF");
     let file = std::fs::File::create(out.join("battery.png")).expect("png");

@@ -37,6 +37,7 @@ mod clipboard;
 mod document;
 mod editor;
 mod faithful;
+mod headless;
 mod history;
 mod journal;
 mod nodes;
@@ -894,6 +895,12 @@ struct Asked {
     /// Whether the usage was asked for instead of a session: `-h` or
     /// `--help`.
     help: bool,
+    /// The PDF to print the configuration to instead of opening a window on
+    /// it: `--print <file>`. See [`print_to`].
+    print: Option<String>,
+    /// Whether that print is left as it is where it was printed from the
+    /// files as they are now: `--if-changed`.
+    if_changed: bool,
 }
 
 /// Reads the command line: the files it names, in order, whether the session
@@ -920,10 +927,27 @@ fn command_line(words: impl Iterator<Item = String>) -> Result<Asked, String> {
     let mut files = Vec::new();
     let mut read_only = false;
     let mut help = false;
-    for word in words {
+    let mut print = None;
+    let mut if_changed = false;
+    let mut words = words;
+    while let Some(word) = words.next() {
         match word.as_str() {
             "-r" | "--read-only" | "--readonly" => read_only = true,
             "-h" | "--help" => help = true,
+            "--if-changed" => if_changed = true,
+            // The PDF's name follows, and is never a flag: a name forgotten
+            // would otherwise take the configuration's place, and the
+            // configuration would be written over by its picture.
+            "--print" => match words.next() {
+                Some(pdf) if !pdf.starts_with('-') && pdf.ends_with(".pdf") => {
+                    print = Some(pdf)
+                }
+                _ => {
+                    return Err("--print is followed by the PDF to write, \
+                                whose name ends in \".pdf\""
+                        .to_string());
+                }
+            },
             flag if flag.starts_with('-') && flag != "-" => {
                 return Err(format!("there is no option {flag:?}"));
             }
@@ -937,16 +961,23 @@ fn command_line(words: impl Iterator<Item = String>) -> Result<Asked, String> {
             files.len()
         ));
     }
+    if if_changed && print.is_none() {
+        return Err("--if-changed is said of a print, and goes with --print"
+            .to_string());
+    }
     Ok(Asked {
         files,
         read_only,
         help,
+        print,
+        if_changed,
     })
 }
 
 /// What is said when the command line is not one tcs-cfge takes, and by
 /// `--help`.
 const USAGE: &str = "usage: tcs-cfge [-h | --help] [-r | --read-only] \
+     [--print <PDF file> [--if-changed]] \
      [<configuration file> [<simulator file>]]";
 
 /// Says what the command line takes, on standard output: `--help`.
@@ -975,6 +1006,13 @@ fn print_help() {
     println!(
         "tcs-cfge: -r, --read-only or --readonly opens the files to look at: \
          nothing in them can be changed and nothing is written"
+    );
+    println!(
+        "tcs-cfge: --print <PDF file> opens no window: it writes every page of \
+         the configuration -- the top page and each subdiagram's -- to the \
+         PDF, as File > Print does, and writes nothing else; with \
+         --if-changed, a PDF printed from the files as they are now is left \
+         as it is"
     );
 }
 
@@ -1010,6 +1048,27 @@ fn main() -> Result<(), slint::PlatformError> {
     if asked.help {
         print_help();
         return Ok(());
+    }
+    if let Some(pdf) = &asked.print {
+        match print_to(
+            std::path::Path::new(pdf),
+            &asked.files,
+            asked.if_changed,
+        ) {
+            Ok(Some(count)) => {
+                let pages = if count == 1 { "page" } else { "pages" };
+                eprintln!("tcs-cfge: printed {pdf}: {count} {pages}");
+                return Ok(());
+            }
+            Ok(None) => {
+                eprintln!("tcs-cfge: {pdf} is up to date");
+                return Ok(());
+            }
+            Err(why) => {
+                eprintln!("tcs-cfge: {why}");
+                std::process::exit(1);
+            }
+        }
     }
     let _ = READ_ONLY.set(asked.read_only);
     let mut files = asked.files.into_iter();
@@ -1158,6 +1217,118 @@ fn main() -> Result<(), slint::PlatformError> {
     }
 
     outcome
+}
+
+/// How large the window `--print` draws its pages in, in pixels: the
+/// larger, the fewer the steps across a page. See [`print_to`].
+const PRINT_WINDOW: (u32, u32) = (2400, 1600);
+
+/// Prints a configuration to a PDF, with no window on a screen:
+/// `--print`.
+///
+/// Every page, the top page and each subdiagram's, as File > Print prints
+/// them, drawn by Slint's software renderer in a window in memory. The
+/// files are read and nothing is written but the PDF: the session is
+/// read-only, keeps no history and reads no settings, the panes being
+/// divided as they are until somebody moves them, so that a print is the
+/// same whoever makes it.
+///
+/// # Arguments
+///
+/// The PDF records a digest of the files it was printed from: see
+/// `print::sources_digest`. Asked to print only if they have changed, a PDF
+/// that recorded the digest they have now is left as it is.
+///
+/// # Arguments
+///
+/// * `out`        - The PDF to write.
+/// * `files`      - The configuration, and the simulator's file or nothing.
+/// * `if_changed` - Whether to leave a PDF printed from the files as they
+///                  are now as it is.
+///
+/// # Returns
+///
+/// How many pages were printed; none where the PDF was left as it was.
+///
+/// # Errors
+///
+/// A sentence saying what is wrong: no configuration named, or one that is
+/// not there or cannot be read, a window that cannot be made or drawn, or
+/// a PDF that cannot be written.
+fn print_to(
+    out: &std::path::Path,
+    files: &[String],
+    if_changed: bool,
+) -> Result<Option<usize>, String> {
+    let Some(path) = files.first().map(std::path::Path::new) else {
+        return Err("--print needs the configuration to print".to_string());
+    };
+    if !tcsos::fs::path_exists(path) {
+        return Err(format!(
+            "{} is not there, so there is nothing to print",
+            path.display()
+        ));
+    }
+    slint::platform::set_platform(Box::new(headless::Headless))
+        .map_err(|e| format!("no window can be made to print in: {e}"))?;
+    let _ = READ_ONLY.set(true);
+    let settings = settings::Settings::default();
+    let dividers = Dividers {
+        physics: pane::physics_width(settings.physics_percent),
+        ..dividers_for(settings.gateway_percent, settings.vehicle_percent)
+    };
+    let lists = (settings.list_gateway_percent, settings.list_vehicle_percent);
+
+    let mut editor = Editor::open(path, dividers)?;
+    editor.set_read_only(true);
+    if let Some(simulator) = files.get(1).map(std::path::Path::new) {
+        sim::must_be_yaml(simulator)?;
+        editor.open_simulator(simulator)?;
+    }
+    let sources = print::sources_digest(editor.document(), path)?;
+    if if_changed {
+        let printed = std::fs::read(out).ok();
+        let recorded = printed.as_deref().and_then(print::recorded_sources);
+        if recorded.as_deref() == Some(sources.as_str()) {
+            return Ok(None);
+        }
+    }
+
+    let ui = MainWindow::new().map_err(|e| e.to_string())?;
+    session!(&ui);
+    furnish!(&ui, descriptions());
+    ui.set_physics_palette(physics_palette());
+    ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+    ui.set_physics_list_percent(settings.list_physics_percent);
+    ui.show().map_err(|e| e.to_string())?;
+    let draw = |window: &MainWindow| {
+        headless::drawn(window.window(), PRINT_WINDOW);
+    };
+    draw(&ui);
+
+    let file = path
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let pages = print::pages_of(editor.document(), &file);
+    let printed = print::made_now(
+        &ui,
+        &pages,
+        &|window: &MainWindow, home: &Home| {
+            show_page(window, &editor, home, dividers, lists)
+        },
+        &|_: &MainWindow| {},
+        &draw,
+    )?;
+    if printed.is_empty() {
+        return Err(format!(
+            "{} has nothing drawn in it to print",
+            path.display()
+        ));
+    }
+    std::fs::write(out, print::pdf_of(&printed, &file, Some(&sources)))
+        .map_err(|why| format!("{} cannot be written: {why}", out.display()))?;
+    Ok(Some(printed.len()))
 }
 
 /// Makes, fills, wires and shows the main window on a session's editor, and
@@ -2250,13 +2421,52 @@ fn wire(
         });
     }
     {
-        // Print, from the File menu: the working panes, trimmed to the
-        // nodes and the lines, made a PDF and opened to print. See print.rs.
-        let weak = window.as_weak();
+        // Print, from the File menu of any page's window: every page of the
+        // configuration, the top page and each subdiagram's, its working
+        // panes trimmed to the nodes and the lines, made one PDF and opened
+        // to print. Drawn page by page in the main window, which is put
+        // back afterwards. See print.rs.
+        let editor = editor.clone();
+        let views = views.clone();
         window.on_print_clicked(move || {
-            if let Some(w) = weak.upgrade() {
-                print::print(&w, drawing_extent(&w), &w.get_path());
-            }
+            let Some(top) = views.borrow().top.upgrade() else {
+                return;
+            };
+            let path = editor.borrow().files().0.to_path_buf();
+            let file = path
+                .file_name()
+                .map(|name| name.to_string_lossy().into_owned())
+                .unwrap_or_default();
+            let pages = print::pages_of(editor.borrow().document(), &file);
+            let show: Rc<print::ShowPage> = {
+                let editor = editor.clone();
+                let views = views.clone();
+                Rc::new(move |window: &MainWindow, home: &Home| {
+                    let views = views.borrow();
+                    show_page(
+                        window,
+                        &editor.borrow(),
+                        home,
+                        views.divider.get(),
+                        views.lists.get(),
+                    )
+                })
+            };
+            let restore: Rc<dyn Fn(&MainWindow)> = {
+                let editor = editor.clone();
+                let views = views.clone();
+                Rc::new(move |window: &MainWindow| {
+                    window.set_editing("".into());
+                    views.borrow().refresh(&editor.borrow());
+                })
+            };
+            print::print(
+                &top,
+                pages,
+                show,
+                restore,
+                &path.display().to_string(),
+            );
         });
     }
     {
@@ -9488,6 +9698,43 @@ fn extent_of(window: &MainWindow, selection: bool) -> Extent {
         })
 }
 
+/// Draws a page of the configuration in a window, for a print: nothing
+/// selected or lit, and the subdiagram's name in the bar where the page is
+/// one.
+///
+/// # Arguments
+///
+/// * `window`   - The window drawn in.
+/// * `editor`   - The session drawn.
+/// * `home`     - The page: `None` for the top.
+/// * `dividers` - Where the working panes' dividers are.
+/// * `lists`    - The gateway and vehicle selection lists' shares of their
+///                column, in per cent.
+///
+/// # Returns
+///
+/// Where on the sheet the page's drawing is: see [`drawing_extent`].
+fn show_page(
+    window: &MainWindow,
+    editor: &Editor,
+    home: &Home,
+    dividers: Dividers,
+    lists: (i32, i32),
+) -> Extent {
+    window.set_editing(home.clone().unwrap_or_default().into());
+    put(
+        window,
+        editor,
+        home,
+        (None, None),
+        dividers,
+        lists,
+        (None, None),
+    );
+    window.set_also_chosen(ModelRc::default());
+    drawing_extent(window)
+}
+
 /// Where on the sheet everything drawn is: every node and component, and
 /// every line, which can reach past the nodes it joins. What Print trims the
 /// sheet to.
@@ -9517,9 +9764,29 @@ fn drawing_extent(window: &MainWindow) -> Extent {
             nodes.y + nodes.height,
         ));
     }
+    // A subdiagram's page has a margin either side, its "outside", where a
+    // line from another file arrives or leaves: a line that reaches one
+    // takes in the whole of it, the terminals it ends at and the word
+    // that names it, rather than cutting it through.
+    let edge = window.get_edge_width();
+    let right_edge = left + window.get_working_width();
     boxes
         .into_iter()
         .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
+        .map(|(l, t, r, b)| {
+            if edge <= 0.0 {
+                return (l, t, r, b);
+            }
+            // A line leaving the page ends where the margin begins, so
+            // reaching it is touching it.
+            let l = if l <= edge + 1.0 { 0.0 } else { l };
+            let r = if r >= right_edge - 1.0 {
+                right_edge + edge
+            } else {
+                r
+            };
+            (l, t, r, b)
+        })
         .map_or_else(Extent::default, |(l, t, r, b)| Extent {
             x: l,
             y: t,
@@ -9914,6 +10181,77 @@ mod tests {
         );
     }
 
+    /// Every example has its configuration printed beside it, from its files
+    /// as they are now, and linked from the examples' README.
+    ///
+    /// An example is a directory of `examples` with a configuration of its
+    /// own name, as `make example-pdfs` takes it. Its PDF records a digest
+    /// of the files it was printed from, which must be the digest they have
+    /// now: a configuration, a file it includes, or its simulator file
+    /// changed without the picture being printed again fails here.
+    #[test]
+    fn every_example_is_printed_from_its_files_as_they_are() {
+        let examples = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../examples");
+        let readme = std::fs::read_to_string(examples.join("README.md"))
+            .expect("the examples' README");
+        let mut seen = 0;
+        let mut wrong = Vec::new();
+        let mut names: Vec<String> = std::fs::read_dir(&examples)
+            .expect("the examples")
+            .map(|entry| {
+                entry
+                    .expect("an entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into()
+            })
+            .collect();
+        names.sort();
+        for name in names {
+            let dir = examples.join(&name);
+            let top = dir.join(format!("{name}.ytcs"));
+            if !tcsos::fs::metadata(&top).is_ok_and(|m| m.is_file()) {
+                continue;
+            }
+            seen += 1;
+            let mut editor = Editor::open(&top, dividers()).expect("it opens");
+            let simulator = dir.join(format!("{name}-sim.yaml"));
+            if tcsos::fs::path_exists(&simulator) {
+                editor.open_simulator(&simulator).expect("its simulator");
+            }
+            let now = print::sources_digest(editor.document(), &top)
+                .expect("its files read");
+            let pdf = dir.join(format!("{name}.pdf"));
+            let said = format!("examples/{name}/{name}.pdf");
+            match std::fs::read(&pdf) {
+                Err(_) => wrong.push(format!("{said} is not there")),
+                Ok(bytes) => match print::recorded_sources(&bytes) {
+                    None => wrong.push(format!(
+                        "{said} does not say what it was printed from"
+                    )),
+                    Some(recorded) if recorded != now => wrong.push(format!(
+                        "{said} was printed from files that have changed since"
+                    )),
+                    Some(_) => (),
+                },
+            }
+            let link = format!("({name}/{name}.pdf)");
+            if !readme.contains(&link) {
+                wrong.push(format!(
+                    "examples/README.md does not link {name}/{name}.pdf"
+                ));
+            }
+        }
+        assert!(seen > 10, "the examples were found: {seen}");
+        assert!(
+            wrong.is_empty(),
+            "{}; run make example-pdfs in the top directory, and link each \
+             PDF from its example's part of examples/README.md",
+            wrong.join("; ")
+        );
+    }
+
     /// The read-only flag is taken in all three spellings and anywhere on the
     /// line, and nothing else that looks like a flag is taken at all.
     #[test]
@@ -9925,6 +10263,8 @@ mod tests {
                 files: files.iter().map(|f| f.to_string()).collect(),
                 read_only,
                 help,
+                print: None,
+                if_changed: false,
             })
         };
         assert_eq!(said(&["a.ytcs"]), asked(&["a.ytcs"], false, false));
@@ -9944,6 +10284,23 @@ mod tests {
         for flag in ["-h", "--help"] {
             assert_eq!(said(&[flag]), asked(&[], false, true));
         }
+        // A print, the PDF's name following the flag; and one without it,
+        // or with one that is not a PDF's, refused rather than taken for
+        // the configuration and written over.
+        assert_eq!(
+            said(&["--print", "a.pdf", "a.ytcs"]).map(|a| (a.print, a.files)),
+            Ok((Some("a.pdf".to_string()), vec!["a.ytcs".to_string()]))
+        );
+        assert!(said(&["--print"]).is_err());
+        assert!(said(&["--print", "a.ytcs"]).is_err());
+        assert!(said(&["--print", "-r", "a.ytcs"]).is_err());
+        // Only if it has changed, which is said of a print and nothing else.
+        assert_eq!(
+            said(&["--print", "a.pdf", "--if-changed", "a.ytcs"])
+                .map(|a| a.if_changed),
+            Ok(true)
+        );
+        assert!(said(&["--if-changed", "a.ytcs"]).is_err());
         assert!(
             said(&["--readonley", "a.ytcs"]).is_err(),
             "a misspelled flag"

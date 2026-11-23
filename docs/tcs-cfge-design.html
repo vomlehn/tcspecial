@@ -419,16 +419,17 @@ ul.auto-toc {
 </li>
 <li><a class="reference internal" href="#the-windows" id="toc-entry-39">The Windows</a><ul>
 <li><a class="reference internal" href="#the-menu-bar-and-the-title" id="toc-entry-40">The menu bar and the title</a></li>
-<li><a class="reference internal" href="#what-a-node-says-about-itself" id="toc-entry-41">What a node says about itself</a></li>
-<li><a class="reference internal" href="#groups" id="toc-entry-42">Groups</a></li>
-<li><a class="reference internal" href="#the-tcspecial-parameters" id="toc-entry-43">The tcspecial parameters</a></li>
-<li><a class="reference internal" href="#the-simulator-s-file" id="toc-entry-44">The simulator's file</a></li>
+<li><a class="reference internal" href="#printing" id="toc-entry-41">Printing</a></li>
+<li><a class="reference internal" href="#what-a-node-says-about-itself" id="toc-entry-42">What a node says about itself</a></li>
+<li><a class="reference internal" href="#groups" id="toc-entry-43">Groups</a></li>
+<li><a class="reference internal" href="#the-tcspecial-parameters" id="toc-entry-44">The tcspecial parameters</a></li>
+<li><a class="reference internal" href="#the-simulator-s-file" id="toc-entry-45">The simulator's file</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#the-editor-is-lazy" id="toc-entry-45">The Editor Is Lazy</a></li>
-<li><a class="reference internal" href="#the-description-tree" id="toc-entry-46">The Description Tree</a></li>
-<li><a class="reference internal" href="#schemas-beside-the-tree" id="toc-entry-47">Schemas Beside the Tree</a></li>
-<li><a class="reference internal" href="#see-also" id="toc-entry-48">See Also</a></li>
+<li><a class="reference internal" href="#the-editor-is-lazy" id="toc-entry-46">The Editor Is Lazy</a></li>
+<li><a class="reference internal" href="#the-description-tree" id="toc-entry-47">The Description Tree</a></li>
+<li><a class="reference internal" href="#schemas-beside-the-tree" id="toc-entry-48">Schemas Beside the Tree</a></li>
+<li><a class="reference internal" href="#see-also" id="toc-entry-49">See Also</a></li>
 </ul>
 </div>
 <p>How tcs-cfge, the configuration editor, works and why.</p>
@@ -2197,7 +2198,8 @@ parameters</strong> and <strong>Arrange the nodes</strong>; <strong>View</strong
 drawn. Open, Close, Cut, Copy, Paste and Select all carry the usual keys,
 Ctrl+O, Ctrl+W, Ctrl+X, Ctrl+C, Ctrl+V and Ctrl+A. Undo and redo are not in a menu but on the bar, where each says what it
 would take back (see <a class="reference internal" href="#undo-and-redo-on-the-bar">Undo and redo on the bar</a>). The editor generates
-nothing: what it writes is the configuration and the simulator's file.</p>
+nothing: what it writes is the configuration, the simulator's file, and the
+PDF a print makes (see <a class="reference internal" href="#printing">Printing</a>).</p>
 <p>The main window's title says what it is and the file it is editing -- &quot;TCSpecial
 Configuration: /home/someone/working/thermostat/thermostat.xtcs&quot; -- the path
 made absolute and changed by <strong>Save as</strong>; a read-only session says &quot;TCSpecial
@@ -2211,8 +2213,65 @@ the first and the last. Shortened by the program and not left to the window
 system, which cuts a title at the end, and the end of a path is the file's name.
 The title is fitted again as the window is made wider or narrower.</p>
 </div>
+<div class="section" id="printing">
+<h2><a class="toc-backref" href="#toc-entry-41">Printing</a></h2>
+<dl class="docutils">
+<dt>Requirement</dt>
+<dd><strong>File -&gt; Print...</strong>, from the window of any page, prints every page of
+the configuration -- the top page, then each subdiagram's -- as pages of
+one PDF, each page once however often or by whatever path it is reached,
+each headed by which page it is, and opens it in the desktop's PDF
+viewer. <tt class="docutils literal"><span class="pre">tcs-cfge</span> <span class="pre">--print</span> &lt;PDF file&gt; &lt;configuration&gt; [&lt;simulator
+file&gt;]</tt> makes the same PDF with no window on a screen, reading the files
+and writing nothing but the PDF. <tt class="docutils literal">make <span class="pre">example-pdfs</span></tt> prints every
+example so, to <tt class="docutils literal"><span class="pre">examples/&lt;name&gt;/&lt;name&gt;.pdf</span></tt>, each linked from the
+examples' README; and an example's PDF is printed again whenever its
+configuration, a file it includes or its simulator file changes.</dd>
+</dl>
+<p>The window toolkit has no printing of its own, and drawing the sheet a second
+time, for paper, would be a second answer to what the editor draws. So a page
+is a picture of the editor's own drawing: the main window draws the page, the
+view is stepped across the drawing at full size, and the part of each snapshot
+that is the sheet is copied into one picture. Each page is drawn in the main
+window in turn, rather than in a window of its own opened for it, and the main
+window is drawn again as it was afterwards. It takes no presses while it
+does -- a clear layer takes the pointer's, the menus are greyed and the keys
+refused -- because a press would be about whichever page it happened to be
+showing; and the page is drawn again at every step, because an edit in
+another window draws the main window from the document again meanwhile.</p>
+<p>The pages are walked from the top page by the boxes on each, keeping the pages
+printed already, so that a page reached twice, or a loop of pages, is printed
+once. The reader allows neither -- an included file may include no other, and
+no file is included twice -- but a walk that relied on that would print for
+ever were it ever otherwise (<tt class="docutils literal"><span class="pre">print::pages_of</span></tt>). A page with nothing on it
+is left out.</p>
+<p>A page is trimmed to its nodes and lines, with a margin, taken up to the top of
+the sheet so that the panes' names are printed with what is under them. A
+subdiagram's page takes in the whole of its <em>outside</em> margin on a side a line
+reaches, the terminals there and the word that names it, rather than cutting it
+through. The PDF is written by hand, a page an image with its heading written
+above it in Helvetica, which every viewer has without the file carrying it.</p>
+<p><tt class="docutils literal"><span class="pre">--print</span></tt> draws in memory, by Slint's software renderer, so that the
+examples' PDFs are made with no desktop at all. Its session is read-only and
+reads no settings: the panes are divided as they are until somebody moves
+them, so that a print does not depend on who makes it. The pictures do depend
+on the fonts the machine has, so the examples' PDFs are not compared with
+pictures made again. What is compared is what each was printed from: <tt class="docutils literal"><span class="pre">--print</span></tt>
+records in the PDF's document information a digest of every file it read --
+<tt class="docutils literal"><span class="pre">Document::files</span></tt>, which is the configuration in both spellings, each file it
+includes and the simulator file, each by its name from the configuration's
+directory so that where the checkout is does not matter
+(<tt class="docutils literal"><span class="pre">print::sources_digest</span></tt>). <tt class="docutils literal"><span class="pre">--if-changed</span></tt> leaves a PDF whose digest is still
+the files', so <tt class="docutils literal">make <span class="pre">example-pdfs</span></tt> prints again only what has changed, and a
+picture that is current is not rewritten in another machine's fonts. A test,
+<tt class="docutils literal">every_example_is_printed_from_its_files_as_they_are</tt>, fails while any
+example's PDF is missing, records nothing, or records a digest its files no
+longer have, and while the README does not link it; it says to run <tt class="docutils literal">make
+<span class="pre">example-pdfs</span></tt>. A file's date would not do: a fresh checkout gives every file
+the same one.</p>
+</div>
 <div class="section" id="what-a-node-says-about-itself">
-<h2><a class="toc-backref" href="#toc-entry-41">What a node says about itself</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-42">What a node says about itself</a></h2>
 <p>In a window of its own, one per node, opened by <strong>Edit</strong> in the node's
 right-click menu -- or by <strong>Go to it</strong> in the list of concerns, or by choosing
 the node's error from the errors button -- and closed by a press of the Close
@@ -2272,7 +2331,7 @@ way, on leaving it or closing, Enter there being a new line. A tick box is
 one press and is taken at once.</p>
 </div>
 <div class="section" id="groups">
-<h2><a class="toc-backref" href="#toc-entry-42">Groups</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-43">Groups</a></h2>
 <p>Groups are edited in a window of their own, reached from <strong>File -&gt; Edit payload
 groups</strong>. A group is not on the canvas and should not be: it is a set of
 payloads read together, and which payloads those are is written on the nodes
@@ -2298,7 +2357,7 @@ as one edit, for the same reason: a rename that left the members behind would
 silently unschedule them.</p>
 </div>
 <div class="section" id="the-tcspecial-parameters">
-<h2><a class="toc-backref" href="#toc-entry-43">The tcspecial parameters</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-44">The tcspecial parameters</a></h2>
 <p>What tcspecial itself is configured with is edited from the Edit menu, under
 <strong>Edit tcspecial parameters</strong>. That is the one part of a configuration which is
 about the whole of it rather than about anything in it -- so there is nothing on
@@ -2332,7 +2391,7 @@ is <tt class="docutils literal">address: &quot;&quot;</tt> -- and saved as neith
 not written, and a file the editor begins names each payload and nothing more.</p>
 </div>
 <div class="section" id="the-simulator-s-file">
-<h2><a class="toc-backref" href="#toc-entry-44">The simulator's file</a></h2>
+<h2><a class="toc-backref" href="#toc-entry-45">The simulator's file</a></h2>
 <p>The simulator's own configuration is edited from the menu too, where the editor
 was given one: tcs-cfge takes a second file name, and <strong>Edit simulated payload
 groups</strong>, in the File menu, opens the groups of settings it declares. The entry
@@ -2404,7 +2463,7 @@ configuration is in, that being the one spelling it has.</p>
 </div>
 </div>
 <div class="section" id="the-editor-is-lazy">
-<h1><a class="toc-backref" href="#toc-entry-45">The Editor Is Lazy</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-46">The Editor Is Lazy</a></h1>
 <p>It requires every value to be <strong>valid</strong> and requires none of them to be
 <strong>entered</strong>.</p>
 <p>An editor that insisted on a complete node before it would let you move on is
@@ -2435,7 +2494,7 @@ that said nothing at all passed every ground check and was found when the
 vehicle tried to open it.</p>
 </div>
 <div class="section" id="the-description-tree">
-<h1><a class="toc-backref" href="#toc-entry-46">The Description Tree</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-47">The Description Tree</a></h1>
 <p>What node types there are is data rather than code in the editor. A node type
 arrives as two files: Rust in tcspecial, and a description tcs-cfge reads
 (<tt class="docutils literal"><span class="pre">tcs_cfge::nodes</span></tt>). The shipped descriptions are under
@@ -2558,7 +2617,7 @@ somebody wrote. Two links to one directory are not a loop, and what they find
 twice is two descriptions of one name, refused as above.</p>
 </div>
 <div class="section" id="schemas-beside-the-tree">
-<h1><a class="toc-backref" href="#toc-entry-47">Schemas Beside the Tree</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-48">Schemas Beside the Tree</a></h1>
 <p><tt class="docutils literal">tcsprotocol/schema</tt> holds a schema for each file tcs-cfge edits, in each
 spelling: a JSON Schema for the YAML and an XML Schema for the XML, for the
 configuration -- YTCS and XTCS -- and for the simulator's file. They are
@@ -2665,7 +2724,7 @@ filesystem hierarchy standard puts it. <tt class="docutils literal"><span class=
 under one prefix, and are still read.</p>
 </div>
 <div class="section" id="see-also">
-<h1><a class="toc-backref" href="#toc-entry-48">See Also</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-49">See Also</a></h1>
 <dl class="docutils">
 <dt><a class="reference external" href="design.html">The TCSpecial design documents</a></dt>
 <dd>What each of TCSpecial's design documents covers.</dd>

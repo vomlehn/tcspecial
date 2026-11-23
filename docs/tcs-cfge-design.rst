@@ -1947,7 +1947,8 @@ parameters** and **Arrange the nodes**; **View** holds how large the sheet is
 drawn. Open, Close, Cut, Copy, Paste and Select all carry the usual keys,
 Ctrl+O, Ctrl+W, Ctrl+X, Ctrl+C, Ctrl+V and Ctrl+A. Undo and redo are not in a menu but on the bar, where each says what it
 would take back (see `Undo and redo on the bar`_). The editor generates
-nothing: what it writes is the configuration and the simulator's file.
+nothing: what it writes is the configuration, the simulator's file, and the
+PDF a print makes (see `Printing`_).
 
 The main window's title says what it is and the file it is editing -- "TCSpecial
 Configuration: /home/someone/working/thermostat/thermostat.xtcs" -- the path
@@ -1961,6 +1962,66 @@ elements as fit -- "/home/…/thermostat/thermostat.xtcs" -- and never less than
 the first and the last. Shortened by the program and not left to the window
 system, which cuts a title at the end, and the end of a path is the file's name.
 The title is fitted again as the window is made wider or narrower.
+
+Printing
+--------
+
+Requirement
+    **File -> Print...**, from the window of any page, prints every page of
+    the configuration -- the top page, then each subdiagram's -- as pages of
+    one PDF, each page once however often or by whatever path it is reached,
+    each headed by which page it is, and opens it in the desktop's PDF
+    viewer. ``tcs-cfge --print <PDF file> <configuration> [<simulator
+    file>]`` makes the same PDF with no window on a screen, reading the files
+    and writing nothing but the PDF. ``make example-pdfs`` prints every
+    example so, to ``examples/<name>/<name>.pdf``, each linked from the
+    examples' README; and an example's PDF is printed again whenever its
+    configuration, a file it includes or its simulator file changes.
+
+The window toolkit has no printing of its own, and drawing the sheet a second
+time, for paper, would be a second answer to what the editor draws. So a page
+is a picture of the editor's own drawing: the main window draws the page, the
+view is stepped across the drawing at full size, and the part of each snapshot
+that is the sheet is copied into one picture. Each page is drawn in the main
+window in turn, rather than in a window of its own opened for it, and the main
+window is drawn again as it was afterwards. It takes no presses while it
+does -- a clear layer takes the pointer's, the menus are greyed and the keys
+refused -- because a press would be about whichever page it happened to be
+showing; and the page is drawn again at every step, because an edit in
+another window draws the main window from the document again meanwhile.
+
+The pages are walked from the top page by the boxes on each, keeping the pages
+printed already, so that a page reached twice, or a loop of pages, is printed
+once. The reader allows neither -- an included file may include no other, and
+no file is included twice -- but a walk that relied on that would print for
+ever were it ever otherwise (``print::pages_of``). A page with nothing on it
+is left out.
+
+A page is trimmed to its nodes and lines, with a margin, taken up to the top of
+the sheet so that the panes' names are printed with what is under them. A
+subdiagram's page takes in the whole of its *outside* margin on a side a line
+reaches, the terminals there and the word that names it, rather than cutting it
+through. The PDF is written by hand, a page an image with its heading written
+above it in Helvetica, which every viewer has without the file carrying it.
+
+``--print`` draws in memory, by Slint's software renderer, so that the
+examples' PDFs are made with no desktop at all. Its session is read-only and
+reads no settings: the panes are divided as they are until somebody moves
+them, so that a print does not depend on who makes it. The pictures do depend
+on the fonts the machine has, so the examples' PDFs are not compared with
+pictures made again. What is compared is what each was printed from: ``--print``
+records in the PDF's document information a digest of every file it read --
+``Document::files``, which is the configuration in both spellings, each file it
+includes and the simulator file, each by its name from the configuration's
+directory so that where the checkout is does not matter
+(``print::sources_digest``). ``--if-changed`` leaves a PDF whose digest is still
+the files', so ``make example-pdfs`` prints again only what has changed, and a
+picture that is current is not rewritten in another machine's fonts. A test,
+``every_example_is_printed_from_its_files_as_they_are``, fails while any
+example's PDF is missing, records nothing, or records a digest its files no
+longer have, and while the README does not link it; it says to run ``make
+example-pdfs``. A file's date would not do: a fresh checkout gives every file
+the same one.
 
 What a node says about itself
 -----------------------------

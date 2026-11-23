@@ -45,7 +45,8 @@ The command line
 
 .. code-block:: text
 
-   tcs-cfge [-h | --help] [-r | --read-only] [<configuration file> [<simulator file>]]
+   tcs-cfge [-h | --help] [-r | --read-only] [--print <PDF file> [--if-changed]]
+            [<configuration file> [<simulator file>]]
 
 With no file named, the window opens with no configuration in it, and
 **File -> Open...** chooses one (see `Opening and closing`_). A configuration
@@ -63,6 +64,20 @@ yet.
 and it may go anywhere on the line: see `Read-only sessions`_. Any other word
 starting with a dash is refused, so that a mistyped flag is not taken for the
 name of a configuration to create. More than two files are refused too.
+
+``--print <PDF file>`` opens no window: it prints the configuration named --
+every page of it, as **File -> Print...** does -- to the PDF, and writes
+nothing else. The configuration must be there, and the PDF's name must end in
+``.pdf``, so that a name forgotten is not taken for the configuration's. The
+panes are divided as they are until somebody moves them, whatever your
+settings say, so that the print is the same whoever makes it.
+
+The PDF records a digest of the files it was printed from: the configuration
+in both its spellings, each file it includes, and the simulator file. With
+``--if-changed``, a PDF whose digest is still the files' is left as it is, and
+tcs-cfge says it is up to date. ``make example-pdfs`` prints every example's
+configuration this way, so only the examples whose files have changed are
+printed again, and a test fails while any example's PDF is out of date.
 
 ``-h`` or ``--help`` prints the usage, with a line apiece on the files and the
 flags, and exits. Given a command line it does not take, tcs-cfge prints its
@@ -850,19 +865,27 @@ once for each edit that fails the same way.
 Printing
 --------
 
-**File -> Print...** prints the working panes -- Physics, Payloads, Vehicle
-and Gateway -- as the window draws them, without the selection lists down the
-left, trimmed to the nodes and the lines between them, with a margin round
-them and the panes' names along the top. The dividers' handles are left out.
+**File -> Print...** prints the whole configuration, from the window of any of
+its pages: the top page first, then each subdiagram's page, each once, as
+pages of one PDF. Each page is headed by which it is: the configuration's
+file name, or the subdiagram's name and the file it comes from. A page with
+nothing on it is left out.
+
+Each page is its working panes -- Physics, Payloads, Vehicle and Gateway --
+as the window draws them, without the selection lists down the left, trimmed
+to the nodes and the lines between them, with a margin round them and the
+panes' names along the top. A subdiagram's page takes in the whole of its
+*outside* margin where a line reaches it. Nothing is drawn selected, and the
+dividers' handles are left out.
 
 The picture is made at full size, whatever the window's zoom, by moving the
-view across the drawing a part at a time; the window shows it moving for a
-moment, and the view is put back where it was. The picture is written as a
-PDF of one page, ``tcs-cfge-print-<name>.pdf`` in the system's temporary
-directory, and opened in the desktop's PDF viewer -- ``xdg-open`` on Linux --
+view across the drawing a part at a time, each page drawn in turn in the main
+window; the window shows it moving for a moment and takes no presses
+meanwhile, and is put back as it was. The pages are written as one
+PDF, ``tcs-cfge-print-<name>.pdf`` in the system's temporary directory, and opened in the desktop's PDF viewer -- ``xdg-open`` on Linux --
 whose Print chooses the printer, the paper and the orientation, and shows
-what will be printed first. The PDF is a picture of the sheet, not text: it
-prints as the window draws, colours and all.
+what will be printed first. Each page is a picture of the sheet, not text,
+its heading apart: it prints as the window draws, colours and all.
 
 Opening and closing
 -------------------

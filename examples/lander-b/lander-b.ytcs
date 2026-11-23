@@ -101,6 +101,7 @@ payloads:
           - to_accel_y.accel_y
       - payload: crashed
         read_size: "16"
+        world-out-type: "string(1)"
         address: "127.0.0.24:20807"
         protocol: "udp"
         world-out:
@@ -113,6 +114,7 @@ payloads:
           - to_joystick_3_4_y.joystick_3_4_y
       - payload: landed
         read_size: "16"
+        world-out-type: "string(1)"
         address: "127.0.0.24:20806"
         protocol: "udp"
         world-out:

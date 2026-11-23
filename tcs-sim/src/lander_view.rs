@@ -767,8 +767,9 @@ struct Readouts {
     state: &'static str,
     /// The fraction of a full tank left.
     fuel: f32,
-    /// The X and Y position, velocity and acceleration, as written.
-    values: [String; 6],
+    /// The X and Y position, velocity, acceleration and thrust, as
+    /// written.
+    values: [String; 8],
 }
 
 /// The lander as last seen flying.
@@ -780,6 +781,10 @@ struct Flying {
     velocity: Point,
     /// The fuel it had, in kilograms.
     fuel: f64,
+    /// Its thrust along each axis, in newtons: see [`thrust`]. What the
+    /// pane shows from a crash until it starts again, with the rest of the
+    /// values as the lander reports them then, those it crashed with.
+    thrust: Point,
 }
 
 /// A crashed lander's explosion: a fireball of its fuel and a spray of its
@@ -1072,6 +1077,27 @@ const PLUME_STEPS: f64 = 64.0;
 /// The nearest step.
 fn plume_step(throttle: f64) -> f64 {
     (throttle * PLUME_STEPS).round() / PLUME_STEPS
+}
+
+/// The thrust of the lander's engines along each axis, as the pane shows
+/// it: the throttles it burns at, from those it is given -- see
+/// [`throttles`] -- times each axis's full thrust; nothing with the tank
+/// dry or once it has crashed, as its plumes show.
+///
+/// # Arguments
+///
+/// * `f`   - The lander's figures.
+/// * `out` - Its terminals' values, in its type's order.
+///
+/// # Returns
+///
+/// The X and Y thrust, in newtons.
+pub fn thrust(f: &Resolved, out: &[f64]) -> Point {
+    if out[CRASHED] > 0.5 || out[FUEL] <= 0.0 {
+        return (0.0, 0.0);
+    }
+    let (across, up) = throttles(out[THROTTLE_X], out[THROTTLE_Y]);
+    (across * f.thrust_x, up * f.thrust_y)
 }
 
 /// The plumes of the lander's engines, as its throttles say they are firing:
@@ -2021,6 +2047,10 @@ pub struct Frame {
     pub acceleration_x: String,
     /// Y acceleration.
     pub acceleration_y: String,
+    /// X thrust, in newtons: see [`thrust`].
+    pub thrust_x: String,
+    /// Y thrust, in newtons.
+    pub thrust_y: String,
     /// Whether the pad's lights are lit.
     pub pad_lit: bool,
     /// Whether the lander's strobes are lit.
@@ -2068,6 +2098,7 @@ impl Watch {
                 place: (out[X], out[Y]),
                 velocity: (out[VELOCITY_X], out[VELOCITY_Y]),
                 fuel: out[FUEL].clamp(0.0, 1.0) * f.fuel,
+                thrust: thrust(f, out),
             });
             self.explosion = None;
         } else if !self.crashed {
@@ -2076,6 +2107,13 @@ impl Watch {
                 .and_then(|flying| Explosion::of(f, flying, simulated));
         }
         self.crashed = crashed;
+        // Crashed, the readouts stand still at what it crashed with, as the
+        // last values sent down do: the lander reports its velocity and
+        // acceleration as it hit, and its thrust is as last seen flying.
+        if let (true, Some(flying)) = (crashed, self.flying) {
+            frame.thrust_x = format!("{:.0}", flying.thrust.0);
+            frame.thrust_y = format!("{:.0}", flying.thrust.1);
+        }
         if let Some(explosion) = self.explosion.as_mut() {
             let t = simulated - explosion.began;
             explosion.follow(f, t);
@@ -2106,13 +2144,15 @@ impl Watch {
         if let Some(kept) = &self.readouts {
             if seconds - kept.at < READOUTS_EVERY && kept.state == frame.state {
                 frame.fuel = kept.fuel;
-                let [px, py, vx, vy, ax, ay] = kept.values.clone();
+                let [px, py, vx, vy, ax, ay, tx, ty] = kept.values.clone();
                 frame.position_x = px;
                 frame.position_y = py;
                 frame.velocity_x = vx;
                 frame.velocity_y = vy;
                 frame.acceleration_x = ax;
                 frame.acceleration_y = ay;
+                frame.thrust_x = tx;
+                frame.thrust_y = ty;
                 return;
             }
         }
@@ -2127,6 +2167,8 @@ impl Watch {
                 frame.velocity_y.clone(),
                 frame.acceleration_x.clone(),
                 frame.acceleration_y.clone(),
+                frame.thrust_x.clone(),
+                frame.thrust_y.clone(),
             ],
         });
     }
@@ -2165,6 +2207,8 @@ fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
     pane.set_velocity_y(frame.velocity_y.as_str().into());
     pane.set_acceleration_x(frame.acceleration_x.as_str().into());
     pane.set_acceleration_y(frame.acceleration_y.as_str().into());
+    pane.set_thrust_x(frame.thrust_x.as_str().into());
+    pane.set_thrust_y(frame.thrust_y.as_str().into());
     pane.set_pad_lit(frame.pad_lit);
     pane.set_strobe_lit(frame.strobe_lit);
 }
@@ -2242,6 +2286,8 @@ fn painted_from(f: &Resolved, out: &[f64], picture: &Drawn) -> Frame {
         velocity_y: format!("{:.2}", out[VELOCITY_Y]),
         acceleration_x: format!("{:.3}", out[ACCELERATION_X]),
         acceleration_y: format!("{:.3}", out[ACCELERATION_Y]),
+        thrust_x: format!("{:.0}", thrust(f, out).0),
+        thrust_y: format!("{:.0}", thrust(f, out).1),
         ..Frame::default()
     }
 }
@@ -2954,6 +3000,7 @@ pub(crate) mod tests {
             place: (200.0, 61.0),
             velocity: (0.0, -speed),
             fuel,
+            thrust: (0.0, 0.0),
         };
         let slow = Explosion::of(&f, flying(10.0, 0.0), 1.0).expect("one");
         let fast = Explosion::of(&f, flying(20.0, 400.0), 1.0).expect("one");

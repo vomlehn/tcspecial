@@ -112,6 +112,7 @@
                 <read_size>16</read_size>
                 <address>127.0.0.24:20807</address>
                 <protocol>udp</protocol>
+                <world-out-type>string(1)</world-out-type>
                 <world-out>gateway.crashed</world-out>
             </payload>
             <payload name="joystick_3_4_y">
@@ -124,6 +125,7 @@
                 <read_size>16</read_size>
                 <address>127.0.0.24:20806</address>
                 <protocol>udp</protocol>
+                <world-out-type>string(1)</world-out-type>
                 <world-out>gateway.landed</world-out>
             </payload>
             <payload name="restart">

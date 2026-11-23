@@ -389,6 +389,40 @@ class Shown(unittest.TestCase):
         readings.values["landed"] = "1"
         self.assertEqual(readings.state(), "Landed")
 
+    def test_the_thrust_is_the_throttle_times_the_full_thrust(self):
+        """Each axis's thrust is the joystick's value, made the throttle
+        tcs-sim burns at, times that axis's full thrust; nought with the
+        tank empty or once crashed; nothing before the joystick's value."""
+        import yaml
+        lander = lander_yamcs.Lander(lander_yamcs.lander_settings(
+            yaml.safe_load(lander_yamcs.SHIPPED_SIM.read_text())))
+        self.assertEqual(lander.thrust, {"x": 12000.0, "y": 48000.0})
+        readings = lander_yamcs.Readings([])
+        self.assertIsNone(readings.thrust("x", lander))
+        self.assertEqual(readings.thrust_text("x", lander),
+                         lander_yamcs.NOTHING_YET)
+        readings.values.update({"to_joystick_3_4_x": -0.5,
+                                "to_joystick_3_4_y": 0.5,
+                                "to_fuel": 0.5})
+        self.assertEqual(readings.thrust_text("x", lander), "-6000")
+        self.assertEqual(readings.thrust_text("y", lander), "24000")
+        # No thrust down, and the bottom engine no lower than a tenth lit.
+        readings.values["to_joystick_3_4_y"] = -1.0
+        self.assertEqual(readings.thrust("y", lander), 0.0)
+        readings.values["to_joystick_3_4_y"] = 0.02
+        self.assertAlmostEqual(readings.thrust("y", lander), 4800.0)
+        readings.values["to_fuel"] = 0.0
+        self.assertEqual(readings.thrust("x", lander), 0.0)
+        # Crashed, it stands at what it was last before the crash, whatever
+        # the joystick says now, until the lander starts again.
+        readings.values["to_fuel"] = 0.5
+        self.assertEqual(readings.thrust("x", lander), -6000.0)
+        readings.values["crashed"] = "1"
+        readings.values["to_joystick_3_4_x"] = 0.0
+        self.assertEqual(readings.thrust("x", lander), -6000.0)
+        readings.values["crashed"] = "0"
+        self.assertEqual(readings.thrust("x", lander), 0.0)
+
     def test_points_read_back(self):
         """Points written as the simulator file states them read back."""
         points = [(0.0, 1.5), (10.0, 0.0)]

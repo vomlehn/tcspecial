@@ -166,7 +166,10 @@ run at once; ``tcs-conflict`` checks the pair. Each has:
 * ``to_value`` nodes for the readings;
 * the joystick's reading passed through to the thrust, so that the pilot
   is in the loop and nothing aboard needs floating point;
-* a ``gateway_yamcs`` gateway, which takes the four values to the ground.
+* a ``gateway_yamcs`` gateway, which takes the four values to the ground;
+  lander-b's takes the ``landed`` and ``crashed`` signals too, each the
+  text ``1`` or ``0``, typed ``string(1)`` so that Yamcs shows that text
+  rather than its bytes.
 
 ``lander-a`` also sends the fuel left, and ``lander-b`` whether the lander
 has landed or crashed. Each logs to its own directory under
@@ -212,8 +215,14 @@ pane at the left of its payload panels:
 * "Landed", or on a crash "On the Moon, no one can hear you CRASH!", in
   words, and the fuel left, in words and as a
   bar;
-* below them, the X and Y position, velocity and acceleration, each named
-  and with its unit;
+* below them, the X and Y position, velocity, acceleration and thrust,
+  each named and with its unit, the thrust in newtons: the throttle the
+  lander burns at times the axis's full thrust, nought with the tank
+  empty. From a crash until the lander starts again they stand at what
+  it crashed with: the lander reports the velocity and acceleration it
+  hit with while it is down, and the thrust stands as it was last seen
+  flying. Those are the last values sent down, so the ground's window
+  shows the same, a light time later;
 * beside those, the joystick;
 * below them, Pause, which halts the simulated world and resumes it, and
   Autoland, which tries to land the lander by flying it through the
@@ -234,7 +243,10 @@ second and shows:
   position sent down, smaller than tcs-sim's;
 * the stars of tcs-sim's sky, as they are sent down: none at first, each
   appearing as its record arrives (see "The sky, sent down");
-* the six values, and the fuel left;
+* the six values sent down, with the thrust under the accelerations,
+  worked out from the joystick's values as tcs-sim works it out from the
+  throttles, and standing from a crash at what it was before it, as
+  tcs-sim's does; and the fuel left;
 * a joystick like tcs-sim's, its two lines at the X and Y values the
   joystick sent down, or its plus when they are nought; the pointer does
   nothing there;

@@ -1178,11 +1178,16 @@ window, drawn without opening it.
 
 #. .. figure:: shots/tcs-sim-enable-3.png
       :alt: The temp_1 panel three seconds later: Running, Sent: 10:00:03
-            followed by two bytes, and Pkts: 3 sent.
+            292.0875 K, and Pkts: 3 sent.
 
-      Three seconds on. ``Sent`` gives the time of the last reading and its
-      bytes -- the zone's temperature as the sensor reads it, in the encoding
-      tcspecial's conversion reads back -- and ``Pkts`` counts three.
+      Three seconds on. ``Sent`` gives the time of the last reading and
+      what it was: the zone's temperature, read back from the sensor's
+      bytes as tcspecial's conversion reads them, in kelvin -- as tcs-moc
+      shows the value made of it -- and ``Pkts`` counts three. A signal
+      shows as its text, ``1`` or ``0``, and what the vehicle sent a part
+      it drives as the value or whole number it drives it to; anything
+      else, or anything that does not read as what it should be, as its
+      bytes in hexadecimal.
 
 **Switching a heater**
 

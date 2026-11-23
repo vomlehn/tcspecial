@@ -536,7 +536,10 @@ velocity and acceleration;</li>
 <li><tt class="docutils literal">to_value</tt> nodes for the readings;</li>
 <li>the joystick's reading passed through to the thrust, so that the pilot
 is in the loop and nothing aboard needs floating point;</li>
-<li>a <tt class="docutils literal">gateway_yamcs</tt> gateway, which takes the four values to the ground.</li>
+<li>a <tt class="docutils literal">gateway_yamcs</tt> gateway, which takes the four values to the ground;
+lander-b's takes the <tt class="docutils literal">landed</tt> and <tt class="docutils literal">crashed</tt> signals too, each the
+text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, typed <tt class="docutils literal">string(1)</tt> so that Yamcs shows that text
+rather than its bytes.</li>
 </ul>
 <p><tt class="docutils literal"><span class="pre">lander-a</span></tt> also sends the fuel left, and <tt class="docutils literal"><span class="pre">lander-b</span></tt> whether the lander
 has landed or crashed. Each logs to its own directory under
@@ -577,8 +580,14 @@ ground, with the smiling face after a landing;</li>
 <li>&quot;Landed&quot;, or on a crash &quot;On the Moon, no one can hear you CRASH!&quot;, in
 words, and the fuel left, in words and as a
 bar;</li>
-<li>below them, the X and Y position, velocity and acceleration, each named
-and with its unit;</li>
+<li>below them, the X and Y position, velocity, acceleration and thrust,
+each named and with its unit, the thrust in newtons: the throttle the
+lander burns at times the axis's full thrust, nought with the tank
+empty. From a crash until the lander starts again they stand at what
+it crashed with: the lander reports the velocity and acceleration it
+hit with while it is down, and the thrust stands as it was last seen
+flying. Those are the last values sent down, so the ground's window
+shows the same, a light time later;</li>
 <li>beside those, the joystick;</li>
 <li>below them, Pause, which halts the simulated world and resumes it, and
 Autoland, which tries to land the lander by flying it through the
@@ -598,7 +607,10 @@ second and shows:</p>
 position sent down, smaller than tcs-sim's;</li>
 <li>the stars of tcs-sim's sky, as they are sent down: none at first, each
 appearing as its record arrives (see &quot;The sky, sent down&quot;);</li>
-<li>the six values, and the fuel left;</li>
+<li>the six values sent down, with the thrust under the accelerations,
+worked out from the joystick's values as tcs-sim works it out from the
+throttles, and standing from a crash at what it was before it, as
+tcs-sim's does; and the fuel left;</li>
 <li>a joystick like tcs-sim's, its two lines at the X and Y values the
 joystick sent down, or its plus when they are nought; the pointer does
 nothing there;</li>

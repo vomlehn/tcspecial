@@ -10,7 +10,9 @@
 //! of a full tank left; `landed`, a decision asserted while it stands on
 //! the pad, and `crashed`, one asserted from a crash until it starts again;
 //! and `acceleration_x` and `acceleration_y`, in metres a second a second,
-//! gravity's included, nought while it is not flying.
+//! gravity's included, nought while it stands on the pad. Crashed, it
+//! reports the velocity and acceleration it hit with until it starts
+//! again, so that the last values sent down, and shown, are those.
 //!
 //! # The arithmetic
 //!
@@ -132,6 +134,13 @@ enum Flight {
     Crashed {
         /// When it crashed, in simulated seconds.
         since: f64,
+        /// How fast it was going as it hit, in metres a second: what it
+        /// reports while it is down, so that the last values sent, and so
+        /// shown, are what it crashed with.
+        velocity: Point,
+        /// Its acceleration as it hit, in metres a second a second,
+        /// gravity's included, reported likewise.
+        acceleration: Point,
     },
 }
 
@@ -509,7 +518,7 @@ impl Lander {
     ///
     /// When, in simulated seconds, and what.
     fn next(&self, now: f64) -> (f64, Next) {
-        if let Flight::Crashed { since } = self.flight {
+        if let Flight::Crashed { since, .. } = self.flight {
             return (since + self.figures.pause.as_secs_f64(), Next::Again);
         }
         let flow = self.flow();
@@ -578,6 +587,8 @@ impl Component for Lander {
         match (terminal, self.flight) {
             (X, _) => self.at.0,
             (Y, _) => self.at.1,
+            (VELOCITY_X, Flight::Crashed { velocity, .. }) => velocity.0,
+            (VELOCITY_Y, Flight::Crashed { velocity, .. }) => velocity.1,
             (VELOCITY_X, _) => self.velocity.0,
             (VELOCITY_Y, _) => self.velocity.1,
             (FUEL, _) => self.fuel / self.figures.fuel,
@@ -585,6 +596,12 @@ impl Component for Lander {
             (CRASHED, Flight::Crashed { .. }) => decision(true),
             (ACCELERATION_X, Flight::Flying) => self.acceleration().0,
             (ACCELERATION_Y, Flight::Flying) => self.acceleration().1,
+            (ACCELERATION_X, Flight::Crashed { acceleration, .. }) => {
+                acceleration.0
+            }
+            (ACCELERATION_Y, Flight::Crashed { acceleration, .. }) => {
+                acceleration.1
+            }
             (SKY, _) => f64::from(SKY_GENERATION),
             _ => 0.0,
         }
@@ -626,7 +643,7 @@ impl Component for Lander {
 
     fn event(&mut self, at: f64) {
         match self.flight {
-            Flight::Crashed { since }
+            Flight::Crashed { since, .. }
                 if at >= since + self.figures.pause.as_secs_f64() - 1e-9 =>
             {
                 self.start_again();
@@ -650,7 +667,11 @@ impl Component for Lander {
                         self.at.1 = pad_y - least_y;
                         self.flight = Flight::Landed { since: at };
                     } else {
-                        self.flight = Flight::Crashed { since: at };
+                        self.flight = Flight::Crashed {
+                            since: at,
+                            velocity: self.velocity,
+                            acceleration: self.acceleration(),
+                        };
                     }
                     self.velocity = (0.0, 0.0);
                 } else if self.fuel <= self.flow() * FOUND_WITHIN {
@@ -733,7 +754,11 @@ mod tests {
         let mut inputs = held(0.0, 0.0, 0.0);
         l.hold(&inputs);
         l.at = (100.0, 60.0);
-        l.flight = Flight::Crashed { since: 1.0 };
+        l.flight = Flight::Crashed {
+            since: 1.0,
+            velocity: (0.0, 0.0),
+            acceleration: (0.0, 0.0),
+        };
         assert_eq!(l.next_event(2.0), Some(4.0));
         l.event(3.9);
         assert!(matches!(l.flight, Flight::Crashed { .. }));
@@ -742,7 +767,11 @@ mod tests {
         assert_eq!(l.at, (500.0, 300.0));
 
         // Crashed again, a restart starts it at once.
-        l.flight = Flight::Crashed { since: 200.0 };
+        l.flight = Flight::Crashed {
+            since: 200.0,
+            velocity: (0.0, 0.0),
+            acceleration: (0.0, 0.0),
+        };
         inputs[RESTART] = 7.0;
         l.hold(&inputs);
         assert_eq!(l.flight, Flight::Flying);
@@ -804,7 +833,11 @@ mod tests {
         l.at = (100.0, 60.0);
         l.velocity = (0.0, -30.0);
         l.fuel = 10.0;
-        l.flight = Flight::Crashed { since: 1.0 };
+        l.flight = Flight::Crashed {
+            since: 1.0,
+            velocity: (0.0, 0.0),
+            acceleration: (0.0, 0.0),
+        };
         l.hold(&held(0.0, 0.0, 1.0));
         assert_eq!(l.flight, Flight::Flying);
         assert_eq!(l.at, figures().start);
@@ -1021,6 +1054,38 @@ mod tests {
         run(&mut l, 0.0, 18.0);
         assert_eq!(l.output(CRASHED), 1.0);
         assert_eq!(l.output(LANDED), 0.0);
+    }
+
+    /// Crashed, it reports the velocity and acceleration it hit with until
+    /// it starts again, so that the last values sent down are those: not
+    /// the nought it stands still at.
+    #[test]
+    fn a_crash_reports_what_it_hit_with() {
+        let mut l = Lander::new(figures());
+        l.hold(&held(0.5, 0.0, 0.0));
+        run(&mut l, 0.0, 18.0);
+        assert_eq!(l.output(CRASHED), 1.0);
+        let Flight::Crashed {
+            velocity,
+            acceleration,
+            ..
+        } = l.flight
+        else {
+            panic!("crashed, but not said to be")
+        };
+        assert!(velocity.1 < -20.0, "it fell, at {velocity:?}");
+        assert!(velocity.0 > 0.0, "pushed across, at {velocity:?}");
+        assert!(acceleration.0 > 0.0, "pushed across: {acceleration:?}");
+        assert_eq!(acceleration.1, -l.figures.gravity);
+        assert_eq!(l.velocity, (0.0, 0.0), "it stands still");
+        let reported = [VELOCITY_X, VELOCITY_Y, ACCELERATION_X, ACCELERATION_Y]
+            .map(|terminal| l.output(terminal));
+        assert_eq!(
+            reported,
+            [velocity.0, velocity.1, acceleration.0, acceleration.1]
+        );
+        run(&mut l, 18.0, 18.5);
+        assert_eq!(l.output(VELOCITY_Y), velocity.1, "still, while down");
     }
 
     /// Off the pad, it crashes however slowly it comes down.

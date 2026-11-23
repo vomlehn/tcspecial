@@ -105,13 +105,33 @@ const DEFAULT_SIM_CONFIG_PATH: &str = "tests/manual/tcspecial1sim.yaml";
 
 /// The two strings a panel shows for one sample: when, and what.
 ///
-/// The formatting is [`DHSample::panel_lines`], which tcs-moc's panels use
-/// too: the two show the one transfer from opposite ends of a link and are
-/// read side by side, so a byte or a time that read differently in the two
-/// would look like a difference in the data.
-fn sample_lines(sample: &DHSample) -> (SharedString, SharedString) {
+/// The time's formatting is [`DHSample::panel_lines`], which tcs-moc's
+/// panels use too: the two show the one transfer from opposite ends of a
+/// link and are read side by side. What was sent is shown as what it is --
+/// a reading as its value and unit, as tcs-moc shows the value the vehicle
+/// makes of it -- where the payload's attachment reads it as one: see
+/// [`Attachment::shown`]. Anything else is its bytes.
+///
+/// # Arguments
+///
+/// * `sample`     - The sample.
+/// * `attachment` - What the payload is to the world, if anything.
+/// * `sent`       - Whether the payload sent it, rather than was sent it.
+///
+/// # Returns
+///
+/// The time and what was sent.
+fn sample_lines(
+    sample: &DHSample,
+    attachment: Option<&Attachment>,
+    sent: bool,
+) -> (SharedString, SharedString) {
     let (time, data) = sample.panel_lines();
-    (SharedString::from(time), SharedString::from(data))
+    let shown = attachment
+        .filter(|_| !sample.is_empty() && !sample.was_truncated())
+        .and_then(|a| a.shown(sent, sample.data()))
+        .unwrap_or(data);
+    (SharedString::from(time), SharedString::from(shown))
 }
 
 /// What a press of a panel's one button asks of the payload.
@@ -163,14 +183,23 @@ fn transfer_wanted(status: &str) -> Transfer {
 ///
 /// # Arguments
 ///
-/// * `info`  - The panel's row, whose counts and last packets are set.
-/// * `stats` - The payload's statistics; a count too large for the panel
-///             shows as `i32::MAX`.
-fn show_traffic(info: &mut PayloadInfo, stats: &PayloadStats) {
+/// * `info`       - The panel's row, whose counts and last packets are
+///                  set.
+/// * `stats`      - The payload's statistics; a count too large for the
+///                  panel shows as `i32::MAX`.
+/// * `attachment` - What the payload is to the world, if anything, which
+///                  its packets are read by.
+fn show_traffic(
+    info: &mut PayloadInfo,
+    stats: &PayloadStats,
+    attachment: Option<&Attachment>,
+) {
     info.packets_sent = i32::try_from(stats.packets_sent).unwrap_or(i32::MAX);
     info.packets_recv = i32::try_from(stats.packets_recv).unwrap_or(i32::MAX);
-    (info.last_sent_time, info.last_sent_data) = sample_lines(&stats.last_sent);
-    (info.last_recv_time, info.last_recv_data) = sample_lines(&stats.last_recv);
+    (info.last_sent_time, info.last_sent_data) =
+        sample_lines(&stats.last_sent, attachment, true);
+    (info.last_recv_time, info.last_recv_data) =
+        sample_lines(&stats.last_recv, attachment, false);
 }
 
 /// Has each panel's one button send its payload or silence it.
@@ -243,7 +272,7 @@ fn show_progress(
         let stats = payload.stats();
         let driving = SharedString::from(payload.driving_said());
         update_row(model, row, |info| {
-            show_traffic(info, &stats);
+            show_traffic(info, &stats, payload.attachment());
             info.driving = driving;
         });
     }
@@ -2316,7 +2345,7 @@ mod tests {
         // Nothing has moved yet, so neither row shows a time or any bytes: a
         // count of nought with a time beside it would be a transfer that
         // never happened.
-        show_traffic(&mut info, &PayloadStats::default());
+        show_traffic(&mut info, &PayloadStats::default(), None);
         assert_eq!(info.last_sent_time, NO_TRANSFER_TIME);
         assert_eq!(info.last_sent_data, "");
         assert_eq!(info.last_recv_time, NO_TRANSFER_TIME);
@@ -2332,6 +2361,7 @@ mod tests {
                 last_recv: sample_of(7322, b"READ\r"),
                 ..PayloadStats::default()
             },
+            None,
         );
         assert_eq!(info.last_sent_time, "01:01:01");
         assert_eq!(info.last_sent_data, "01 AB FF");
@@ -2348,6 +2378,7 @@ mod tests {
                 last_sent: sample_of(86_399, &[0x11; 12]),
                 ..PayloadStats::default()
             },
+            None,
         );
         assert_eq!(info.last_sent_time, "23:59:59");
         assert_eq!(info.last_sent_data, "11 11 11 11 11 11 11 11...");
@@ -3656,6 +3687,7 @@ mod tests {
                 last_recv: sample_of(7322, b"ASK"),
                 ..PayloadStats::default()
             },
+            None,
         );
         let (sent, recv, pkts) = shown(moving);
         assert_eq!(

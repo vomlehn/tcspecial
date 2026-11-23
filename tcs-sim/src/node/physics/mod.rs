@@ -199,6 +199,40 @@ impl Attachment {
         }
     }
 
+    /// What a panel shows of a packet this payload sent or was sent, as
+    /// what it is rather than its bytes: a reading as the number it is,
+    /// with its unit; a signal as its text, `1` or `0`; what the vehicle
+    /// sent a driven part as the value or the whole number it drives it
+    /// to. Its time is shown as it always was, by the panel.
+    ///
+    /// `None` -- and the panel shows the bytes -- for a sky's records and a
+    /// GPIO payload's lines, which are not one value, and for any packet
+    /// that does not read as what the attachment sends or takes: bytes
+    /// that are wrong are what says they are, and a number made of them
+    /// would hide it.
+    ///
+    /// # Arguments
+    ///
+    /// * `sent` - Whether the payload sent the packet, rather than was sent
+    ///            it.
+    /// * `data` - The packet's bytes.
+    ///
+    /// # Returns
+    ///
+    /// What the panel shows, or `None` for the bytes.
+    pub fn shown(&self, sent: bool, data: &[u8]) -> Option<String> {
+        match self {
+            Attachment::Reports { reading, .. } if sent => {
+                reading_shown(reading, data)
+            }
+            Attachment::Signals { .. } if sent => signal_shown(data),
+            Attachment::Drives { unit, .. } if !sent => {
+                driven_shown(*unit, data)
+            }
+            _ => None,
+        }
+    }
+
     /// Takes what the vehicle sent a driven part, at a simulated time: it is
     /// kept as the latest, and the world's input is driven to it if the
     /// part is enabled. Nothing for any other attachment.
@@ -478,6 +512,87 @@ impl Attachment {
             }
         }
         false
+    }
+}
+
+/// A number as a panel shows it: the shortest decimal that is the number,
+/// once rounded to twelve significant figures, so that a count times a
+/// scale that is not exact in binary -- three thousandths, say -- reads as
+/// it was meant rather than with a tail of noise.
+///
+/// # Arguments
+///
+/// * `number` - The number.
+///
+/// # Returns
+///
+/// Its text.
+fn number_shown(number: f64) -> String {
+    let rounded = format!("{number:.11e}").parse().unwrap_or(number);
+    tcsprotocol::node::vehicle::compute::as_text(rounded)
+}
+
+/// A sensor's reading as a panel shows it: the counts read in the
+/// conversion's format, scaled and offset to the value the vehicle makes of
+/// them, with its unit.
+///
+/// # Arguments
+///
+/// * `reading` - The conversion the readings go to.
+/// * `data`    - The reading's bytes.
+///
+/// # Returns
+///
+/// The value and its unit, or `None` where the bytes are not one reading
+/// in the format.
+fn reading_shown(reading: &ToValueParams, data: &[u8]) -> Option<String> {
+    let counts = reading.format.counts(data).ok()?;
+    let value = counts * reading.scale + reading.offset;
+    Some(format!("{} {}", number_shown(value), reading.unit))
+}
+
+/// A signal as a panel shows it: its text, `1` or `0`.
+///
+/// # Arguments
+///
+/// * `data` - What it sent.
+///
+/// # Returns
+///
+/// The text, or `None` where it is anything else.
+fn signal_shown(data: &[u8]) -> Option<String> {
+    match data {
+        b"0" | b"1" => Some(String::from_utf8_lossy(data).into_owned()),
+        _ => None,
+    }
+}
+
+/// What the vehicle sent a driven part, as a panel shows it: a value as the
+/// number it is, with its unit, or a decision or the lines' bits as the
+/// whole number it is, as [`driven`] reads them.
+///
+/// # Arguments
+///
+/// * `unit` - The unit of the value the part takes, or `None` where it
+///            takes a whole number.
+/// * `data` - What the vehicle sent.
+///
+/// # Returns
+///
+/// The number, with its unit for a value, or `None` where the bytes are
+/// not what the part takes.
+fn driven_shown(unit: Option<Unit>, data: &[u8]) -> Option<String> {
+    match unit {
+        Some(unit) => {
+            let value = from_value(data, unit, "what was sent").ok()?;
+            Some(format!("{} {unit}", number_shown(value)))
+        }
+        None if !data.is_empty() && data.len() <= 8 => {
+            let mut bytes = [0u8; 8];
+            bytes[8 - data.len()..].copy_from_slice(data);
+            Some(u64::from_be_bytes(bytes).to_string())
+        }
+        None => None,
     }
 }
 
@@ -1442,5 +1557,43 @@ connections:
             "it fell to {lowest} K, under a band starting at {} K",
             SETPOINT - HALF_BAND
         );
+    }
+
+    /// A panel shows what a payload sent or was sent as what it is: a
+    /// reading as its value and unit, a signal as its text, what drives a
+    /// part as its value or whole number; and the bytes, by `None`, for
+    /// anything that does not read as one.
+    #[test]
+    fn a_panel_shows_a_packet_as_what_it_is() {
+        let sixteenths = ToValueParams {
+            format: Format::I16Be,
+            scale: 0.0625,
+            offset: 273.15,
+            unit: Unit::Kelvin,
+        };
+        assert_eq!(
+            reading_shown(&sixteenths, &encode(&sixteenths, 293.15)),
+            Some("293.15 K".to_string())
+        );
+        assert_eq!(reading_shown(&sixteenths, &[1, 2, 3]), None);
+
+        assert_eq!(signal_shown(b"1"), Some("1".to_string()));
+        assert_eq!(signal_shown(b"0"), Some("0".to_string()));
+        assert_eq!(signal_shown(b"yes"), None);
+
+        let throttle =
+            tcsprotocol::node::vehicle::compute::as_value(-0.25, Unit::Ratio)
+                .expect("a ratio");
+        assert_eq!(
+            driven_shown(Some(Unit::Ratio), &throttle),
+            Some(format!("-0.25 {}", Unit::Ratio))
+        );
+        assert_eq!(driven_shown(Some(Unit::Ratio), b"1"), None);
+        assert_eq!(driven_shown(None, &[1]), Some("1".to_string()));
+        assert_eq!(driven_shown(None, &[]), None);
+
+        // Three thousandths a count is not exact in binary, and a panel
+        // shows the value meant, not its tail of noise.
+        assert_eq!(number_shown(0.1 + 0.2), "0.3");
     }
 }

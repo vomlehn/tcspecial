@@ -1448,10 +1448,15 @@ button offers <tt class="docutils literal">Disable</tt>; no reading has gone yet
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The temp_1 panel three seconds later: Running, Sent: 10:00:03 followed by two bytes, and Pkts: 3 sent." src="shots/tcs-sim-enable-3.png" />
-<p class="caption">Three seconds on. <tt class="docutils literal">Sent</tt> gives the time of the last reading and its
-bytes -- the zone's temperature as the sensor reads it, in the encoding
-tcspecial's conversion reads back -- and <tt class="docutils literal">Pkts</tt> counts three.</p>
+<img alt="The temp_1 panel three seconds later: Running, Sent: 10:00:03 292.0875 K, and Pkts: 3 sent." src="shots/tcs-sim-enable-3.png" />
+<p class="caption">Three seconds on. <tt class="docutils literal">Sent</tt> gives the time of the last reading and
+what it was: the zone's temperature, read back from the sensor's
+bytes as tcspecial's conversion reads them, in kelvin -- as tcs-moc
+shows the value made of it -- and <tt class="docutils literal">Pkts</tt> counts three. A signal
+shows as its text, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and what the vehicle sent a part
+it drives as the value or whole number it drives it to; anything
+else, or anything that does not read as what it should be, as its
+bytes in hexadecimal.</p>
 </div>
 </li>
 </ol>

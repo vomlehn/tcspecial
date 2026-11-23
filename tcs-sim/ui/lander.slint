@@ -360,6 +360,8 @@ export global LanderScene {
     in-out property <string> velocity-y;
     in-out property <string> acceleration-x: "-";
     in-out property <string> acceleration-y: "-";
+    in-out property <string> thrust-x: "-";
+    in-out property <string> thrust-y: "-";
     // Where the joystick's dot is: set by Rust.
     in-out property <length> dot-x;
     in-out property <length> dot-y;
@@ -757,6 +759,12 @@ export component LanderPane inherits Rectangle {
                         unit: "m/s²";
                         first: LanderScene.acceleration-x;
                         second: LanderScene.acceleration-y;
+                    }
+                    Values {
+                        name: "Thrust";
+                        unit: "N";
+                        first: LanderScene.thrust-x;
+                        second: LanderScene.thrust-y;
                     }
                 }
             }

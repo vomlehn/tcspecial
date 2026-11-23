@@ -115,6 +115,12 @@ export component StationWindow inherits Window {
                     first: LanderScene.acceleration-x;
                     second: LanderScene.acceleration-y;
                 }
+                Values {
+                    name: "Thrust";
+                    unit: "N";
+                    first: LanderScene.thrust-x;
+                    second: LanderScene.thrust-y;
+                }
             }
             HorizontalLayout {
                 alignment: center;

@@ -129,6 +129,11 @@ LOWEST_PAD = 0.02
 #: What a value is shown as before one has arrived.
 NOTHING_YET = "--"
 
+#: The least the bottom engine burns at, as a share of its full thrust,
+#: once it burns at all: tcs-sim's ``LEAST_THROTTLE``, in
+#: tcs-sim/src/node/physics/lander.rs.
+LEAST_THROTTLE = 0.1
+
 #: How often the window takes in what the reading loop has read, in
 #: milliseconds: 20 times a second, a third as often as tcs-sim's own
 #: window, the lander drawn between readings by dead reckoning, so that it
@@ -325,6 +330,9 @@ class Lander:
             #: The lander's outline, each line a list of points about
             #: where it is, its feet at nought.
             self.outline = points_of(settings["outline"])
+            #: Each axis's full thrust, in newtons.
+            self.thrust = {"x": float(settings["thrust_x"].split()[0]),
+                           "y": float(settings["thrust_y"].split()[0])}
         except (KeyError, IndexError, AttributeError) as why:
             raise ValueError(f"the lander's settings: {why}")
 
@@ -876,6 +884,9 @@ class Readings:
         #: When each value last changed, on this program's monotonic clock.
         self.changed = {}
         self._lock = threading.Lock()
+        #: Each axis's thrust as last worked out before a crash, which
+        #: stands from the crash until the lander starts again.
+        self._thrust_before = {}
 
     def read(self):
         """Reads each vehicle's latest values from Yamcs."""
@@ -977,6 +988,56 @@ class Readings:
         """
         value = self.number(node)
         return NOTHING_YET if value is None else f"{value:.{places}f}"
+
+    def thrust(self, axis, lander):
+        """An axis's thrust, as the lander burns its engines: the
+        joystick's value, which the vehicle drives that axis's throttle
+        with, made the throttle tcs-sim burns at -- across within minus one
+        and one; up within nought and one, and lit, no less than
+        :data:`LEAST_THROTTLE` -- times the axis's full thrust; nought with
+        the tank empty. Crashed, it stands at what it was last worked out
+        before the crash, as tcs-sim's pane holds it, and as the lander's
+        other values stand at what it crashed with.
+
+        Args:
+            axis:   ``"x"`` or ``"y"``.
+            lander: The :class:`Lander`, whose full thrusts these are.
+
+        Returns:
+            The thrust, in newtons, or ``None`` before the joystick's value
+            has arrived.
+        """
+        if self.said("crashed"):
+            return self._thrust_before.get(axis, 0.0)
+        stick = self.number(f"to_joystick_3_4_{axis}")
+        if stick is None:
+            return None
+        left = self.number("to_fuel")
+        if left is not None and left <= 0:
+            thrust = 0.0
+        else:
+            if axis == "x":
+                throttle = min(max(stick, -1.0), 1.0)
+            else:
+                throttle = min(max(stick, 0.0), 1.0)
+                if throttle > 0:
+                    throttle = max(throttle, LEAST_THROTTLE)
+            thrust = throttle * lander.thrust[axis]
+        self._thrust_before[axis] = thrust
+        return thrust
+
+    def thrust_text(self, axis, lander):
+        """An axis's thrust as the window shows it.
+
+        Args:
+            axis:   ``"x"`` or ``"y"``.
+            lander: The :class:`Lander`.
+
+        Returns:
+            The thrust in whole newtons, or :data:`NOTHING_YET`.
+        """
+        thrust = self.thrust(axis, lander)
+        return NOTHING_YET if thrust is None else f"{thrust:.0f}"
 
     def arrived(self, nodes):
         """Whether every one of some nodes has said something.
@@ -1395,17 +1456,27 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
 
     label(text="X").grid(row=0, column=1, sticky="e")
     label(text="Y").grid(row=0, column=2, sticky="e")
+    # Each row's name, its unit, and what says its X and its Y: a node's
+    # value, or for the thrust, worked out from the joystick's -- under the
+    # accelerations, as in tcs-sim's lander pane.
+    rows = [(name, unit, (lambda node=x: readings.text(node)),
+             (lambda node=y: readings.text(node)))
+            for name, unit, x, y in ROWS]
+    below_acceleration = 1 + [row[0] for row in ROWS].index("Acceleration")
+    rows.insert(below_acceleration, ("Thrust", "N",
+                    lambda: readings.thrust_text("x", lander),
+                    lambda: readings.thrust_text("y", lander)))
     shown = []
-    for number, (name, unit, x_node, y_node) in enumerate(ROWS, start=1):
+    for number, (name, unit, x_said, y_said) in enumerate(rows, start=1):
         said = f"{name} ({unit})" if unit else name
         label(text=said).grid(row=number, column=0, sticky="w")
-        for column, node in ((1, x_node), (2, y_node)):
+        for column, get in ((1, x_said), (2, y_said)):
             value = label(width=8, anchor="e")
             value.grid(row=number, column=column, sticky="e",
                        padx=(between // 2, 0))
-            shown.append((value, node))
+            shown.append((value, get))
     fuel = label(text="Fuel --")
-    fuel.grid(row=len(ROWS) + 1, column=0, sticky="w")
+    fuel.grid(row=len(rows) + 1, column=0, sticky="w")
     note = ttk.Label(window, style="Lander.TLabel", wraplength=wide,
                      text=f"Seed {seed}; everything here is {delay:g} s "
                           "behind the lander")
@@ -1467,8 +1538,8 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
         if stopped():
             window.destroy()
             return
-        for value, node in shown:
-            value.configure(text=readings.text(node))
+        for value, get in shown:
+            value.configure(text=get())
         left = readings.number("to_fuel")
         fuel.configure(text="Fuel --" if left is None
                        else f"Fuel {round(left * 100)}%")

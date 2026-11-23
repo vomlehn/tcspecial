@@ -88,26 +88,17 @@
           </DefaultCalibrator>
         </IntegerDataEncoding>
       </FloatParameterType>
-      <IntegerParameterType name="bytes_length" signed="false"
-          sizeInBits="32">
-        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
-        <ValidRange minInclusive="0" maxInclusive="4096"/>
-      </IntegerParameterType>
-      <BinaryParameterType name="bytes">
-        <BinaryDataEncoding>
-          <SizeInBits>
-            <DynamicValue>
-              <ParameterInstanceRef parameterRef="bytes_length"/>
-              <LinearAdjustment slope="8"/>
-            </DynamicValue>
-          </SizeInBits>
-        </BinaryDataEncoding>
-      </BinaryParameterType>
+      <StringParameterType name="string">
+        <StringDataEncoding encoding="UTF-8">
+          <Variable maxSizeInBits="32800">
+            <LeadingSize sizeInBitsOfSizeTag="32"/>
+          </Variable>
+        </StringDataEncoding>
+      </StringParameterType>
     </ParameterTypeSet>
     <ParameterSet>
-      <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
-      <Parameter name="crashed" parameterTypeRef="bytes"/>
-      <Parameter name="landed" parameterTypeRef="bytes"/>
+      <Parameter name="crashed" parameterTypeRef="string"/>
+      <Parameter name="landed" parameterTypeRef="string"/>
       <Parameter name="to_accel_y" parameterTypeRef="metre_per_second_squared"/>
       <Parameter name="to_joystick_3_4_y" parameterTypeRef="ratio"/>
       <Parameter name="to_velocity_y" parameterTypeRef="metre_per_second"/>
@@ -116,13 +107,11 @@
     <ContainerSet>
       <SequenceContainer name="crashed_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="bytes_length"/>
           <ParameterRefEntry parameterRef="crashed"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="landed_packet">
         <EntryList>
-          <ParameterRefEntry parameterRef="bytes_length"/>
           <ParameterRefEntry parameterRef="landed"/>
         </EntryList>
       </SequenceContainer>

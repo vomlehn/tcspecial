@@ -417,6 +417,16 @@ impl SimulatedPayload {
             .unwrap_or_default()
     }
 
+    /// What this payload is to the physics model's world, if it is joined
+    /// to it: what its panel reads its packets by.
+    ///
+    /// # Returns
+    ///
+    /// The attachment, or `None` for a payload that is not joined.
+    pub fn attachment(&self) -> Option<&crate::node::physics::Attachment> {
+        self.config.attachment.as_ref()
+    }
+
     /// Stop the payload simulation
     pub fn stop(&mut self) {
         self.running.store(false, Ordering::SeqCst);

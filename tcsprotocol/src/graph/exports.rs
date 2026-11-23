@@ -1,9 +1,9 @@
 //! What of an included file may be joined from outside it.
 //!
 //! An included file is a page of the configuration -- tcs-cfge draws it as a
-//! box on the top page, opened into a page of its own -- and its `exports`
-//! section is the box's edge: for each of the four terminals, the nodes in
-//! the file whose terminal of that name a line from another file may reach.
+//! box on the page that includes it, opened into a page of its own -- and its
+//! `exports` section is the box's edge: for each of the four terminals, the
+//! nodes inside it whose terminal of that name a line from outside may reach.
 //! A line that crosses into or out of an included file at a node it does not
 //! export is refused by [`crate::graph::Graph::check`], saying which list to
 //! add the node to.
@@ -16,8 +16,13 @@
 //! node's name being its own in every file; so nothing aboard reads this, and
 //! the flight software runs the same graph whether a file exports or not.
 //!
-//! One level, as includes are: the top file has nothing around it, and a
-//! top file with an `exports` section is refused as it is read.
+//! A subdiagram may hold subdiagrams of its own, and a line is held to the
+//! edge of every one it crosses: one from the top page to a node two
+//! subdiagrams deep is held to both files' `exports`. So a file may export a
+//! node of a subdiagram inside it, at any depth, passing it on outwards;
+//! that is how a deep node is reached from outside, and the outer file's
+//! list says that it is. The top file has nothing around it, and a top file
+//! with an `exports` section is refused as it is read.
 
 use serde::{Deserialize, Serialize};
 

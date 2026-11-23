@@ -1119,7 +1119,8 @@ about the payloads themselves.</dd>
 <p>A configuration may be written as several files. The one named on the command
 line is the top file, and its <tt class="docutils literal">include</tt> list names the others, each read in
 the top file's spelling and taken in as if it were written there. Each is a
-subdiagram, with a name of its own and its file's path under it:</p>
+subdiagram, with a name of its own and its file's path under it, and an
+included file may have an <tt class="docutils literal">include</tt> list of its own, so subdiagrams nest:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">include</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">subdiagram</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">thermostat-common</span><span class="whitespace">
@@ -1128,22 +1129,24 @@ subdiagram, with a name of its own and its file's path under it:</p>
 <p>In XML it is one element with the two as attributes, <tt class="docutils literal">&lt;include
 <span class="pre">name=&quot;thermostat-common&quot;</span> <span class="pre">path=&quot;../thermostat-common/thermostat&quot;/&gt;</span></tt>. The name
 is the subdiagram's, the name tcs-cfge draws its box under, and is no node's
-and no other subdiagram's, with no dot or slash in it. An include written as a
+and no other subdiagram's in any file, with no dot or slash in it. An include written as a
 bare path, as includes once were, is refused, saying how to write it now.</p>
-<p>An include's path is relative to the top file's directory: it is the file's path from
-there, without the extension, <tt class="docutils literal">zone</tt> for <tt class="docutils literal">zone.ytcs</tt> beside the top file
-and <tt class="docutils literal"><span class="pre">../thermostat-common/thermostat</span></tt> for <tt class="docutils literal">thermostat.ytcs</tt> in a directory
-beside the top file's. Nothing in it is expanded, so an include that is
+<p>An include's path is relative to the directory of the file that writes it: it
+is the file's path from there, without the extension, <tt class="docutils literal">zone</tt> for
+<tt class="docutils literal">zone.ytcs</tt> beside that file and <tt class="docutils literal"><span class="pre">../thermostat-common/thermostat</span></tt> for
+<tt class="docutils literal">thermostat.ytcs</tt> in a directory beside its own. Nothing in it is expanded, so an include that is
 absolute, that begins with <tt class="docutils literal">~</tt> or that has a <tt class="docutils literal">$</tt> in it is refused, saying
 so, rather than looked for as a file of that name; so is an empty one, and one
 with a part that is empty or <tt class="docutils literal">.</tt>. An included file has no <tt class="docutils literal">tcspecial</tt>
-section and includes no others, no file is included twice, and no two files
-have a node of one name, since a node is known by its name in every file:
+section, no file is read twice, which also refuses an include that comes back
+round to a file that includes it, and no two files have a node of one name, since a node is known by its name in every file:
 a line in one file may run to a node in another. Only to one the other file
 exports, though. An included file's <tt class="docutils literal">exports</tt> section says, for each of
-the four terminals, which of its nodes a line from another file may reach
+the four terminals, which nodes inside it a line from outside may reach
 there, and a line that crosses into or out of the file anywhere else is
-refused, saying which list to add the node to:</p>
+refused, saying which list to add the node to. A line crossing several
+subdiagrams' edges must be exported at each: a file may name a node of a
+subdiagram inside it, passing it outwards:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">exports</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">world-out</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">consensus_temp</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">gpio-out-tmass2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k1</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k2</span><span class="punctuation indicator">,</span><span class="whitespace"> </span><span class="name variable">to_k3</span><span class="punctuation indicator">]</span>
@@ -1152,7 +1155,7 @@ refused, saying which list to add the node to:</p>
 inside <tt class="docutils literal">&lt;exports&gt;</tt>. A top file has nothing around it and may not have the
 section. tcs-cfge draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
-include, name and path, as it is written, so a set of files digests alike from
+include, name and path, as it is written, and which subdiagram wrote it, so a set of files digests alike from
 wherever it is read. Two examples that fly one vehicle include it from a directory of their
 own: see <a class="reference internal" href="#the-thermostat-yamcs-example">The thermostat-yamcs example</a>.</p>
 <p>tcspecial once read a configuration of its own as well, named by
@@ -5796,9 +5799,10 @@ a link each time data is sent over it: a wide line, a shade lighter than the
 link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.</p>
 <p>A configuration that includes other files opens a window for each of them as
-well, drawn as tcs-cfge draws that subdiagram's page, with its edge in the
-margins and its own physics; on the top page, each is a box. A link that
-crosses a subdiagram's edge blinks on both pages.</p>
+well, at any depth, drawn as tcs-cfge draws that subdiagram's page, with its
+edge in the margins and its own physics; on the page of the file that
+includes it, each is a box, and a node inside it, however deep, is drawn at
+the box. A link blinks on every page it is drawn on.</p>
 <p>Nothing in the windows can be pressed. Close any of them to stop tcspecial,
 which stops as it does on an interrupt; if tcspecial stops first, the windows
 close.</p>

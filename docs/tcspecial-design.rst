@@ -5025,9 +5025,10 @@ Configuration
 
 One logical configuration, which may be written as several files.
 
-The top file may carry an ``include`` list naming others; their contents are
+Any file may carry an ``include`` list naming others; their contents are
 merged into it. Each is a subdiagram, with a name of its own and its file's
-path written under it, as a node is written with its attributes:
+path written under it, as a node is written with its attributes, and an
+included file may include others in turn, so subdiagrams nest:
 
 .. code-block:: yaml
 
@@ -5043,42 +5044,59 @@ ground can say which configuration is flying rather than which top file is.
 
 Requirement
     A subdiagram's name is its own: no node's and no other subdiagram's,
-    and with no dot or slash in it, which a line reads as separating a
-    node's name from an input's or a page's. A subdiagram is drawn as a node
-    of the top page and joined like one, and a path is no name for it: it
+    in any file of the configuration and at any depth, and with no dot or
+    slash in it, which a line reads as separating a node's name from an
+    input's or a page's. A subdiagram is drawn as a node of the page that
+    includes it and joined like one, and a path is no name for it: it
     says where the file is, which changes when the file moves, and is full of
     slashes and dots. An include written as a bare path, as includes once
     were, is refused, saying how to write it now.
 
 Requirement
-    An include's path names a file by its path relative to the top file's
-    directory, without an extension, the top file's being given it: ``zone``
-    beside the top file, ``../common/zone`` in another directory. Each part
-    of it is a name or ``..``. Nothing in it is expanded: an include that is
-    empty, absolute, begins with ``~``, has a ``$`` in it, or has a part that
-    is empty or ``.`` is refused, saying that includes are relative to the
-    top file. The digest takes in each include, its name and its path, as
-    it is written, so the same set of files digests the same from any
-    working directory, and an
-    expansion would make the digest depend on something that is not in the
-    files.
+    An include's path names a file by its path relative to the directory of
+    the file that writes the include, without an extension, that file's
+    being given it: ``zone`` beside it, ``../common/zone`` in another
+    directory. So a subdiagram and the subdiagrams it includes can be moved
+    or reused together, their paths unchanged. Each part of it is a name or
+    ``..``. Nothing in it is expanded: an include that is empty, absolute,
+    begins with ``~``, has a ``$`` in it, or has a part that is empty or
+    ``.`` is refused, saying that includes are relative to the file that
+    writes them. The digest takes in each include, its name and its path,
+    as it is written, and, for one an included file writes, which
+    subdiagram wrote it, so the same set of files digests the same from any
+    working directory, two trees of the same files nested differently are
+    two configurations, and a configuration of one level digests as it did
+    before subdiagrams could nest. An expansion would make the digest depend
+    on something that is not in the files. A configuration kept on board is
+    laid out from its top file, each file at its path from the top file's
+    directory: an include's own path, joined to the directory of the
+    subdiagram that wrote it.
 
 Requirement
-    One level: an included file has no ``tcspecial`` section and no
-    ``include`` list of its own. A file is included once, the top file not
-    at all, whatever path names it; and a node's name is its own in every
-    file, so no two files have a node of one name and a link or a command
-    binding in one file may name a node in another.
+    An included file has no ``tcspecial`` section, and may have an
+    ``include`` list of its own, to any depth. Each file is read once,
+    whatever path names it: one included twice, the top file included, and
+    a file that includes, at any depth, a file that includes it are
+    refused, so the files make a tree and reading it ends. A node's name is
+    its own in every file, so no two files have a node of one name, and a
+    link or a command binding in one file may name a node in any other.
+    Nesting is the files' shape and nothing more: the reader flattens them
+    as it reads them, so the vehicle and the ground see one graph, and run
+    it the same however its files are nested.
 
 Requirement
     A line that crosses into or out of an included file reaches it only at
     a node the file exports at that terminal. An included file's
     ``exports`` section lists, under each of ``world-in``, ``world-out``,
-    ``moc-in`` and ``moc-out``, the nodes of that file whose terminal of
-    that name a line from another file may reach; a line crossing anywhere
-    else is refused, saying which list to add the node to, and so is a list
-    naming a node that is not in the file or a terminal its type has not
-    got. A line to one of a computation's named inputs, a vote's ``in0``,
+    ``moc-in`` and ``moc-out``, the nodes inside it whose terminal of that
+    name a line from outside may reach; a line crossing anywhere else is
+    refused, saying which list to add the node to, and so is a list naming
+    a node that is neither in the file nor in a subdiagram inside it, or a
+    terminal its type has not got. A line is held to the edge of every
+    subdiagram it crosses: one from the top page to a node two subdiagrams
+    deep must be exported by both files, the outer one naming the inner
+    one's node to pass it outwards; one between two files inside the same
+    subdiagram crosses only the edges inside it. A line to one of a computation's named inputs, a vote's ``in0``,
     reaches it at its ``world-in``, since a named input is which way in
     and not a terminal: no exports list could name it. A top file has
     nothing around it, and one with an ``exports`` section is refused as
@@ -8757,16 +8775,20 @@ Requirement
     tcs-cfge setting, read and never written, and the nodes are settled into
     their panes by the rule the editor settles a file it opens with. Each
     file the top file includes is drawn on the top page as the editor draws
-    it, a subdiagram's box saying how many nodes it holds and how many lines
-    cross its edge, and a line to a node inside it is drawn to the box.
+    it, a subdiagram's box saying how many nodes it holds, at any depth, and
+    how many lines cross its edge, and a line to a node inside it, however
+    deep, is drawn to the box.
 
 Requirement
-    Each subdiagram has a window of its own, open from the start beside the
-    top file's and drawn as tcs-cfge draws the subdiagram's page: its nodes,
-    its edge in a margin either side with the terminals a line from another
-    file crosses by, a node outside it drawn at that edge, and the Physics
-    pane holding the components the editor put on that page. Its links are
-    lit as the top page's are, a line crossing the edge on both pages.
+    Each subdiagram has a window of its own, at any depth, open from the
+    start beside the top file's and drawn as tcs-cfge draws the subdiagram's
+    page: its nodes, the boxes of the subdiagrams its file includes, drawn
+    as the top page's are, its edge in a margin either side with the
+    terminals a line from another file crosses by, a node outside it drawn
+    at that edge, and the Physics pane holding the components the editor
+    put on that page. Its links are lit as the top page's are, a line lit
+    on every page it is drawn on: one with an end on the page, or with its
+    two ends in two of the page's boxes, or in one and outside the page.
 
 Requirement
     The drawing is one drawing. What a node, a link and the sheet look like --

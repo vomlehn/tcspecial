@@ -329,11 +329,13 @@ pub enum Problem {
     /// what it does.
     Unconnected { node: String },
     /// A line crossing into or out of an included file at a node that file
-    /// does not export at that terminal: see [`crate::graph::exports`].
+    /// does not export at that terminal: see [`crate::graph::exports`]. A
+    /// line crossing several edges is one problem for each edge whose file
+    /// does not export it.
     ///
     /// `from` is the node the line leaves, which is where it is written;
-    /// `node` is the end in the included file, `terminal` its terminal, and
-    /// `file` the file's include name.
+    /// `node` is the end inside the included file, `terminal` its terminal,
+    /// and `file` the file's include name.
     NotExported {
         from: String,
         link: String,
@@ -341,8 +343,8 @@ pub enum Problem {
         terminal: String,
         file: String,
     },
-    /// An `exports` list naming a node that is not in its file, or a
-    /// terminal that node has not got. `file` is the file's path, which is
+    /// An `exports` list naming a node that is neither in its file nor in a
+    /// subdiagram inside it, or a terminal that node has not got. `file` is the file's path, which is
     /// where the list is.
     BadExport {
         file: std::path::PathBuf,
@@ -836,22 +838,22 @@ impl Graph {
     /// lines that cross into and out of those files: see
     /// [`crate::graph::exports`].
     ///
-    /// A line crossing between two files is held to the `exports` of each
-    /// included file it touches, at the terminal it touches there; the top
-    /// file has no `exports` and holds nothing. Each list is held to its
-    /// file: every node it names is a node of that file, with the terminal
-    /// it is listed under.
+    /// A line crossing between two files is held, at each of its ends, to
+    /// the `exports` of every subdiagram it enters to reach that end: each
+    /// one around that end's file and not around the other's, from the
+    /// end's own file outwards, at the terminal it touches there. A line
+    /// from the top page to a node two subdiagrams deep is held to both;
+    /// one between two files of the same subdiagram, to neither of its
+    /// edges. The top file has no `exports` and holds nothing. Each list is
+    /// held to its file: every node it names is a node of that file, or of
+    /// a subdiagram inside it at any depth, with the terminal it is listed
+    /// under.
     ///
     /// # Returns
     ///
     /// The problems, in the order the links and the files are held.
     fn exports_problems(&self) -> Vec<Problem> {
         let mut problems = Vec::new();
-        let top = self.files.first();
-        let include = |file: &std::path::Path| {
-            self.include_name(file)
-                .unwrap_or_else(|| file.display().to_string())
-        };
 
         for (name, exports) in &self.exports {
             let Some(file) = self
@@ -865,8 +867,16 @@ impl Graph {
                 for node in nodes {
                     let why = match self.node(node) {
                         None => Some("is not a node".to_string()),
-                        Some(_) if self.homes.get(node) != Some(file) => {
-                            Some("is in another file".to_string())
+                        Some(_)
+                            if !self.homes.get(node).is_some_and(|home| {
+                                self.subdiagrams_around(home).contains(name)
+                            }) =>
+                        {
+                            Some(
+                                "is in neither this file nor a subdiagram \
+                                 inside it"
+                                    .to_string(),
+                            )
                         }
                         Some(found) => {
                             terminals::terminals_of(&found.node_type)
@@ -948,31 +958,37 @@ impl Graph {
                 if from_file == to_file {
                     continue;
                 }
-                for (end, file, terminal) in [
-                    (&origin.node, from_file, &leaves),
-                    (&node, to_file, &arrives),
+                let (from_around, to_around) = (
+                    self.subdiagrams_around(from_file),
+                    self.subdiagrams_around(to_file),
+                );
+                for (end, around, other, terminal) in [
+                    (&origin.node, &from_around, &to_around, &leaves),
+                    (&node, &to_around, &from_around, &arrives),
                 ] {
                     let Some(terminal) = terminal else {
                         continue;
                     };
-                    if Some(file) == top {
-                        continue;
-                    }
-                    let exported = self
-                        .include_name(file)
-                        .and_then(|name| self.exports.get(&name))
-                        .is_some_and(|e| e.exports(end, terminal));
-                    if !exported {
-                        problems.push(Problem::NotExported {
-                            from: origin.node.clone(),
-                            link: format!(
-                                "\"{}\" to \"{destination}\"",
-                                link.from
-                            ),
-                            node: end.clone(),
-                            terminal: terminal.clone(),
-                            file: include(file),
-                        });
+                    // Every edge the line crosses to reach this end: each
+                    // subdiagram around it that is not also around the
+                    // other end, innermost first.
+                    for name in around.iter().filter(|n| !other.contains(n)) {
+                        let exported = self
+                            .exports
+                            .get(name)
+                            .is_some_and(|e| e.exports(end, terminal));
+                        if !exported {
+                            problems.push(Problem::NotExported {
+                                from: origin.node.clone(),
+                                link: format!(
+                                    "\"{}\" to \"{destination}\"",
+                                    link.from
+                                ),
+                                node: end.clone(),
+                                terminal: terminal.clone(),
+                                file: name.clone(),
+                            });
+                        }
                     }
                 }
             }

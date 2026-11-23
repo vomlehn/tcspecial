@@ -675,7 +675,8 @@ the simulator configuration file
 A configuration may be written as several files. The one named on the command
 line is the top file, and its ``include`` list names the others, each read in
 the top file's spelling and taken in as if it were written there. Each is a
-subdiagram, with a name of its own and its file's path under it:
+subdiagram, with a name of its own and its file's path under it, and an
+included file may have an ``include`` list of its own, so subdiagrams nest:
 
 .. code-block:: yaml
 
@@ -686,23 +687,25 @@ subdiagram, with a name of its own and its file's path under it:
 In XML it is one element with the two as attributes, ``<include
 name="thermostat-common" path="../thermostat-common/thermostat"/>``. The name
 is the subdiagram's, the name tcs-cfge draws its box under, and is no node's
-and no other subdiagram's, with no dot or slash in it. An include written as a
+and no other subdiagram's in any file, with no dot or slash in it. An include written as a
 bare path, as includes once were, is refused, saying how to write it now.
 
-An include's path is relative to the top file's directory: it is the file's path from
-there, without the extension, ``zone`` for ``zone.ytcs`` beside the top file
-and ``../thermostat-common/thermostat`` for ``thermostat.ytcs`` in a directory
-beside the top file's. Nothing in it is expanded, so an include that is
+An include's path is relative to the directory of the file that writes it: it
+is the file's path from there, without the extension, ``zone`` for
+``zone.ytcs`` beside that file and ``../thermostat-common/thermostat`` for
+``thermostat.ytcs`` in a directory beside its own. Nothing in it is expanded, so an include that is
 absolute, that begins with ``~`` or that has a ``$`` in it is refused, saying
 so, rather than looked for as a file of that name; so is an empty one, and one
 with a part that is empty or ``.``. An included file has no ``tcspecial``
-section and includes no others, no file is included twice, and no two files
-have a node of one name, since a node is known by its name in every file:
+section, no file is read twice, which also refuses an include that comes back
+round to a file that includes it, and no two files have a node of one name, since a node is known by its name in every file:
 a line in one file may run to a node in another. Only to one the other file
 exports, though. An included file's ``exports`` section says, for each of
-the four terminals, which of its nodes a line from another file may reach
+the four terminals, which nodes inside it a line from outside may reach
 there, and a line that crosses into or out of the file anywhere else is
-refused, saying which list to add the node to:
+refused, saying which list to add the node to. A line crossing several
+subdiagrams' edges must be exported at each: a file may name a node of a
+subdiagram inside it, passing it outwards:
 
 .. code-block:: yaml
 
@@ -713,7 +716,7 @@ In XML each name is an element of its own, ``<world-out>to_k1</world-out>``,
 inside ``<exports>``. A top file has nothing around it and may not have the
 section. tcs-cfge draws an included file as a box whose corner terminals are
 its exports, and writes the section back as it read it. The digest takes in each
-include, name and path, as it is written, so a set of files digests alike from
+include, name and path, as it is written, and which subdiagram wrote it, so a set of files digests alike from
 wherever it is read. Two examples that fly one vehicle include it from a directory of their
 own: see `The thermostat-yamcs example`_.
 
@@ -5784,9 +5787,10 @@ link's own colour, appears under it and goes a quarter of a second later. A
 link carrying a reading every second blinks once a second.
 
 A configuration that includes other files opens a window for each of them as
-well, drawn as tcs-cfge draws that subdiagram's page, with its edge in the
-margins and its own physics; on the top page, each is a box. A link that
-crosses a subdiagram's edge blinks on both pages.
+well, at any depth, drawn as tcs-cfge draws that subdiagram's page, with its
+edge in the margins and its own physics; on the page of the file that
+includes it, each is a box, and a node inside it, however deep, is drawn at
+the box. A link blinks on every page it is drawn on.
 
 Nothing in the windows can be pressed. Close any of them to stop tcspecial,
 which stops as it does on an interrupt; if tcspecial stops first, the windows

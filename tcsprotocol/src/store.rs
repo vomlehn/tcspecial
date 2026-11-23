@@ -529,11 +529,10 @@ impl Store {
                     path.display()
                 )
             })?;
-        let names: Vec<String> = graph
-            .included()
-            .into_iter()
-            .map(|include| include.path)
-            .collect();
+        // Each file by its path from the top file's directory, which is how
+        // the tree is laid out: an include's own path is from the file that
+        // wrote it, which for a subdiagram another includes is not the top.
+        let names = graph.include_paths_from_top();
         let climbs = depth(path, &names, digest)?;
         let layout = layout(path, &names, digest, climbs, &ext)?;
         let cannot = |what: &str, e: std::io::Error| {
@@ -1040,6 +1039,41 @@ mod tests {
         );
         let (graph, _) = store.load(digest).expect("it loads");
         assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(digest_of_graph(&graph).unwrap(), original);
+    }
+
+    /// A subdiagram's own include is laid out from its file, not from the
+    /// top's: `zone`, in `shared/`, includes `../parts/heater`, which is
+    /// `parts/heater` in the tree, beside `shared/`. It loads, and its
+    /// checksum is the original's.
+    #[test]
+    fn a_nested_include_is_kept_from_its_own_file() {
+        let from = tempfile::tempdir().expect("a directory");
+        let store_dir = tempfile::tempdir().expect("a store");
+        let store = Store::at(store_dir.path());
+        put(
+            &from.path().join("shared/zone.ytcs"),
+            "include:\n  - subdiagram: heater\n    path: ../parts/heater\n",
+        );
+        put(
+            &from.path().join("parts/heater.ytcs"),
+            "vehicle:\n  - type ping:\n      - { compute: h }\n",
+        );
+        let top = from.path().join("a/top.ytcs");
+        put(
+            &top,
+            "include:\n  - subdiagram: zone\n    path: ../shared/zone\n",
+        );
+        let original = crate::config_digest::digest_of_file(&top).unwrap();
+
+        let (digest, kept) = store.keep(&top).expect("kept");
+        assert_eq!(digest, original);
+        let at = store_dir.path().join(digest.to_string());
+        assert_eq!(kept, Kept::Written(at.join(format!("top/{digest}.ytcs"))));
+        assert!(tcsos::fs::is_file(at.join("shared/zone.ytcs")));
+        assert!(tcsos::fs::is_file(at.join("parts/heater.ytcs")));
+        let (graph, _) = store.load(digest).expect("it loads");
+        assert_eq!(graph.nodes.len(), 1, "the nested file's node");
         assert_eq!(digest_of_graph(&graph).unwrap(), original);
     }
 

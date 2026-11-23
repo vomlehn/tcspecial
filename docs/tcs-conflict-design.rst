@@ -84,6 +84,6 @@ Requirement
 Requirement
     A pair is compared, not a set: three tcspecials are three pairs. A
     configuration's includes are followed as every reader follows them,
-    one level, an include loop refused (see ``Graph::load``).
+    to any depth, an include loop refused (see ``Graph::load``).
 
     **Built** (2026-11-14).

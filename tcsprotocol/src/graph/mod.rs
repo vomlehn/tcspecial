@@ -101,12 +101,16 @@ pub const VERSION: &str = "3.0";
 /// and in XML as an element with the two as attributes,
 /// `<include name="zone" path="../thermostat-common/thermostat"/>`.
 ///
-/// A name of its own because a subdiagram is drawn as a node of the top page
-/// and joined like one, and a path is no name: it says where the file is,
-/// which changes when the file moves, and it has slashes and dots in it,
-/// which a name may not. The name is one no node of the configuration has.
-/// An include written as a bare path, as they once were, is refused, saying
-/// how to write it now.
+/// A name of its own because a subdiagram is drawn as a node of the page that
+/// includes it and joined like one, and a path is no name: it says where the
+/// file is, which changes when the file moves, and it has slashes and dots in
+/// it, which a name may not. The name is one no node of the configuration
+/// has, and no other subdiagram, at whatever depth. An include written as a
+/// bare path, as they once were, is refused, saying how to write it now.
+///
+/// Any file may include others, the top file or an included one: a
+/// subdiagram may hold subdiagrams of its own. [`Include::within`] says which
+/// file wrote the include.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(try_from = "IncludeWritten")]
 pub struct Include {
@@ -115,6 +119,10 @@ pub struct Include {
     /// The file's path from the including file's directory, without an
     /// extension: see [`include_path`].
     pub path: String,
+    /// The subdiagram whose file wrote this include, or `None` where the top
+    /// file did. Not written in the file -- the file it is written in says
+    /// it -- but set by [`Graph::load`] as it reads the include.
+    pub within: Option<String>,
 }
 
 /// An include as a file may write it: as it is written now, or as a bare
@@ -157,7 +165,11 @@ impl TryFrom<IncludeWritten> for Include {
             IncludeWritten::Named(IncludeNamed {
                 name: Some(name),
                 path: Some(path),
-            }) => Ok(Include { name, path }),
+            }) => Ok(Include {
+                name,
+                path,
+                within: None,
+            }),
             IncludeWritten::Named(IncludeNamed { name, path }) => {
                 let what = match (name, path) {
                     (Some(name), None) => {
@@ -1201,8 +1213,10 @@ pub struct Graph {
     /// see [`exports`]. A file with no `exports` section exports nothing,
     /// and has no entry.
     pub exports: BTreeMap<String, exports::Exports>,
-    /// The top file's includes, as it wrote them and in its order: the
-    /// files after the first in [`Graph::files`], one for one.
+    /// Every file's includes, as each wrote them, in the order they are
+    /// read: a file's includes in its order, each followed by those of its
+    /// own, before the next. The files after the first in [`Graph::files`],
+    /// one for one.
     pub includes: Vec<Include>,
 }
 
@@ -1245,10 +1259,10 @@ impl Graph {
     /// # Errors
     ///
     /// [`TcsError::Config`], naming the file, for a file that does not read,
-    /// an include name of a shape [`include_path`] refuses, an include named
-    /// twice, an included file with a `tcspecial` section or
-    /// includes of its own, a node in the wrong section, and a link to a
-    /// name its far end does not list.
+    /// an include name of a shape [`include_path`] refuses, a subdiagram
+    /// named twice, a file read twice, an included file with a `tcspecial`
+    /// section, a node in the wrong section, and a link to a name its far
+    /// end does not list.
     pub fn load<P: AsRef<Path>>(path: P) -> TcsResult<Graph> {
         let path = path.as_ref();
         let mut graph = Graph {
@@ -1290,49 +1304,14 @@ impl Graph {
 
         // Each file once, by what it is rather than by how it was named:
         // `zone` and `../vehicle/zone` from a top file in `vehicle` are one
-        // file, and so is a name that comes back to the top file itself.
+        // file, and so is a name that comes back to the top file itself. Once
+        // also stops a file that includes itself, at any depth, from being
+        // read for ever.
         let mut seen = vec![canonical(path)?];
-        for include in &top.include {
-            let name = &include.name;
-            include_name_ok(path, include, &top.include)?;
-            let included = include_path(path, &include.path)?;
-            let file: GraphFile = read_one(&included)?;
-            let real = canonical(&included)?;
-            if seen.contains(&real) {
-                return Err(TcsError::Config(format!(
-                    "{}: {} is included twice, or is this file",
-                    path.display(),
-                    included.display()
-                )));
-            }
-            seen.push(real);
-            if file.tcspecial.is_some() {
-                return Err(TcsError::Config(format!(
-                    "{}: an included file may not have a tcspecial section -- \
-                     a configuration has one command interpreter, and the file \
-                     that was asked for says what it is",
-                    included.display()
-                )));
-            }
-            if !file.include.is_empty() {
-                // One level, and the refusal says why rather than silently
-                // ignoring it: a subdiagram that included another would be a
-                // nesting this has no need for and the editor does not make.
-                return Err(TcsError::Config(format!(
-                    "{}: an included file may not include others",
-                    included.display()
-                )));
-            }
-            graph.absorb(&included, &file, &mut mirror)?;
-            if let Some(exports) = &file.exports {
-                graph.exports.insert(name.clone(), exports.clone());
-            }
-            graph.files.push(included);
-            graph.includes.push(include.clone());
-        }
+        graph.include_all(path, &top.include, None, &mut seen, &mut mirror)?;
 
-        // A subdiagram is drawn as a node of the top page and joined like
-        // one, so its name is no node's.
+        // A subdiagram is drawn as a node of the page that includes it and
+        // joined like one, so its name is no node's.
         for include in &graph.includes {
             if graph.homes.contains_key(&include.name) {
                 return Err(TcsError::Config(format!(
@@ -1365,15 +1344,15 @@ impl Graph {
         Ok(graph)
     }
 
-    /// Says the top file's includes: each subdiagram's name, and its file's
-    /// path from the top file's directory without the extension
-    /// [`Graph::load`] gave it, as the top file wrote them. The same set of
-    /// files is named the same from wherever it is read, which is what lets
-    /// the digest take these in.
+    /// Says every file's includes: each subdiagram's name, its file's path
+    /// from the including file's directory without the extension
+    /// [`Graph::load`] gave it, as that file wrote them, and which subdiagram
+    /// wrote it. The same set of files is named the same from wherever it is
+    /// read, which is what lets the digest take these in.
     ///
     /// # Returns
     ///
-    /// The includes, in the order the top file gave them; none for a
+    /// The includes, in the order [`Graph::includes`] holds them; none for a
     /// configuration of one file, or one not read from files.
     pub fn included(&self) -> Vec<Include> {
         self.includes.clone()
@@ -1394,6 +1373,153 @@ impl Graph {
         let at = self.files.iter().position(|f| f == file)?;
         let include = self.includes.get(at.checked_sub(1)?)?;
         Some(include.name.clone())
+    }
+
+    /// Says each included file's path from the top file's directory, without
+    /// its extension: what the include that names it says, for one the top
+    /// file includes, and for one another subdiagram includes, that
+    /// subdiagram's directory followed by what its include says.
+    ///
+    /// Each include's own path is from the directory of the file that wrote
+    /// it, which is what lets a subdiagram and its own subdiagrams be moved
+    /// or reused together; but a configuration kept on board is laid out
+    /// from its top file (see `crate::store`), so what it needs is each
+    /// file's path from there. A `..` in the joined path is left for the
+    /// reader of the path to take out, as the store's does.
+    ///
+    /// # Returns
+    ///
+    /// The paths, one for each of [`Graph::includes`], in its order.
+    pub fn include_paths_from_top(&self) -> Vec<String> {
+        let mut paths: Vec<String> = Vec::new();
+        for include in &self.includes {
+            // A subdiagram is read before the subdiagrams it includes, so
+            // its own path is already worked out.
+            let parent = include.within.as_ref().and_then(|within| {
+                let at =
+                    self.includes.iter().position(|i| &i.name == within)?;
+                paths.get(at)
+            });
+            paths.push(match parent.and_then(|p| p.rsplit_once('/')) {
+                Some((dir, _)) => format!("{dir}/{}", include.path),
+                None => include.path.clone(),
+            });
+        }
+        paths
+    }
+
+    /// Says which subdiagrams a file is inside: its own, then the one whose
+    /// file includes it, and so on out to the top file's.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - One of [`Graph::files`].
+    ///
+    /// # Returns
+    ///
+    /// The subdiagrams' names, innermost first; none for the top file and
+    /// for a file that is not one of this configuration's.
+    pub fn subdiagrams_around(&self, file: &Path) -> Vec<String> {
+        let mut around = Vec::new();
+        let mut name = self.include_name(file);
+        while let Some(this) = name {
+            // Each subdiagram is read once, so each has one include, and a
+            // chain of them ends at the top file's: `Graph::load` refuses a
+            // file met twice, so there is no loop to follow round.
+            name = self
+                .includes
+                .iter()
+                .find(|include| include.name == this)
+                .and_then(|include| include.within.clone());
+            around.push(this);
+        }
+        around
+    }
+
+    /// Reads a file's includes, and theirs, into the configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `from`     - The file that wrote them.
+    /// * `includes` - Its includes, as it wrote them.
+    /// * `within`   - The subdiagram `from` is, or `None` for the top file.
+    /// * `seen`     - Every file read so far, by what it is, to refuse one
+    ///                met again.
+    /// * `mirror`   - Where what the files' data sinks say is recorded.
+    ///
+    /// # Errors
+    ///
+    /// [`TcsError::Config`], naming the file, for an include of a shape
+    /// [`include_name_ok`] or [`include_path`] refuses, a subdiagram named
+    /// as another is, a file that does not read or is read twice, an
+    /// included file with a `tcspecial` section, and whatever
+    /// [`Graph::absorb`] refuses.
+    fn include_all(
+        &mut self,
+        from: &Path,
+        includes: &[Include],
+        within: Option<&str>,
+        seen: &mut Vec<PathBuf>,
+        mirror: &mut mirror::Mirror,
+    ) -> TcsResult<()> {
+        for include in includes {
+            let name = &include.name;
+            include_name_ok(from, include, includes)?;
+            if let Some(other) =
+                self.includes.iter().find(|other| &other.name == name)
+            {
+                let place = match &other.within {
+                    Some(parent) => format!("in the subdiagram \"{parent}\""),
+                    None => "in the top file".to_string(),
+                };
+                return Err(TcsError::Config(format!(
+                    "{}: the subdiagram \"{name}\" is named as one {place} \
+                     is; each subdiagram has a name of its own, across \
+                     every file of the configuration",
+                    from.display()
+                )));
+            }
+            let included = include_path(from, &include.path)?;
+            let file: GraphFile = read_one(&included)?;
+            let real = canonical(&included)?;
+            if seen.contains(&real) {
+                return Err(TcsError::Config(format!(
+                    "{}: {} is included twice, or is the top file, or \
+                     includes the file that includes it: each file is read \
+                     once",
+                    from.display(),
+                    included.display()
+                )));
+            }
+            seen.push(real);
+            if file.tcspecial.is_some() {
+                return Err(TcsError::Config(format!(
+                    "{}: an included file may not have a tcspecial section -- \
+                     a configuration has one command interpreter, and the file \
+                     that was asked for says what it is",
+                    included.display()
+                )));
+            }
+            self.absorb(&included, &file, mirror)?;
+            if let Some(exports) = &file.exports {
+                self.exports.insert(name.clone(), exports.clone());
+            }
+            // The file and its include together, before its own includes,
+            // so that the two lists stay one for one.
+            self.files.push(included.clone());
+            self.includes.push(Include {
+                within: within.map(str::to_string),
+                ..include.clone()
+            });
+            self.include_all(
+                &included,
+                &file.include,
+                Some(name),
+                seen,
+                mirror,
+            )?;
+        }
+        Ok(())
     }
 
     /// Takes in one file: its nodes, the links they carry, and the rest.
@@ -2516,6 +2642,7 @@ gateways:
             [Include {
                 name: "inside".into(),
                 path: "zone".into(),
+                within: None,
             }]
         );
         assert_eq!(
@@ -2647,25 +2774,201 @@ gateways:
         }
     }
 
-    /// An included file may not include others.
+    /// A subdiagram may include subdiagrams of its own, each by its path
+    /// from the directory of the file that includes it.
+    ///
+    /// The top file includes `zone` from `parts/`, and `zone` includes
+    /// `heater` as `heater`: beside itself, in `parts/`, not beside the top
+    /// file. Each include says which subdiagram wrote it, the files and the
+    /// includes stay one for one, a file says the subdiagrams around it,
+    /// and each file's path from the top is what the store lays out.
     #[test]
-    fn an_include_does_not_nest() {
+    fn a_subdiagram_includes_its_own_from_its_own_directory() {
         let where_ = tempfile::tempdir().expect("a directory");
-        let top = where_.path().join("vehicle.ytcs");
+        let dir = where_.path();
+        tcsos::fs::create_dir(dir.join("parts")).unwrap();
+        let top = dir.join("vehicle.ytcs");
+        tcsos::fs::write(
+            &top,
+            "include:\n  - subdiagram: zone\n    path: parts/zone\n",
+        )
+        .unwrap();
+        tcsos::fs::write(
+            dir.join("parts/zone.ytcs"),
+            "include:\n  - subdiagram: heater\n    path: heater\n",
+        )
+        .unwrap();
+        let heater = dir.join("parts/heater.ytcs");
+        tcsos::fs::write(
+            &heater,
+            "payloads:\n  - type i2c:\n      - payload: probe\n",
+        )
+        .unwrap();
+
+        let graph = Graph::load(&top).expect("a nested include reads");
+        assert_eq!(
+            graph.included(),
+            [
+                Include {
+                    name: "zone".into(),
+                    path: "parts/zone".into(),
+                    within: None,
+                },
+                Include {
+                    name: "heater".into(),
+                    path: "heater".into(),
+                    within: Some("zone".into()),
+                },
+            ]
+        );
+        assert_eq!(
+            graph.files,
+            [top.clone(), dir.join("parts/zone.ytcs"), heater.clone()]
+        );
+        assert_eq!(graph.include_name(&heater).as_deref(), Some("heater"));
+        assert_eq!(graph.subdiagrams_around(&heater), ["heater", "zone"]);
+        assert!(graph.subdiagrams_around(&top).is_empty());
+        assert_eq!(
+            graph.include_paths_from_top(),
+            ["parts/zone", "parts/heater"]
+        );
+        assert_eq!(graph.homes.get("probe"), Some(&heater));
+    }
+
+    /// Nesting is refused where it would loop or reuse a name.
+    ///
+    /// A file that includes itself, at any depth, would be read for ever
+    /// were each file not read once; and a subdiagram's name is its own
+    /// across every file, so one level may not reuse another's.
+    #[test]
+    fn a_nested_include_neither_loops_nor_reuses_a_name() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let dir = where_.path();
+        let top = dir.join("vehicle.ytcs");
         tcsos::fs::write(
             &top,
             "include:\n  - subdiagram: zone\n    path: zone\n",
         )
         .unwrap();
+        let zone = |text: &str| {
+            tcsos::fs::write(dir.join("zone.ytcs"), text).unwrap();
+            format!("{}", Graph::load(&top).expect_err("it is refused"))
+        };
+
+        let said = zone("include:\n  - subdiagram: again\n    path: zone\n");
+        assert!(said.contains("each file is read once"), "{said}");
+        let said = zone("include:\n  - subdiagram: up\n    path: vehicle\n");
+        assert!(said.contains("each file is read once"), "{said}");
+
+        tcsos::fs::write(dir.join("room.ytcs"), "payloads: []\n").unwrap();
+        let said = zone("include:\n  - subdiagram: zone\n    path: room\n");
+        assert!(said.contains("named as one in the top file is"), "{said}");
+    }
+
+    /// A line crossing two edges is held to both files' exports.
+    ///
+    /// The gateway and a sensor are on the top page; the conversion is in
+    /// `heater`, inside `zone`. Each of the two lines crosses `zone`'s edge
+    /// and then `heater`'s, and is refused at each edge whose file does not
+    /// export its end there. `zone` may export `heater`'s node, passing it
+    /// outwards, but not one of the top file's.
+    #[test]
+    fn a_line_crossing_two_edges_is_exported_at_both() {
+        use crate::graph::check::Problem;
+
+        let where_ = tempfile::tempdir().expect("a directory");
+        let dir = where_.path();
+        let top = dir.join("vehicle.ytcs");
         tcsos::fs::write(
-            where_.path().join("zone.ytcs"),
-            "include:\n  - subdiagram: deeper\n    path: deeper\n",
+            &top,
+            "include:\n  - subdiagram: zone\n    path: zone\n\
+             gateways:\n  - type gateway_radio:\n      \
+             - gateway: ground\n        world-in: [temp]\n\
+             payloads:\n  - type i2c:\n      - payload: sensor\n        \
+             world-out:\n          - temp.sensor\n",
         )
         .unwrap();
+        let problems = |zone: &str, heater: &str| {
+            tcsos::fs::write(
+                dir.join("zone.ytcs"),
+                format!(
+                    "{zone}include:\n  - subdiagram: heater\n    \
+                     path: heater\n"
+                ),
+            )
+            .unwrap();
+            tcsos::fs::write(
+                dir.join("heater.ytcs"),
+                format!(
+                    "{heater}vehicle:\n  - type compute:\n      \
+                     - compute: temp\n        function: \"to_kelvin\"\n        \
+                     world-in: [sensor]\n        world-out:\n          \
+                     - ground.temp\n"
+                ),
+            )
+            .unwrap();
+            Graph::load(&top)
+                .expect("it loads")
+                .check()
+                .into_iter()
+                .filter(|p| {
+                    matches!(
+                        p,
+                        Problem::NotExported { .. } | Problem::BadExport { .. }
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        let edges = |found: &[Problem]| {
+            let mut edges: Vec<String> = found
+                .iter()
+                .map(|p| match p {
+                    Problem::NotExported { file, terminal, .. } => {
+                        format!("{file} {terminal}")
+                    }
+                    other => panic!("{other:?}"),
+                })
+                .collect();
+            edges.sort();
+            edges
+        };
+        let both = "exports:\n  world-in: [temp]\n  world-out: [temp]\n";
 
-        let said =
-            format!("{}", Graph::load(&top).expect_err("nesting is refused"));
-        assert!(said.contains("may not include others"), "{said}");
+        assert_eq!(
+            edges(&problems("", "")),
+            [
+                "heater world-in",
+                "heater world-out",
+                "zone world-in",
+                "zone world-out"
+            ]
+        );
+        assert_eq!(
+            edges(&problems("", both)),
+            ["zone world-in", "zone world-out"],
+            "heater's own edge is not enough: the lines cross zone's too"
+        );
+        assert_eq!(
+            edges(&problems(both, "")),
+            ["heater world-in", "heater world-out"]
+        );
+        assert!(problems(both, both).is_empty(), "exported at every edge");
+
+        let bad = problems(
+            "exports:\n  world-in: [temp, sensor]\n  world-out: [temp]\n",
+            both,
+        );
+        let why: Vec<String> = bad
+            .iter()
+            .map(|p| match p {
+                Problem::BadExport { node, why, .. } => format!("{node} {why}"),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            why,
+            ["sensor is in neither this file nor a subdiagram inside it"]
+        );
     }
 
     /// A line into or out of an included file reaches only what it exports.
@@ -2750,7 +3053,13 @@ gateways:
                 other => panic!("{other:?}"),
             })
             .collect();
-        assert_eq!(why, ["sensor is in another file", "nobody is not a node"]);
+        assert_eq!(
+            why,
+            [
+                "sensor is in neither this file nor a subdiagram inside it",
+                "nobody is not a node"
+            ]
+        );
     }
 
     /// A line to one of a vote's named inputs arrives at its `world-in`.

@@ -183,7 +183,8 @@ class ConfigurationTest(unittest.TestCase):
             include("zone") + include("zone", "t"): "included twice",
             include("vehicle"): "included twice",
             include("section"): "may not have a tcspecial",
-            include("nests"): "may not include others",
+            # A file may include others, but not round in a loop.
+            include("nests"): "each file is read once",
             "<exports><world-in>a</world-in></exports>":
                 "only an included file may have an exports section",
             include("zone")
@@ -211,7 +212,7 @@ class ConfigurationTest(unittest.TestCase):
                     (here / "section.xtcs").write_text(
                         "<configuration><tcspecial/></configuration>")
                     (here / "nests.xtcs").write_text(
-                        '<configuration><include name="z" path="zone"/>'
+                        '<configuration><include name="v" path="vehicle"/>'
                         "</configuration>")
                     with self.assertRaisesRegex(ValueError, why):
                         configuration.load(path)
@@ -229,6 +230,39 @@ class ConfigurationTest(unittest.TestCase):
                              [configuration.Include("inside", "zone")])
             top.write_text("include:\n  - zone\n")
             with self.assertRaisesRegex(ValueError, "subdiagram: <name>"):
+                configuration.load(top)
+
+    def test_a_subdiagram_includes_its_own_from_its_own_directory(self):
+        # As Graph::load reads them: zone, in parts/, includes heater beside
+        # itself; each include says which subdiagram wrote it, and heater's
+        # node is counted with the rest.
+        with tempfile.TemporaryDirectory() as directory:
+            here = Path(directory)
+            (here / "parts").mkdir()
+            (here / "parts" / "zone.ytcs").write_text(
+                "include:\n  - subdiagram: heater\n    path: heater\n")
+            (here / "parts" / "heater.ytcs").write_text(
+                "payloads:\n  - type i2c:\n      - payload: probe\n")
+            top = here / "top.ytcs"
+            top.write_text("include:\n  - subdiagram: zone\n"
+                           "    path: parts/zone\n")
+            config = configuration.load(top)
+            self.assertEqual(config.included, [
+                configuration.Include("zone", "parts/zone"),
+                configuration.Include("heater", "heater", "zone"),
+            ])
+            self.assertEqual([node.name for node in config.nodes], ["probe"])
+
+            # A file that includes itself, and a name used at another level,
+            # are refused.
+            (here / "parts" / "zone.ytcs").write_text(
+                "include:\n  - subdiagram: again\n    path: zone\n")
+            with self.assertRaisesRegex(ValueError, "each file is read once"):
+                configuration.load(top)
+            (here / "parts" / "zone.ytcs").write_text(
+                "include:\n  - subdiagram: zone\n    path: heater\n")
+            with self.assertRaisesRegex(ValueError,
+                                        "named as one in the top file is"):
                 configuration.load(top)
 
     def test_the_two_spellings_read_alike(self):

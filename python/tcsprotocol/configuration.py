@@ -311,16 +311,21 @@ class Node:
 
 @dataclass(frozen=True, order=True)
 class Include:
-    """One file a top file includes: ``graph::Include``.
+    """One file another includes: ``graph::Include``.
 
-    A subdiagram, by its own name, and the file's path from the top file's
-    directory without an extension.
+    A subdiagram, by its own name, the file's path from the including file's
+    directory without an extension, and the subdiagram whose file includes
+    it. Any file may include others, the top file or an included one.
     """
 
-    #: The subdiagram's name: no node's, and no other subdiagram's.
+    #: The subdiagram's name: no node's, and no other subdiagram's, in any
+    #: file of the configuration.
     name: str
     #: The file's path: see :func:`include_path`.
     path: str
+    #: The subdiagram whose file wrote the include, or ``None`` where the top
+    #: file did: not written in the file, but set as the include is read.
+    within: str = None
 
 
 def _include_refused(path, line, why):
@@ -353,9 +358,11 @@ class Configuration:
     #: The command bindings, each the gateway node a command arrives on
     #: and the ``node.attribute`` it sets: ``(from, sets)``.
     commands: list = field(default_factory=list)
-    #: The other files the configuration is made of, as its ``include``
-    #: list gives them: each an :class:`Include`, its subdiagram's name and
-    #: its path. See :func:`include_path`.
+    #: The other files the configuration is made of, as the files'
+    #: ``include`` lists give them: each an :class:`Include`, its
+    #: subdiagram's name, its path and the subdiagram that wrote it, a
+    #: file's includes in its order, each followed by those of its own. See
+    #: :func:`include_path`.
     included: list = field(default_factory=list)
     #: Whether the file has an ``exports`` section, saying what of it the
     #: files around it may join: only an included file may. What it says is
@@ -1142,8 +1149,10 @@ def load(path):
 
     The included files are read as ``Graph::load`` reads them, by the same
     rules: each in the top file's spelling, at the path :func:`include_path`
-    gives its name, none with a ``tcspecial`` section or an ``include`` list
-    of its own, none named twice, and no node named in two of them. Their
+    gives its name from the file that includes it, none with a ``tcspecial``
+    section, none read twice, no subdiagram named twice in any file, and no
+    node named in two of them. An included file may include others, and
+    their nodes are counted too. Their
     nodes are counted with the top file's, because a node's device id is its
     place among the names of the whole configuration: a station that counted
     only the top file's would receive on the wrong ports.
@@ -1268,11 +1277,11 @@ def _with_includes(path):
         in it.
 
     Raises:
-        ValueError: A file is refused, an include name is refused, a file is
-                    included twice or is the top file, the top file has an
-                    ``exports`` section, an included file has a ``tcspecial``
-                    section or includes of its own, or two files have a node
-                    of one name.
+        ValueError: A file is refused, an include name is refused, a
+                    subdiagram is named twice, a file is read twice, the top
+                    file has an ``exports`` section, an included file has a
+                    ``tcspecial`` section, or two files have a node of one
+                    name.
         OSError: A file cannot be read.
     """
     config, _ = _load_one(path)
@@ -1284,8 +1293,44 @@ def _with_includes(path):
             "it names into a file this one includes")
     homes = {node.name: path for node in config.nodes}
     seen = [path.resolve(strict=True)]
-    names = [include.name for include in config.included]
-    for include in config.included:
+    includes = []
+    _include_all(config, path, config.included, None, homes, seen, includes)
+    config.included = includes
+    for include in includes:
+        if include.name in homes:
+            raise ValueError(
+                f'{path}: the subdiagram "{include.name}" has the name of a '
+                "node; a subdiagram is drawn and joined as a node is, so its "
+                "name has to be its own")
+    return config
+
+
+def _include_all(config, path, own, within, homes, seen, includes):
+    """Read a file's includes, and theirs, into a configuration:
+    ``Graph::include_all``.
+
+    Args:
+        config:   The configuration being read, which takes in each file's
+                  nodes and command bindings.
+        path:     The file that wrote the includes.
+        own:      Its includes, as it wrote them.
+        within:   The subdiagram ``path`` is, or ``None`` for the top file.
+        homes:    Each node read so far, by name, to the file it is in.
+        seen:     Every file read so far, by what it is, to refuse one met
+                  again: which is also what stops a file that includes
+                  itself, at any depth, from being read for ever.
+        includes: Every include read so far, each with the subdiagram that
+                  wrote it, in the order they are read.
+
+    Raises:
+        ValueError: An include name is refused, a subdiagram is named as
+                    another is, a file is read twice, an included file has a
+                    ``tcspecial`` section, or two files have a node of one
+                    name.
+        OSError: A file cannot be read.
+    """
+    names = [include.name for include in own]
+    for include in own:
         name = include.name
         if not name.strip():
             raise ValueError(f'{path}: the subdiagram "{name}" has no name')
@@ -1298,21 +1343,28 @@ def _with_includes(path):
             raise ValueError(
                 f'{path}: the subdiagram "{name}" is named twice; each '
                 "subdiagram has a name of its own")
+        other = next((i for i in includes if i.name == name), None)
+        if other is not None:
+            place = (f'in the subdiagram "{other.within}"' if other.within
+                     else "in the top file")
+            raise ValueError(
+                f'{path}: the subdiagram "{name}" is named as one {place} is; '
+                "each subdiagram has a name of its own, across every file of "
+                "the configuration")
         included = include_path(path, include.path)
         part, has_section = _load_one(included)
         real = included.resolve(strict=True)
         if real in seen:
-            raise ValueError(f"{path}: {included} is included twice, or is "
-                             "this file")
+            raise ValueError(
+                f"{path}: {included} is included twice, or is the top file, "
+                "or includes the file that includes it: each file is read "
+                "once")
         seen.append(real)
         if has_section:
             raise ValueError(
                 f"{included}: an included file may not have a tcspecial "
                 "section -- a configuration has one command interpreter, and "
                 "the file that was asked for says what it is")
-        if part.included:
-            raise ValueError(
-                f"{included}: an included file may not include others")
         for node in part.nodes:
             if node.name in homes:
                 raise ValueError(
@@ -1324,13 +1376,10 @@ def _with_includes(path):
         config.nodes = sorted(config.nodes + part.nodes,
                               key=lambda n: n.name)
         config.commands.extend(part.commands)
-    for name in names:
-        if name in homes:
-            raise ValueError(
-                f'{path}: the subdiagram "{name}" has the name of a node; a '
-                "subdiagram is drawn and joined as a node is, so its name has "
-                "to be its own")
-    return config
+        # The include before its own, as the Rust holds them.
+        includes.append(Include(name, include.path, within))
+        _include_all(config, included, part.included, name, homes, seen,
+                     includes)
 
 
 def node_types(section):

@@ -480,13 +480,22 @@ pub fn interpretation_of_graph(
     // that the checksum a kept configuration is named by says the shape of
     // its tree too: see `crate::store`. Only where there are some, so that
     // a configuration of one file keeps the checksum it always had. By name,
-    // the order meaning nothing.
+    // the order meaning nothing. A subdiagram another one includes says
+    // which, its path being from that one's file; one the top file includes
+    // says nothing more, so that a configuration of one level keeps the
+    // checksum it had before subdiagrams could nest.
     let mut included = graph.included();
     included.sort();
     if !included.is_empty() {
         let included: Vec<Value> = included
             .iter()
-            .map(|i| json!({ "subdiagram": i.name, "path": i.path }))
+            .map(|i| {
+                let mut said = json!({ "subdiagram": i.name, "path": i.path });
+                if let Some(within) = &i.within {
+                    said["in"] = json!(within);
+                }
+                said
+            })
             .collect();
         interpretation["include"] = json!(included);
     }
@@ -1039,5 +1048,40 @@ mod tests {
         );
         assert_eq!(said.len(), 32, "{said}");
         assert!(said.chars().all(|c| c.is_ascii_hexdigit()), "{said}");
+    }
+
+    /// Which file includes a subdiagram is in the checksum: the same files,
+    /// with `heater` included by the top file in one tree and by `zone` in
+    /// the other, are two configurations.
+    #[test]
+    fn which_file_includes_a_subdiagram_is_in_the_checksum() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let at = |name: &str| dir.path().join(name);
+        tcsos::fs::write(
+            at("heater.ytcs"),
+            "vehicle:\n  - type ping:\n      - { compute: h }\n",
+        )
+        .unwrap();
+        tcsos::fs::write(at("zone.ytcs"), "payloads: []\n").unwrap();
+        tcsos::fs::write(
+            at("flat.ytcs"),
+            "include:\n  - subdiagram: zone\n    path: zone\n  \
+             - subdiagram: heater\n    path: heater\n",
+        )
+        .unwrap();
+        let flat = digest_of_file(at("flat.ytcs")).unwrap();
+
+        tcsos::fs::write(
+            at("zone.ytcs"),
+            "include:\n  - subdiagram: heater\n    path: heater\n",
+        )
+        .unwrap();
+        tcsos::fs::write(
+            at("nested.ytcs"),
+            "include:\n  - subdiagram: zone\n    path: zone\n",
+        )
+        .unwrap();
+        let nested = digest_of_file(at("nested.ytcs")).unwrap();
+        assert_ne!(flat, nested);
     }
 }

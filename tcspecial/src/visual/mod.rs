@@ -213,8 +213,8 @@ pub fn run(
     dividers.physics = pane::physics_width(settings.physics_percent);
     let pages = Pages::of(&graph, dividers);
 
-    // The top page first, then each subdiagram in the order the top file
-    // includes them.
+    // The top page first, then each subdiagram in the order the files are
+    // read: a subdiagram's own after it, at any depth.
     let mut windows = Vec::new();
     let mut shown = Vec::new();
     for page in std::iter::once(None).chain(
@@ -324,6 +324,10 @@ struct Pages {
     /// By node, the subdiagram whose file it was read from: `None` for the
     /// top file.
     page: BTreeMap<String, Option<String>>,
+    /// By subdiagram, the one whose file includes it: `None` for one the top
+    /// file includes. Subdiagrams nest, and a box is drawn on the page of
+    /// the subdiagram that includes it.
+    within: BTreeMap<String, Option<String>>,
     /// By node and by subdiagram, where it is drawn, settled into its pane.
     at: BTreeMap<String, (i32, i32)>,
     /// Where the panes are divided.
@@ -388,7 +392,88 @@ impl Pages {
             .map(|((name, _), placed)| (name.to_string(), placed.at))
             .collect();
 
-        Pages { page, at, dividers }
+        let within = graph
+            .includes
+            .iter()
+            .map(|include| (include.name.clone(), include.within.clone()))
+            .collect();
+        Pages {
+            page,
+            within,
+            at,
+            dividers,
+        }
+    }
+
+    /// Says which pages a page is inside: itself, then the subdiagram that
+    /// includes it, and so on out to the top page's.
+    ///
+    /// # Arguments
+    ///
+    /// * `page` - A subdiagram's name, or `None` for the top page.
+    ///
+    /// # Returns
+    ///
+    /// The subdiagrams' names, innermost first; none for the top page.
+    fn around<'a>(&'a self, page: Option<&'a str>) -> Vec<&'a str> {
+        let mut around = Vec::new();
+        let mut at = page;
+        while let Some(name) = at {
+            around.push(name);
+            // Each subdiagram is included once, and the reader refuses a
+            // loop, so this ends at the top page.
+            at = self
+                .within
+                .get_key_value(name)
+                .and_then(|(_, within)| within.as_deref());
+        }
+        around
+    }
+
+    /// Says where a node is seen from a page: on it, inside one of its
+    /// boxes, at any depth, or outside it altogether.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    /// * `page` - The page it is seen from: a subdiagram's name, or `None`
+    ///            for the top.
+    ///
+    /// # Returns
+    ///
+    /// Where it is drawn on that page.
+    fn seen_on<'a>(&'a self, node: &str, page: Option<&str>) -> Seen<'a> {
+        let home = self.of_node(node);
+        if home == page {
+            return Seen::Here;
+        }
+        let around = self.around(home);
+        // The box it is in on this page is the subdiagram just inside the
+        // page on the way out from the node's own: the outermost one, from
+        // the top page.
+        let boxed = match page {
+            None => around.last().copied(),
+            Some(page) => around
+                .iter()
+                .position(|name| *name == page)
+                .and_then(|at| at.checked_sub(1))
+                .map(|at| around[at]),
+        };
+        boxed.map_or(Seen::Outside, Seen::InBox)
+    }
+
+    /// Says whether a node is inside a subdiagram, at any depth.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`       - The node's name.
+    /// * `subdiagram` - The subdiagram's name.
+    ///
+    /// # Returns
+    ///
+    /// Whether the node's file is the subdiagram's or one inside it.
+    fn is_inside(&self, node: &str, subdiagram: &str) -> bool {
+        self.around(self.of_node(node)).contains(&subdiagram)
     }
 
     /// Says which page a node is on.
@@ -409,10 +494,10 @@ impl Pages {
         self.at.get(name).copied().unwrap_or_default()
     }
 
-    /// Says whether a line is drawn on a page: on a subdiagram's page, one
-    /// with an end there; on the top page, one with an end there, and one
-    /// between two subdiagrams, drawn between their boxes, as the editor
-    /// draws it.
+    /// Says whether a line is drawn on a page: one with an end there, and
+    /// one between two of its boxes or between a box and the page's edge,
+    /// drawn between them as the editor draws it; not one between two nodes
+    /// inside one box, nor one wholly outside the page.
     ///
     /// # Arguments
     ///
@@ -423,19 +508,32 @@ impl Pages {
     ///
     /// Whether it is drawn there.
     fn shows(&self, line: &Line, page: Option<&str>) -> bool {
-        let (from, to) = (self.of_node(&line.from), self.of_node(&line.to));
-        match page {
-            Some(_) => from == page || to == page,
-            None => from.is_none() || to.is_none() || from != to,
+        match (self.seen_on(&line.from, page), self.seen_on(&line.to, page)) {
+            (Seen::Here, _) | (_, Seen::Here) => true,
+            (Seen::Outside, Seen::Outside) => false,
+            (from, to) => from != to,
         }
     }
 }
 
+/// Where a node is drawn, seen from a page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Seen<'a> {
+    /// On the page itself.
+    Here,
+    /// Inside the box of the subdiagram named, which is on the page; the
+    /// node may be in it or in a subdiagram inside it.
+    InBox(&'a str),
+    /// Outside the page altogether, drawn at its edge.
+    Outside,
+}
+
 /// Puts one page of the graph in a window, as tcs-cfge would draw it.
 ///
-/// A node on another page is drawn as the editor draws it: on the top page,
-/// at its subdiagram's box; on a subdiagram's page, at the page's edge. Each
-/// box on the top page says what is inside it, as the editor's does.
+/// A node on another page is drawn as the editor draws it: inside a box on
+/// this page, at the box, however deep inside it is; outside this page, at
+/// the page's edge. Each box on the page says what is inside it, as the
+/// editor's does.
 ///
 /// # Arguments
 ///
@@ -463,32 +561,28 @@ fn draw(
     let mut sheet: Vec<OnSheet> = graph
         .nodes
         .iter()
-        .map(|node| {
-            let home = pages.of_node(&node.name);
-            match (page, home) {
-                // Seen from the top page, a node in a subdiagram is drawn
-                // at its box, whose terminals are the subdiagram's edge.
-                (None, Some(boxed)) => OnSheet {
-                    name: node.name.clone(),
-                    node_type: "subdiagram",
-                    at: pages.at(boxed),
-                    here: true,
-                    drawn: Drawn::AtItsBox,
+        .map(|node| match pages.seen_on(&node.name, page) {
+            // A node inside a box on this page, however deep, is drawn at
+            // the box, whose terminals are the subdiagram's edge.
+            Seen::InBox(boxed) => OnSheet {
+                name: node.name.clone(),
+                node_type: "subdiagram",
+                at: pages.at(boxed),
+                here: true,
+                drawn: Drawn::AtItsBox,
+            },
+            seen => OnSheet {
+                name: node.name.clone(),
+                node_type: &node.node_type,
+                at: pages.at(&node.name),
+                here: seen == Seen::Here,
+                // And a node outside this page at the page's own edge.
+                drawn: if seen == Seen::Here {
+                    Drawn::Itself
+                } else {
+                    Drawn::AtTheEdge(inside.0, inside.1)
                 },
-                _ => OnSheet {
-                    name: node.name.clone(),
-                    node_type: &node.node_type,
-                    at: pages.at(&node.name),
-                    here: home == page,
-                    // And seen from a subdiagram's page, a node outside it
-                    // at the page's own edge.
-                    drawn: if home == page {
-                        Drawn::Itself
-                    } else {
-                        Drawn::AtTheEdge(inside.0, inside.1)
-                    },
-                },
-            }
+            },
         })
         .collect();
     let mut nodes: Vec<ui::NodeView> = sheet
@@ -507,32 +601,34 @@ fn draw(
             ))
         })
         .collect();
-    if page.is_none() {
-        for include in &graph.includes {
-            let name = include.name.as_str();
-            let inside =
-                pages.page.values().filter(|p| p.as_deref() == Some(name));
-            let crossing = lines.iter().filter(|line| {
-                (pages.of_node(&line.from) == Some(name))
-                    != (pages.of_node(&line.to) == Some(name))
-            });
-            let summary = view::box_summary(inside.count(), crossing.count());
-            nodes.push(node_view(view::node_look(
-                name,
-                "subdiagram",
-                None,
-                pages.at(name),
-                false,
-                Some(&summary),
-            )));
-            sheet.push(OnSheet {
-                name: name.to_string(),
-                node_type: "subdiagram",
-                at: pages.at(name),
-                here: true,
-                drawn: Drawn::Itself,
-            });
+    // The boxes of the subdiagrams this page's file includes, each counting
+    // what is inside it at any depth, and the lines crossing its edge.
+    for include in &graph.includes {
+        if include.within.as_deref() != page {
+            continue;
         }
+        let name = include.name.as_str();
+        let inside =
+            pages.page.keys().filter(|node| pages.is_inside(node, name));
+        let crossing = lines.iter().filter(|line| {
+            pages.is_inside(&line.from, name) != pages.is_inside(&line.to, name)
+        });
+        let summary = view::box_summary(inside.count(), crossing.count());
+        nodes.push(node_view(view::node_look(
+            name,
+            "subdiagram",
+            None,
+            pages.at(name),
+            false,
+            Some(&summary),
+        )));
+        sheet.push(OnSheet {
+            name: name.to_string(),
+            node_type: "subdiagram",
+            at: pages.at(name),
+            here: true,
+            drawn: Drawn::Itself,
+        });
     }
 
     let edge = if page.is_some() {
@@ -834,5 +930,67 @@ mod tests {
         assert!(inside > 0 && crossing > 0, "{inside} in, {crossing} across");
         // And the box is placed, in the vehicle's panes or the payloads'.
         assert_ne!(pages.at("thermostat-common"), (0, 0));
+    }
+
+    /// Subdiagrams nest, and each page shows its own nodes, its own boxes
+    /// and its edge: from the top page, a node two subdiagrams deep is at
+    /// the outer box; from `zone`'s page, at `heater`'s box; from
+    /// `heater`'s, itself. A line is drawn on a page where its ends are
+    /// drawn apart, so the one inside `zone`, from `heater` to `zone`'s own
+    /// node, is on `zone`'s page and `heater`'s and not the top one, where
+    /// both its ends are in `zone`'s box.
+    #[test]
+    fn a_nested_subdiagram_is_drawn_at_each_page_around_it() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let dir = where_.path();
+        let top = dir.join("vehicle.ytcs");
+        tcsos::fs::write(
+            &top,
+            "include:\n  - subdiagram: zone\n    path: zone\n\
+             gateways:\n  - type gateway_radio:\n      \
+             - gateway: ground\n        world-in: [temp]\n\
+             payloads:\n  - type i2c:\n      - payload: sensor\n        \
+             world-out:\n          - temp.sensor\n",
+        )
+        .unwrap();
+        tcsos::fs::write(
+            dir.join("zone.ytcs"),
+            "include:\n  - subdiagram: heater\n    path: heater\n\
+             vehicle:\n  - type compute:\n      - compute: scale\n        \
+             function: \"to_kelvin\"\n        world-in: [temp]\n",
+        )
+        .unwrap();
+        tcsos::fs::write(
+            dir.join("heater.ytcs"),
+            "vehicle:\n  - type compute:\n      - compute: temp\n        \
+             function: \"to_kelvin\"\n        world-in: [sensor]\n        \
+             world-out:\n          - ground.temp\n          - scale.temp\n",
+        )
+        .unwrap();
+        let graph = Graph::load(&top).expect("it reads");
+        let pages = Pages::of(&graph, pane::default_dividers());
+        let (zone, heater) = (Some("zone"), Some("heater"));
+
+        assert_eq!(pages.seen_on("temp", None), Seen::InBox("zone"));
+        assert_eq!(pages.seen_on("temp", zone), Seen::InBox("heater"));
+        assert_eq!(pages.seen_on("temp", heater), Seen::Here);
+        assert_eq!(pages.seen_on("scale", None), Seen::InBox("zone"));
+        assert_eq!(pages.seen_on("scale", heater), Seen::Outside);
+        assert_eq!(pages.seen_on("sensor", heater), Seen::Outside);
+        assert!(pages.is_inside("temp", "zone"));
+        assert!(!pages.is_inside("scale", "heater"));
+
+        let lines = lines_of(&graph);
+        let line = |from: &str, to: &str| {
+            lines
+                .iter()
+                .find(|l| l.from == from && l.to == to)
+                .unwrap_or_else(|| panic!("{from} to {to}"))
+        };
+        let on =
+            |l: &Line| [None, zone, heater].map(|page| pages.shows(l, page));
+        assert_eq!(on(line("sensor", "temp")), [true, true, true]);
+        assert_eq!(on(line("temp", "ground")), [true, true, true]);
+        assert_eq!(on(line("temp", "scale")), [false, true, true]);
     }
 }

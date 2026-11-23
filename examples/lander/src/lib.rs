@@ -264,7 +264,7 @@ fn run(asked: &Asked) -> Result<(), String> {
     }
 
     let note = format!(
-        "Seed {seed}; everything here is {} s behind the lander",
+        "Everything here is {} s behind the lander",
         asked.delay.as_secs_f64()
     );
     tcs_ui::windows::on_window_thread(move |closed| {

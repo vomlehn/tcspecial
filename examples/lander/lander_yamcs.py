@@ -1308,7 +1308,7 @@ def watch_and_print(readings, seconds, every, stopped):
     return 1
 
 
-def run_the_window(readings, lander, seed, delay, stopped, restarter,
+def run_the_window(readings, lander, delay, stopped, restarter,
                    room=None):
     """The window, and the loop that reads Yamcs for it.
 
@@ -1319,7 +1319,6 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
         readings:    The :class:`Readings`.
         lander:      The :class:`Lander`, whose landscape and outline are
                      drawn.
-        seed:        The landscape's seed, which the window says.
         delay:       The link's delay, in seconds, which the window says.
         stopped:     Says whether tcs-sim has stopped, its window closed:
                      this window is closed then too, which ends the run.
@@ -1478,8 +1477,8 @@ def run_the_window(readings, lander, seed, delay, stopped, restarter,
     fuel = label(text="Fuel --")
     fuel.grid(row=len(rows) + 1, column=0, sticky="w")
     note = ttk.Label(window, style="Lander.TLabel", wraplength=wide,
-                     text=f"Seed {seed}; everything here is {delay:g} s "
-                          "behind the lander")
+                     text=f"Everything here is {delay:g} s behind the "
+                          "lander")
     note.pack(fill="x", padx=between, pady=(0, between))
     # Commands sent up: each reaches the lander a light time later, and
     # what it did is seen here a light time after that.
@@ -1743,7 +1742,7 @@ def main(argv):
         restarter = (Restarter(uplinks["restart"]) if "restart" in uplinks
                      else None)
         if options.seconds is None:
-            return run_the_window(readings, lander, seed, options.delay,
+            return run_the_window(readings, lander, options.delay,
                                   stopped, restarter, room_of(room_file))
         return watch_and_print(readings, options.seconds, options.every,
                                stopped)

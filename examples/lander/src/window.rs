@@ -62,7 +62,7 @@ struct View {
 /// * `figures`  - The lander's figures.
 /// * `station`  - The links to the vehicles.
 /// * `readings` - What has come down, nothing yet.
-/// * `note`     - The seed and the light time, said under the values.
+/// * `note`     - The light time, said under the values.
 /// * `closed`   - What says the window has closed.
 ///
 /// # Errors

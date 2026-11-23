@@ -204,9 +204,9 @@ pub fn read(path: &Path) -> Result<Document, String> {
         });
     }
 
-    // And a box in the top diagram for each file it includes, which is what
-    // opens that file's page: named by its include, and drawn where the top
-    // file's own section put it.
+    // And a box for each file a file includes, on the page of the file that
+    // includes it, which is what opens that file's page: named by its
+    // include, and drawn where the including file's own section put it.
     for include in graph.included() {
         let name = include.name;
         document.nodes.push(Node {
@@ -216,7 +216,7 @@ pub fn read(path: &Path) -> Result<Document, String> {
             // Where its file is, which is what the include says beside the
             // name: see `Document::include_path`.
             attributes: BTreeMap::from([("path".to_string(), include.path)]),
-            home: None,
+            home: include.within,
             comment: None,
         });
     }
@@ -1679,5 +1679,97 @@ mod tests {
 
         let said = read(&path).expect_err("a file that is not one");
         assert!(!said.is_empty(), "the complaint should say something");
+    }
+
+    /// A subdiagram that includes its own reads with its box on its parent's
+    /// page, and writes back as it was: the top file including `zone` from
+    /// `parts/`, `zone`'s file including `heater` beside itself, each
+    /// include in the file that wrote it, with its path from there. Read
+    /// again, the files say the same.
+    #[test]
+    fn a_nested_subdiagram_reads_and_writes_back_where_it_was() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let dir = where_.path();
+        tcsos::fs::create_dir(dir.join("parts")).unwrap();
+        let top = dir.join("vehicle.ytcs");
+        tcsos::fs::write(
+            &top,
+            "include:\n  - subdiagram: zone\n    path: parts/zone\n\
+             gateways:\n  - type gateway_radio:\n      \
+             - gateway: ground\n        world-in: [temp]\n",
+        )
+        .unwrap();
+        tcsos::fs::write(
+            dir.join("parts/zone.ytcs"),
+            "include:\n  - subdiagram: heater\n    path: heater\n",
+        )
+        .unwrap();
+        tcsos::fs::write(
+            dir.join("parts/heater.ytcs"),
+            "vehicle:\n  - type compute:\n      - compute: temp\n        \
+             function: \"to_kelvin\"\n        world-out:\n          \
+             - ground.temp\n",
+        )
+        .unwrap();
+
+        let document = read(&top).expect("it reads");
+        assert_eq!(document.within("zone"), None);
+        assert_eq!(document.within("heater").as_deref(), Some("zone"));
+        assert_eq!(
+            document.subdiagrams_around(&Some("heater".to_string())),
+            ["heater", "zone"]
+        );
+        assert!(document.node("heater").is_some(), "its box, by its name");
+        assert!(document.node("heater/temp").is_some(), "its node");
+        assert_eq!(document.crossings("zone"), 1, "the line out, from deep");
+        assert_eq!(document.crossings("heater"), 1);
+
+        let files = document.files(&top).expect("files");
+        let text_of = |path: &std::path::Path| {
+            files
+                .iter()
+                .find(|(at, _)| at == path)
+                .map(|(_, text)| text.clone())
+                .unwrap_or_else(|| panic!("{} is written", path.display()))
+        };
+        let zone = text_of(&dir.join("parts/zone.ytcs"));
+        assert!(
+            zone.contains(
+                "include:\n  - subdiagram: heater\n    path: heater\n"
+            ),
+            "{zone}"
+        );
+        let top_text = text_of(&top);
+        assert!(!top_text.contains("heater"), "{top_text}");
+
+        // And in XML, each include in the same file.
+        let xml = document.files(&top.with_extension("xtcs")).expect("files");
+        let zone_xml = xml
+            .iter()
+            .find(|(at, _)| at == &dir.join("parts/zone.xtcs"))
+            .map(|(_, text)| text.clone())
+            .expect("zone's file is written");
+        assert!(
+            zone_xml.contains("<include name=\"heater\" path=\"heater\"/>"),
+            "{zone_xml}"
+        );
+        assert!(text_of(&dir.join("parts/heater.ytcs")).contains("temp"));
+
+        for (path, text) in &files {
+            tcsos::fs::write(path, text).unwrap();
+        }
+        let again = Graph::load(&top).expect("what was written reads");
+        let included: Vec<(String, String, Option<String>)> = again
+            .included()
+            .into_iter()
+            .map(|i| (i.name, i.path, i.within))
+            .collect();
+        assert_eq!(
+            included,
+            [
+                ("zone".into(), "parts/zone".into(), None),
+                ("heater".into(), "heater".into(), Some("zone".into())),
+            ]
+        );
     }
 }

@@ -625,10 +625,9 @@ impl Document {
     /// Absolute: `temp_1` for a node of the top diagram and
     /// `zone/temp_1` for one inside a subdiagram. That is how the editor
     /// holds a name everywhere except in a file, where it is written as the
-    /// node's own -- see [`Qualified::written`]. A subdiagram's box in the
-    /// top diagram is named by its include, which may be a path such as
-    /// `../common/zone`: its `/` says no home, so a box of the whole name is
-    /// looked for first.
+    /// node's own -- see [`Qualified::written`]. A subdiagram's box is found
+    /// by its plain name on whichever page it is drawn, a subdiagram's name
+    /// being its own across every file, as well as by its absolute one.
     ///
     /// # Arguments
     ///
@@ -638,11 +637,9 @@ impl Document {
     ///
     /// The node, or `None` if there is none of that name.
     pub fn node(&self, name: &str) -> Option<&Node> {
-        if let Some(node) = self
-            .nodes
-            .iter()
-            .find(|n| n.home.is_none() && n.name == name)
-        {
+        if let Some(node) = self.nodes.iter().find(|n| {
+            n.name == name && (n.home.is_none() || n.node_type == "subdiagram")
+        }) {
             return Some(node);
         }
         let wanted = Qualified::parse(name);
@@ -661,13 +658,11 @@ impl Document {
     ///
     /// The node, or `None` if there is none of that name.
     fn node_mut(&mut self, name: &str) -> Option<&mut Node> {
-        // A subdiagram's box first, whose name, a path, has a `/` in it
-        // that does not say a home: see `Document::node`.
-        if let Some(at) = self
-            .nodes
-            .iter()
-            .position(|n| n.home.is_none() && n.name == name)
-        {
+        // A node of the top page, or a subdiagram's box on any page, by its
+        // plain name first: see `Document::node`.
+        if let Some(at) = self.nodes.iter().position(|n| {
+            n.name == name && (n.home.is_none() || n.node_type == "subdiagram")
+        }) {
             return self.nodes.get_mut(at);
         }
         let wanted = Qualified::parse(name);
@@ -693,18 +688,16 @@ impl Document {
     pub fn include_path(&self, home: &str) -> String {
         self.nodes
             .iter()
-            .find(|node| {
-                node.home.is_none()
-                    && node.node_type == "subdiagram"
-                    && node.name == home
-            })
+            .find(|node| node.node_type == "subdiagram" && node.name == home)
             .and_then(|node| node.attributes.get("path"))
             .filter(|path| !path.trim().is_empty())
             .cloned()
             .unwrap_or_else(|| home.to_string())
     }
 
-    /// A subdiagram's file, beside a top file at `like`: see
+    /// A subdiagram's file, for a top file at `like`: its include's path read
+    /// from the directory of the file that includes it, which is the top
+    /// file's or another subdiagram's, at any depth. See
     /// [`Document::include_path`] and [`crate::subdiagram::file_for`].
     ///
     /// # Arguments
@@ -720,7 +713,84 @@ impl Document {
         home: &str,
         like: &std::path::Path,
     ) -> std::path::PathBuf {
-        file_for(&self.include_path(home), like)
+        // From the top down: the outermost subdiagram's file beside the top
+        // file, each one inside it beside the one that includes it.
+        let mut file = like.to_path_buf();
+        for name in self
+            .subdiagrams_around(&Some(home.to_string()))
+            .iter()
+            .rev()
+        {
+            file = file_for(&self.include_path(name), &file);
+        }
+        file
+    }
+
+    /// The page whose file includes a subdiagram: the page its box is drawn
+    /// on.
+    ///
+    /// # Arguments
+    ///
+    /// * `subdiagram` - The subdiagram's name.
+    ///
+    /// # Returns
+    ///
+    /// The subdiagram that includes it, or `None` for the top diagram, and
+    /// for a subdiagram with no box, whose file the top file includes.
+    pub fn within(&self, subdiagram: &str) -> Home {
+        self.nodes
+            .iter()
+            .find(|n| n.node_type == "subdiagram" && n.name == subdiagram)
+            .and_then(|n| n.home.clone())
+    }
+
+    /// Which subdiagrams a page is inside: itself, then the one whose file
+    /// includes it, and so on out to the top diagram's.
+    ///
+    /// A box drawn inside its own subdiagram, at any depth, would be a page
+    /// inside itself, which no file can say; the reader refuses it, and here
+    /// the chain stops where it would come round, so that nothing that walks
+    /// it walks for ever while somebody is still drawing.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The page: a subdiagram, or `None` for the top diagram.
+    ///
+    /// # Returns
+    ///
+    /// The subdiagrams' names, innermost first; none for the top diagram.
+    pub fn subdiagrams_around(&self, home: &Home) -> Vec<String> {
+        let mut around: Vec<String> = Vec::new();
+        let mut at = home.clone();
+        while let Some(name) = at {
+            if around.contains(&name) {
+                break;
+            }
+            at = self.within(&name);
+            around.push(name);
+        }
+        around
+    }
+
+    /// The subdiagrams a page's file includes: those whose boxes are drawn
+    /// on it, and, for the top diagram, any with no box at all.
+    ///
+    /// # Arguments
+    ///
+    /// * `home` - The page: a subdiagram, or `None` for the top diagram.
+    ///
+    /// # Returns
+    ///
+    /// Their names, in order of name, which is the order the digest takes
+    /// them in.
+    fn included_by(&self, home: &Home) -> Vec<String> {
+        let mut included: Vec<String> = self
+            .subdiagrams()
+            .into_iter()
+            .filter(|name| &self.within(name) == home)
+            .collect();
+        included.sort();
+        included
     }
 
     /// Every subdiagram the document holds, in the order they first appear.
@@ -1421,8 +1491,8 @@ impl Document {
         None
     }
 
-    /// Whether this is a subdiagram's box: a node of the top page that stands
-    /// for a file the top file includes.
+    /// Whether this is a subdiagram's box: a node, on the page of the file
+    /// that includes it, that stands for that file.
     ///
     /// # Arguments
     ///
@@ -1432,11 +1502,9 @@ impl Document {
     ///
     /// `true` for a box.
     pub fn is_subdiagram(&self, name: &str) -> bool {
-        self.nodes.iter().any(|node| {
-            node.home.is_none()
-                && node.node_type == "subdiagram"
-                && node.name == name
-        })
+        self.nodes
+            .iter()
+            .any(|node| node.node_type == "subdiagram" && node.name == name)
     }
 
     /// Renames a subdiagram everywhere its name is said but its box: the
@@ -1457,10 +1525,7 @@ impl Document {
             if same(&node.home) {
                 node.home = Some(now.to_string());
             }
-            if node.home.is_none()
-                && node.node_type == "subdiagram"
-                && node.name == was
-            {
+            if node.node_type == "subdiagram" && node.name == was {
                 node.attributes.insert("path".to_string(), path.clone());
             }
         }
@@ -2092,7 +2157,8 @@ impl Document {
             .collect()
     }
 
-    /// How many links cross into or out of `subdiagram`.
+    /// How many links cross into or out of `subdiagram`, from anywhere inside
+    /// it.
     ///
     /// What a closed box shows instead of its contents: the count of nodes
     /// inside it and the count of connections that cross its edge are the two
@@ -2106,8 +2172,12 @@ impl Document {
     ///
     /// How many links have one end inside it and the other outside.
     pub fn crossings(&self, subdiagram: &str) -> usize {
+        // Inside it at any depth: a line from a subdiagram within it to a
+        // node outside crosses its edge too.
         let inside = |name: &str| {
-            Qualified::parse(name).in_.as_deref() == Some(subdiagram)
+            self.subdiagrams_around(&Qualified::parse(name).in_)
+                .iter()
+                .any(|around| around == subdiagram)
         };
         self.links
             .iter()
@@ -3212,10 +3282,9 @@ impl Document {
             }
         }
 
-        if home.is_none() {
+        {
             // In order of name, which is the order they are digested in.
-            let mut included = self.subdiagrams();
-            included.sort();
+            let included = self.included_by(home);
             for name in included {
                 out.push_str(&format!(
                     "    <include name=\"{}\" path=\"{}\"/>\n",
@@ -3529,12 +3598,11 @@ impl Document {
             }
         }
 
-        // The subdiagrams this file pulls in, named rather than discovered.
-        // Only the top diagram has them: a subdiagram that included another
-        // would be a nesting this editor does not make.
-        if home.is_none() {
-            let mut included = self.subdiagrams();
-            included.sort();
+        // The subdiagrams this file pulls in, named rather than discovered:
+        // those whose boxes are drawn on its page, the top diagram's or a
+        // subdiagram's, which may include subdiagrams of its own.
+        {
+            let included = self.included_by(home);
             if !included.is_empty() {
                 out.push_str("\ninclude:\n");
                 for name in &included {

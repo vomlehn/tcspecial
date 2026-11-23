@@ -238,6 +238,10 @@ mod tests {
     /// A lander over flat ground with a pad from -10 m to 10 m at nought:
     /// a 4 m square outline about the place between its feet, the Moon's
     /// gravity, and the Apollo module's limits.
+    ///
+    /// # Returns
+    ///
+    /// Its figures.
     fn figures() -> Resolved {
         Resolved {
             dry_mass: 2000.0,

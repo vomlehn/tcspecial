@@ -851,10 +851,11 @@ flown with. The two share one simulator file,
 it, and each payload in it says whose it is with `configuration`. A
 landing is the lander wholly on the pad within 3.05 m/s down and 1.22 m/s
 across, the Apollo lunar module's limits; touching any other ground, or
-dropping below the display's bottom line off either side, is a crash. A
-landing flown by hand is rated in tcs-sim's picture as *Efficiency N%*:
-the least propellant any pilot could have landed with from where the
-lander was taken over, over what was used. The
+dropping below the display's bottom line off either side, is a crash.
+Each landing is rated in tcs-sim's picture as *Efficiency N%*: the least
+propellant any pilot could have landed with from where the lander was
+taken over, over what was used, with *w/ Autoland* where Autoland flew it
+after the flight's first two seconds. The
 lander has no thrust down, so its joystick has no arm below its middle. A
 landing does not end the flight: the lander stands on the pad, a smiling
 face drawn over it, until thrust greater than its weight lifts it off

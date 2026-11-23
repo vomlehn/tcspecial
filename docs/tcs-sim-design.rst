@@ -678,17 +678,24 @@ Requirement
     joined to them to report.
 
 Requirement
-    A landing flown by hand -- not by Autoland, nor a flight Autoland took
-    back -- is rated in the lander's pane, at its top right, as *Efficiency
-    N%*: the least propellant any pilot could have landed with, from the
-    state the lander was taken in, over what was used. It stays whole until
-    the lander starts again and then fades over 3 s of the window's clock,
-    which stops while paused. A crash is not rated.
+    Each landing is rated in the lander's pane, at its top right, as
+    *Efficiency N%*: the least propellant any pilot could have landed with,
+    from the state the lander was taken in, over what was used; and as
+    *Efficiency N% w/ Autoland* where Autoland flew it after the flight's
+    first 2 s. It stays whole until the lander starts again and then fades
+    over 3 s of the window's clock, which stops while paused. A crash is not
+    rated.
 
-The state a flight is rated from is the lander's place, speeds and mass as
-the visitor took it -- from Autoland as the joystick was taken hold of, as it
-started with nobody else flying it, or as it lifted off the pad -- so that a
-landing from high and far away is not marked down for where it began.
+The state a flight is rated from is the lander's place, speeds and mass as a
+hand first took it -- from Autoland as the joystick was taken hold of -- or
+as the flight began where no hand took it, a flight beginning as the lander
+starts or lifts off the pad; so a landing from high and far away is not
+marked down for where it began. A flight that starts by itself is
+Autoland's until the joystick is taken, so Autoland's first 2 s are not
+counted against it: taken at once, it was flown by hand. Autoland flying it
+from one look at the lander to the next is counted to the second look, so a
+hand taking it at 3 s took it from Autoland that had flown past 2 s
+(``followed``).
 Propellant is counted as the change of velocity it buys: fuel flows as
 ``|Fx| + |Fy|``, so by the rocket equation the mass falls as ``exp(-D/ve)``,
 ``D`` being the integral of ``|ax| + |ay|``, and what was used is ``ve

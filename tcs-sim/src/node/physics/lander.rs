@@ -70,7 +70,7 @@ pub const SKY_GENERATION: u16 = 1;
 /// Standard gravity, which turns a specific impulse in seconds into an
 /// exhaust velocity: a definition, not the gravity of anywhere in
 /// particular.
-const STANDARD_GRAVITY: f64 = 9.80665;
+pub(crate) const STANDARD_GRAVITY: f64 = 9.80665;
 
 /// How far apart, in seconds, the path is looked at for touchdown.
 pub const LOOK_EVERY: f64 = 0.02;

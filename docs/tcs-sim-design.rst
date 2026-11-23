@@ -677,6 +677,50 @@ Requirement
     ``y``, each held within minus one and one, for simulated payloads
     joined to them to report.
 
+Requirement
+    A landing flown by hand -- not by Autoland, nor a flight Autoland took
+    back -- is rated in the lander's pane, at its top right, as *Efficiency
+    N%*: the least propellant any pilot could have landed with, from the
+    state the lander was taken in, over what was used. It stays whole until
+    the lander starts again and then fades over 3 s of the window's clock,
+    which stops while paused. A crash is not rated.
+
+The state a flight is rated from is the lander's place, speeds and mass as
+the visitor took it -- from Autoland as the joystick was taken hold of, as it
+started with nobody else flying it, or as it lifted off the pad -- so that a
+landing from high and far away is not marked down for where it began.
+Propellant is counted as the change of velocity it buys: fuel flows as
+``|Fx| + |Fy|``, so by the rocket equation the mass falls as ``exp(-D/ve)``,
+``D`` being the integral of ``|ax| + |ay|``, and what was used is ``ve
+ln(m0/m1)``. The least is a lower bound, worked out under physics more
+generous than the lander's so that no rating can pass 100 %: thrust along X
+is instant; thrust along Y is no more than full thrust over the mass the
+visitor's lander had at touchdown, which the best flight, burning no more,
+is never lighter than; and the terrain is ignored. What the landing must
+still do is what the lander's must: end over the pad, end to end, within
+``landing_speed`` down and ``landing_drift`` across. For a landing at a time
+``T`` the two axes part: along X, a change at once to the speed that carries
+it over the pad and another into the drift allowed; along Y, the change that
+lands it at the pad's height, at no more than the landing speed, between
+thrust spent all at the start and all at the end. The least over ``T``, up
+to 600 s, is the bound (``landing_rating``). The autopilot, which is
+cautious, rates about 52 % on the shipped landscape.
+
+Requirement
+    In a web page on a small screen, where the page shows none of the
+    panels -- neither tcs-sim's beside the lander's pane nor another
+    program's window -- and nobody flies the lander by hand, the pane says
+    across its top how to reach them: *Drag up for the MOC's view, 1.3 s
+    late* and *Drag left for the Moon's, live*. Never on Linux, whose
+    windows show all of themselves.
+
+What the page shows is told by the page, never asked for: tcsos's
+``browser::page::watch_view`` works it out as anything on the page scrolls,
+the page itself or the frame a window wider than the screen is scrolled
+across in -- caught at the document, a scroll not rising from its frame --
+as the page is resized, and as the window's canvas is, and says it through
+tcs-ui's ``windows::watch_view``.
+
 **What the bytes are**
 
 A sensor has to send bytes the vehicle will read back as what it reports, and

@@ -1352,14 +1352,17 @@ directory’s <code>-sim.yaml</code> a link to it, and each payload in it
 says whose it is with <code>configuration</code>. A landing is the
 lander wholly on the pad within 3.05 m/s down and 1.22 m/s across, the
 Apollo lunar module’s limits; touching any other ground, or dropping
-below the display’s bottom line off either side, is a crash. The lander
-has no thrust down, so its joystick has no arm below its middle. A
-landing does not end the flight: the lander stands on the pad, a smiling
-face drawn over it, until thrust greater than its weight lifts it off
-again, or until it has stood there 10 s and starts again. After a crash
-the lander stays down until Restart, or starts again by itself with a
-full tank after a pause. Each flight that starts by itself, tcs-sim’s
-Autoland flies, until someone takes the joystick.</p>
+below the display’s bottom line off either side, is a crash. A landing
+flown by hand is rated in tcs-sim’s picture as <em>Efficiency N%</em>:
+the least propellant any pilot could have landed with from where the
+lander was taken over, over what was used. The lander has no thrust
+down, so its joystick has no arm below its middle. A landing does not
+end the flight: the lander stands on the pad, a smiling face drawn over
+it, until thrust greater than its weight lifts it off again, or until it
+has stood there 10 s and starts again. After a crash the lander stays
+down until Restart, or starts again by itself with a full tank after a
+pause. Each flight that starts by itself, tcs-sim’s Autoland flies,
+until someone takes the joystick.</p>
 <p><code>lander/lander_yamcs.py</code> is the ground station. It makes a
 landscape at random from a seed – <code>--seed N</code>, or one it
 chooses and says – and writes it into the run’s copy of the simulator

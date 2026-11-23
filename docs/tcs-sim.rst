@@ -1052,7 +1052,16 @@ both. From the top:
   corner, *Flying* -- *Flying - autoland engaged* while Autoland flies
   it -- *Landed* or, on a crash, *On the Moon, no one can hear you
   CRASH!*, and while it stands on the pad, landed, a smiling face
-  is drawn over it, gone as it lifts off again.
+  is drawn over it, gone as it lifts off again. A landing flown by hand,
+  not by Autoland, is rated in the opposite corner as *Efficiency N%*: the
+  least propellant any pilot could have landed with from where the lander
+  was taken, over what was used, so that a landing from far away is
+  measured as fairly as one from near. The rating stays until the lander
+  starts again, and then fades over three seconds into the next flight. A
+  crash is not rated. In a web page on a small screen, while none of the
+  panels is on the screen and nobody is flying the lander, the top of the
+  picture says how to reach them: *Drag up for the MOC's view, 1.3 s late*,
+  *Drag left for the Moon's, live*.
 * The fuel left, as a percentage and as a bar.
 * The lander's X and Y position, velocity and acceleration, each with its
   unit, and beside them:

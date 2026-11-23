@@ -63,6 +63,7 @@ mod grid;
 // Public for a ground station that draws the lander as tcs-sim does: see
 // examples/lander.
 pub mod lander_view;
+mod landing_rating;
 mod node;
 mod payload;
 // Linux alone: a page has no terminals.

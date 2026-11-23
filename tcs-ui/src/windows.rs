@@ -204,6 +204,82 @@ pub fn regions<C: ComponentHandle + 'static>(
 ) {
 }
 
+/// What of a window a page shows: the part of it on the screen, measured
+/// from the window's top left -- nothing wide for none -- and whether any of
+/// another window is on the screen too.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InView {
+    /// The part of this window on the screen.
+    pub seen: Area,
+    /// Whether any of another window is on the screen.
+    pub others: bool,
+}
+
+/// Has a window told what of it a page shows, now and whenever that may
+/// change: see tcsos's `browser::page::watch_view`. A window's canvas is
+/// the page's only once the event loop has made it, so this says whether
+/// it was there to watch: called again until it was.
+///
+/// # Arguments
+///
+/// * `window` - The window.
+/// * `told`   - What is told.
+///
+/// # Returns
+///
+/// Whether the window is watched now.
+#[cfg(target_arch = "wasm32")]
+pub fn watch_view<C: ComponentHandle + 'static>(
+    window: &C,
+    told: impl FnMut(InView) + 'static,
+) -> bool {
+    use slint::winit_030::winit::platform::web::WindowExtWebSys;
+    use slint::winit_030::WinitWindowAccessor;
+
+    let mut told = Some(told);
+    window
+        .window()
+        .with_winit_window(|winit| {
+            let canvas = winit.canvas()?;
+            let mut told = told.take()?;
+            tcsos::browser::page::watch_view(&canvas, move |view| {
+                let [x, y, width, height] = view.seen;
+                told(InView {
+                    seen: Area {
+                        x,
+                        y,
+                        width,
+                        height,
+                    },
+                    others: view.others,
+                })
+            });
+            Some(())
+        })
+        .flatten()
+        .is_some()
+}
+
+/// Nothing, but in a page: a window on Linux shows all of itself, and the
+/// windows beside it, as the window manager places them. Watched, there
+/// being nothing more to do.
+///
+/// # Arguments
+///
+/// * `_window` - The window.
+/// * `_told`   - What would be told.
+///
+/// # Returns
+///
+/// That it is watched.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn watch_view<C: ComponentHandle + 'static>(
+    _window: &C,
+    _told: impl FnMut(InView) + 'static,
+) -> bool {
+    true
+}
+
 /// Shows or hides the canvas a window is drawn on, in a page: a browser's
 /// windowing does nothing with a window shown or hidden. See tcsos's
 /// `browser::page`.

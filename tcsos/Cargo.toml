@@ -21,10 +21,16 @@ wasm-bindgen = "0.2"
 wasm_thread = "0.3.3"
 # The page's clock, for Instant and SystemTime.
 web-time = "1.1.0"
-# The page itself, for showing and hiding the canvas a window is drawn on.
+# The page itself, for showing and hiding the canvas a window is drawn on,
+# and for what of a window the page shows.
 web-sys = { version = "0.3", features = [
+    "Document",
+    "DomRect",
     "Element",
+    "EventTarget",
     "HtmlCanvasElement",
+    "NodeList",
+    "ResizeObserver",
     "Window",
 ] }
 

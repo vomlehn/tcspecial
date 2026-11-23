@@ -28,6 +28,7 @@ use tcsprotocol::node::physics::lander::{Point, Resolved};
 use tcsprotocol::node::physics::{Place, Resolution};
 use tcsprotocol::sim_config::SimConfigFile;
 
+use crate::landing_rating as rating;
 use crate::node::physics::lander::throttles;
 use crate::node::physics::sky::{ground_at, stars};
 use crate::node::physics::world::World;
@@ -1464,6 +1465,18 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
         // flying, and the fuel it had, which only a restart raises.
         let was = Cell::new(Stopped::Flying);
         let had_fuel = Cell::new(f64::INFINITY);
+        // The lander as the visitor flying it took it, while a visitor
+        // flies it: what its landing is rated from. See landing_rating.rs.
+        let rated_from: Cell<Option<rating::State>> = Cell::new(None);
+        // When, on the window's clock, the last rating began to fade: from
+        // the moment the lander starts again after it. None while it is
+        // shown whole, or not shown.
+        let fading_since: Cell<Option<f64>> = Cell::new(None);
+        // Whether the page shows none of the panels -- neither those beside
+        // the pane nor another window -- as it last said; and whether it
+        // is saying yet. Never, on Linux. See tcs_ui::windows::watch_view.
+        let panels_hidden = Rc::new(Cell::new(false));
+        let watching = Cell::new(false);
         timer.start(slint::TimerMode::Repeated, REFRESH, move || {
             let Some(ui) = weak.upgrade() else { return };
             let now = Instant::now();
@@ -1487,6 +1500,16 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             let before = was.replace(now);
             let refuelled = out[FUEL] > had_fuel.replace(out[FUEL]) + 1e-9;
             let after_crash = before == Stopped::Crashed && now != before;
+            rate(
+                &ui,
+                &scene,
+                &out,
+                (before, now),
+                pilot.borrow().is_none() && scene.joystick_3_4.is_some(),
+                after_crash || refuelled,
+                (&rated_from, &fading_since),
+                seconds,
+            );
             if after_crash || refuelled {
                 // Started again. After a crash or from the pad, which is how
                 // the lander starts again by itself, the autopilot flies the
@@ -1510,9 +1533,127 @@ pub fn attach(ui: &MainWindow, scene: Scene) -> slint::Timer {
             pane.set_beckon(beckoning.get());
             pane.set_beckon_lit(beckoning.get() && beckon_lit(seconds));
             regions(&ui);
+            // What the page shows, said by the page as it changes: asked
+            // for once the window's canvas is there to be watched.
+            if !watching.get() {
+                let hidden = Rc::clone(&panels_hidden);
+                let weak = ui.as_weak();
+                watching.set(tcs_ui::windows::watch_view(&ui, move |view| {
+                    let right = weak.upgrade().map_or(0.0, |ui| {
+                        ui.global::<LanderScene>().get_pane_right()
+                    });
+                    hidden.set(panels_out_of_view(view, right));
+                }));
+            }
+            let flown_by_hand = pilot.borrow().is_none()
+                && now == Stopped::Flying
+                && scene.joystick_3_4.is_some();
+            pane.set_hint(
+                panels_hidden.get()
+                    && !flown_by_hand
+                    && scene.joystick_3_4.is_some(),
+            );
         });
     }
     timer
+}
+
+/// How long the last landing's rating takes to fade, once the lander has
+/// started again, in seconds of the window's clock.
+const RATING_FADES: f64 = 3.0;
+
+/// Rates a landing a visitor flew, and fades the rating once the lander
+/// starts again: see landing_rating.rs.
+///
+/// The visitor's flight is rated from the moment they took the lander --
+/// from Autoland, as the joystick was taken hold of, or as it started with
+/// nobody else flying it -- and again from a lift-off from the pad. Autoland's
+/// landings are not rated, nor a flight Autoland took back.
+///
+/// # Arguments
+///
+/// * `ui`            - The window.
+/// * `scene`         - The lander's world and figures.
+/// * `out`           - The lander's outputs, as just looked at.
+/// * `(before, now)` - How it was at the last look, and how it is now.
+/// * `by_hand`       - Whether a visitor, not Autoland, flies it now.
+/// * `restarted`     - Whether it has just started again.
+/// * `(from, fade)`  - The lander as the visitor took it, while they fly
+///                     it; and when the last rating began to fade.
+/// * `seconds`       - The window's clock, which stops while paused.
+#[allow(clippy::too_many_arguments)]
+fn rate(
+    ui: &MainWindow,
+    scene: &Scene,
+    out: &[f64],
+    (before, now): (Stopped, Stopped),
+    by_hand: bool,
+    restarted: bool,
+    (from, fade): (&Cell<Option<rating::State>>, &Cell<Option<f64>>),
+    seconds: f64,
+) {
+    let pane = ui.global::<LanderScene>();
+    let state = rating::State {
+        at: (out[X], out[Y]),
+        velocity: (out[VELOCITY_X], out[VELOCITY_Y]),
+        mass: rating::mass_with(&scene.figures, out[FUEL]),
+    };
+    if before == Stopped::Flying && now == Stopped::Pad {
+        if let Some(took) = from.take().filter(|_| by_hand) {
+            let share = rating::rating(&scene.figures, &took, state.mass);
+            pane.set_rating(format!("Efficiency {:.0}%", share * 100.0).into());
+            pane.set_rating_shown(1.0);
+            fade.set(None);
+        }
+    }
+    if restarted || now != Stopped::Flying || !by_hand {
+        from.set(None);
+    } else if from.get().is_none() {
+        from.set(Some(state));
+    }
+    if restarted && pane.get_rating_shown() > 0.0 && fade.get().is_none() {
+        fade.set(Some(seconds));
+    }
+    if let Some(since) = fade.get() {
+        let left = still_shown(since, seconds);
+        pane.set_rating_shown(left);
+        if left <= 0.0 {
+            fade.set(None);
+        }
+    }
+}
+
+/// How much of a fading rating is still drawn.
+///
+/// # Arguments
+///
+/// * `since`   - When it began to fade, on the window's clock.
+/// * `seconds` - The window's clock now.
+///
+/// # Returns
+///
+/// From one, as it begins, to nought, [`RATING_FADES`] seconds later.
+fn still_shown(since: f64, seconds: f64) -> f32 {
+    (1.0 - (seconds - since) / RATING_FADES).clamp(0.0, 1.0) as f32
+}
+
+/// Says whether a page shows none of tcs-sim's panels: nothing of its
+/// window right of the lander's pane on the screen, and no other window
+/// either -- the ground's, below.
+///
+/// # Arguments
+///
+/// * `view`  - What of the window the page shows.
+/// * `right` - Where the lander's pane ends, in the window's logical
+///             pixels.
+///
+/// # Returns
+///
+/// Whether none is shown.
+fn panels_out_of_view(view: tcs_ui::windows::InView, right: f32) -> bool {
+    let seen = view.seen;
+    let beside = seen.width > 0.0 && seen.x + seen.width > right + 1.0;
+    !beside && !view.others
 }
 
 /// How the lander was before it started again.
@@ -2285,13 +2426,14 @@ pub(crate) mod tests {
     ///
     /// # Returns
     ///
-    /// Whether it landed, true, or crashed, false, and when, in simulated
-    /// seconds; `None` where it did neither in five minutes.
+    /// Whether it landed, true, or crashed, false, when, in simulated
+    /// seconds, and the share of its tank it had left then, with the
+    /// figures it flew by; `None` where it did neither in five minutes.
     fn autoland(
         ground: Vec<Point>,
         pad: usize,
         start: Point,
-    ) -> Option<(bool, f64)> {
+    ) -> Option<(bool, f64, f64, Resolved)> {
         use crate::node::physics::component::Component;
         use crate::node::physics::lander::Lander;
         let outline =
@@ -2327,10 +2469,10 @@ pub(crate) mod tests {
             let out: Vec<f64> =
                 (0..terminals).map(|t| lander.output(t)).collect();
             if out[LANDED] > 0.5 {
-                return Some((true, now));
+                return Some((true, now, out[FUEL], f));
             }
             if out[CRASHED] > 0.5 {
-                return Some((false, now));
+                return Some((false, now, out[FUEL], f));
             }
             on_the_way.push_back(pilot.steer(&f, &out));
             let (x, y) = on_the_way.pop_front().expect("two steps held");
@@ -2370,8 +2512,8 @@ pub(crate) mod tests {
             (850.0, 330.0),
             (1000.0, 200.0),
         ];
-        let said = autoland(shipped, 4, (60.0, 540.0));
-        assert!(matches!(said, Some((true, _))), "{said:?}");
+        let said = autoland(shipped.clone(), 4, (60.0, 540.0));
+        assert!(matches!(said, Some((true, ..))), "{said:?}");
 
         let high = vec![
             (0.0, 100.0),
@@ -2384,7 +2526,80 @@ pub(crate) mod tests {
             (1000.0, 150.0),
         ];
         let said = autoland(high, 4, (60.0, 540.0));
-        assert!(matches!(said, Some((true, _))), "{said:?}");
+        assert!(matches!(said, Some((true, ..))), "{said:?}");
+    }
+
+    /// A landing actually flown is rated as a share, the least that could
+    /// have been spent being no more than what was: the least is a lower
+    /// bound, and a rating over one would say it was not. The autopilot,
+    /// flying from the shipped start, lands well short of the best -- it is
+    /// cautious -- and well above nothing.
+    #[test]
+    fn a_flown_landing_is_rated_as_a_share() {
+        let shipped = vec![
+            (0.0, 210.0),
+            (90.0, 300.0),
+            (180.0, 170.0),
+            (300.0, 240.0),
+            (420.0, 80.0),
+            (480.0, 80.0),
+            (600.0, 190.0),
+            (720.0, 120.0),
+            (850.0, 330.0),
+            (1000.0, 200.0),
+        ];
+        let Some((true, _, left, f)) = autoland(shipped, 4, (60.0, 540.0))
+        else {
+            panic!("the autopilot lands");
+        };
+        let from = rating::State {
+            at: f.start,
+            velocity: (0.0, 0.0),
+            mass: rating::mass_with(&f, 1.0),
+        };
+        let touchdown = rating::mass_with(&f, left);
+        let exhaust = f.isp.as_secs_f64()
+            * crate::node::physics::lander::STANDARD_GRAVITY;
+        let used = exhaust * (from.mass / touchdown).ln();
+        let least = rating::least(&f, &from, f.thrust_y / touchdown);
+        assert!(least <= used, "the least, {least}, over the used, {used}");
+        let share = rating::rating(&f, &from, touchdown);
+        assert!((0.05..1.0).contains(&share), "{share}");
+    }
+
+    /// A rating fades over three seconds of the window's clock, from whole
+    /// to gone, and stays gone.
+    #[test]
+    fn a_rating_fades_over_three_seconds() {
+        assert_eq!(still_shown(10.0, 10.0), 1.0);
+        assert!((still_shown(10.0, 11.5) - 0.5).abs() < 1e-6);
+        assert_eq!(still_shown(10.0, 13.0), 0.0);
+        assert_eq!(still_shown(10.0, 60.0), 0.0);
+    }
+
+    /// The hint shows where nothing of tcs-sim's window right of the
+    /// lander's pane is on the screen, and no other window is; and not
+    /// where either is, nor before the page has said.
+    #[test]
+    fn the_hint_shows_only_with_every_panel_out_of_view() {
+        use tcs_ui::windows::{Area, InView};
+        let seeing = |x: f32, width: f32, others: bool| InView {
+            seen: Area {
+                x,
+                y: 0.0,
+                width,
+                height: 500.0,
+            },
+            others,
+        };
+        // The pane ends at 600: the page shows 0 to 600 of the window.
+        assert!(panels_out_of_view(seeing(0.0, 600.0, false), 600.0));
+        // A little of the panels beside it.
+        assert!(!panels_out_of_view(seeing(0.0, 650.0, false), 600.0));
+        // Scrolled across to the panels.
+        assert!(!panels_out_of_view(seeing(500.0, 600.0, false), 600.0));
+        // The ground's window, below, on the screen too.
+        assert!(!panels_out_of_view(seeing(0.0, 600.0, true), 600.0));
     }
 
     /// The lander's cabin is its highest shape, the green light faces the

@@ -49,7 +49,11 @@ as after logging out and in again, needs the container made again, as
 D-Bus session bus of `tcs`'s own, at `/run/user/UID/bus`, where there is none
 running, since a podman exec is no login and nothing else would: the windows'
 toolkit asks it for the desktop's light or dark theme, and says it cannot
-find one each time a window opens without it. Xvfb is there too, for a program to open
+find one each time a window opens without it. `fresh` lets the container
+have 16384 processes and threads at once, not podman's 2048, which the
+lander through Yamcs fills -- Yamcs, two tcspecials and tcs-sim, whose
+software renderer starts threads for each of the host's cores -- so that a
+tcspecial is not stopped for want of a thread. Xvfb is there too, for a program to open
 its window where nobody sees it. What a package needs it brings with
 it, and what building a project needs that project's `make
 install-tools` installs.

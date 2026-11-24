@@ -109,6 +109,10 @@ build() {
 # Where the host's display is put in the container.
 DISPLAY_DIR=/mnt/tcs-display
 
+# How many processes and threads the container may have at once, 8 times
+# podman's default: a bound still, against a run that forks without end.
+PIDS_LIMIT=16384
+
 # Makes the container afresh from the image, building the image first if
 # there is none, and starts it.
 fresh() {
@@ -144,6 +148,12 @@ fresh() {
 	fedora) cache=/var/cache/libdnf5 ;;
 	esac
 	set -- "$@" -v "tcs-$distro-packages:$cache"
+	# Room for the threads of a whole run: podman's default of 2048 is
+	# filled by the lander through Yamcs -- Yamcs's JVM, two tcspecials, a
+	# relay, and tcs-sim, whose software renderer starts threads for each
+	# of the host's cores -- and a tcspecial that cannot start a node's
+	# thread stops. See PIDS_LIMIT.
+	set -- "$@" --pids-limit "$PIDS_LIMIT"
 	"$podman" run -d --name "$name" --hostname "$name" \
 		--systemd=always --userns=keep-id --user root "$@" "$image" \
 		> /dev/null
@@ -335,6 +345,12 @@ shell() {
 	# the values has a space in it, so the options are a list of words.
 	uid=$(as_root id -u tcs)
 	as_root install -d -m 700 -o tcs -g tcs "/run/user/$uid"
+	# What podman exec starts goes in systemd's init.scope, which an image
+	# made before its systemd was told otherwise holds to 15% of the
+	# container's processes and threads: none of them is held to less
+	# than the container itself. See the Containerfiles' DefaultTasksMax.
+	as_root sh -c 'echo max > /sys/fs/cgroup/init.scope/pids.max' \
+		2> /dev/null || true
 	envs="-e XDG_RUNTIME_DIR=/run/user/$uid"
 	if session_bus "$uid"; then
 		envs="$envs -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus"

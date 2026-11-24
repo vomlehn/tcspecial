@@ -89,5 +89,15 @@ RUN userdel --remove ubuntu 2>/dev/null || true \
 # nothing for it to authorize.
 RUN systemctl mask polkit.service
 
+# What a shell or an example runs is started by podman exec, which puts it in
+# systemd's init.scope, and systemd holds each unit and scope to a share of
+# the container's processes and threads -- 15%, 307 of podman's 2048 -- which
+# the lander through Yamcs fills, a tcspecial then stopping for want of a
+# thread. Nothing in the container is held to less than the container
+# itself: see PIDS_LIMIT in bin/tcs-container.
+RUN mkdir -p /etc/systemd/system.conf.d \
+ && printf '[Manager]\nDefaultTasksMax=infinity\n' \
+	> /etc/systemd/system.conf.d/tasks.conf
+
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]

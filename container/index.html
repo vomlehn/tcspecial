@@ -305,10 +305,14 @@ there starts a D-Bus session bus of <code>tcs</code>‘s own, at
 <code>/run/user/UID/bus</code>, where there is none running, since a
 podman exec is no login and nothing else would: the windows’ toolkit
 asks it for the desktop’s light or dark theme, and says it cannot find
-one each time a window opens without it. Xvfb is there too, for a
-program to open its window where nobody sees it. What a package needs it
-brings with it, and what building a project needs that project’s
-<code>make install-tools</code> installs.</p>
+one each time a window opens without it. <code>fresh</code> lets the
+container have 16384 processes and threads at once, not podman’s 2048,
+which the lander through Yamcs fills – Yamcs, two tcspecials and
+tcs-sim, whose software renderer starts threads for each of the host’s
+cores – so that a tcspecial is not stopped for want of a thread. Xvfb is
+there too, for a program to open its window where nobody sees it. What a
+package needs it brings with it, and what building a project needs that
+project’s <code>make install-tools</code> installs.</p>
 <p>The quickest way in: build the packages of whatever you are testing,
 then start the container, made from scratch with the newest of them
 installed in it the first time, and as you left it after that:</p>

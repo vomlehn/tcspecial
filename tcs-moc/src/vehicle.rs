@@ -56,6 +56,7 @@ use tcsprotocol::graph::reach::reach_of;
 use tcsprotocol::graph::telemetry::{self, Reaches, Telemetered, Via};
 use tcsprotocol::graph::Graph;
 use tcsprotocol::link_type::LinkType;
+use tcsprotocol::node::physical::terminal::{Direction, Kind, Said, Terminal};
 use tcsprotocol::ready::SetUpFor;
 use tcsprotocol::sim_config::SimConfigFile;
 use tcsprotocol::simulate::Mode;
@@ -995,7 +996,6 @@ fn simulator_for(
         }
         None => {
             pm_tcs_sim.start_child(tcs_sim, payload_path);
-            eprintln!("waiting for tcs-sim to say at {at} that it is ready");
         }
     }
 
@@ -1134,10 +1134,6 @@ fn connect_said(
     let version = tcsprotocol::ConfigVersion::of_this_build();
     match answer {
         Ok((theirs, their_digest)) => {
-            eprintln!(
-                "CONNECT answer: {}",
-                tcsmoc::beacon::what_it_read(theirs, their_digest)
-            );
             let same = their_digest == digest;
             if let Ok(mut held) = agreed.lock() {
                 *held = Some(same);
@@ -1981,7 +1977,6 @@ fn set_a_nodes_attribute(
         ),
         Err(e) => format!("SET_NODE {node} ({name}) failed: {e}"),
     };
-    eprintln!("{said}");
     ui.set_last_response(SharedString::from(said));
 }
 
@@ -2092,7 +2087,6 @@ fn command_a_node(
         ),
         Err(e) => format!("{verb} {node} ({name}) failed: {e}"),
     };
-    eprintln!("{said}");
     ui.set_last_response(SharedString::from(said));
 }
 
@@ -2229,7 +2223,6 @@ pub(crate) fn command_buttons(
                 )));
                 return;
             }
-            eprintln!("Connected to {address}");
             ui.set_ci_status(SharedString::from(CONNECTED_STATUS));
 
             match digest {
@@ -2870,16 +2863,24 @@ fn show_ping(window: &PingWindow, shown: &PingShown) {
 ///                    as readings rather than as bytes.
 /// * `consolidated` - The consolidators, and how each one's datum is laid
 ///                    out, shown member by member rather than as bytes.
+/// * `said_by`      - The sources a simulator stands in for that are
+///                    joined to a terminal with words of its own -- a
+///                    lander's `landed`, its ratings -- and the terminal,
+///                    so that what they send is said as tcs-sim says it.
 /// * `arrivals`     - Where the last arrival for each panel is left, by row.
 /// * `pings`        - The pinger to hand the ping node's answers to, where
 ///                    they come down through this gateway node.
 /// * `plot`         - The plot window's plot, where there is one, to hand
 ///                    each value and each switch's decision to.
+// Each argument is a thing the loop is handed once and keeps for as long as
+// the MOC runs; a struct holding them would only be built to be taken apart.
+#[allow(clippy::too_many_arguments)]
 fn serve(
     mut gateway: GatewayReceiver,
     rows: Arc<BTreeMap<String, usize>>,
     units: Arc<BTreeMap<String, Unit>>,
     consolidated: Arc<BTreeMap<String, Layout>>,
+    said_by: Arc<BTreeMap<String, Terminal>>,
     arrivals: Arrivals,
     pings: Option<PingFeed>,
     plot: Option<Arc<Mutex<Plot>>>,
@@ -2900,6 +2901,9 @@ fn serve(
         /// How its datum is laid out, where it is a consolidator, and room
         /// to find each input's value in: made here, before the loop.
         layout: Option<(Layout, Vec<std::ops::Range<usize>>)>,
+        /// The terminal it is joined to, where that has words for what it
+        /// sends.
+        terminal: Option<Terminal>,
     }
     let mut sources: Vec<Source> = gateway
         .sources()
@@ -2915,12 +2919,16 @@ fn serve(
             layout: consolidated.get(source).map(|layout| {
                 (layout.clone(), vec![0..0; layout.inputs.len()])
             }),
+            terminal: said_by.get(source).copied(),
         })
         .collect();
     let mut datum = vec![0u8; DATUM_BYTES];
     // A consolidation as text, written again for each datum: its capacity
     // grows to the longest written and is then reused.
     let mut members = String::new();
+    // What a source joined to a terminal with words sent, in those words,
+    // written again for each datum into text that keeps its capacity.
+    let mut words = String::new();
     loop {
         let arrival = match gateway.receive_into(None, &mut datum) {
             Ok(Some(arrival)) => arrival,
@@ -2957,6 +2965,12 @@ fn serve(
                 members.clear();
             }
         }
+        words.clear();
+        if let Some(terminal) = source.terminal {
+            if !terminal.write_said(data, &mut words) {
+                words.clear();
+            }
+        }
         if let Ok(mut slots) = arrivals.lock() {
             if let Some(slot) = slots.get_mut(row) {
                 match slot {
@@ -2969,6 +2983,8 @@ fn serve(
                         arrival.unit = source.unit;
                         arrival.members.clear();
                         arrival.members.push_str(&members);
+                        arrival.said.clear();
+                        arrival.said.push_str(&words);
                     }
                     // The first from this source: its arrival is made once.
                     None => {
@@ -2978,6 +2994,7 @@ fn serve(
                             packets: source.packets,
                             unit: source.unit,
                             members: members.clone(),
+                            said: words.clone(),
                         })
                     }
                 }
@@ -3168,20 +3185,14 @@ pub fn run(
     // with no `tcspecial` section states no ports, so there is nothing to
     // connect to and the buttons say so.
     let (link, vehicle_at) = match command_links_of(&graph) {
-        Ok(Some((from, to, commanded))) => {
-            eprintln!(
-                "Commands from {from} to {to}, nodes on {}",
-                commanded.to
-            );
-            (
-                Some(Arc::new(Mutex::new(CiLink::down_commanding(
-                    &from,
-                    commanded,
-                    matched.clone(),
-                )))),
-                to,
-            )
-        }
+        Ok(Some((from, to, commanded))) => (
+            Some(Arc::new(Mutex::new(CiLink::down_commanding(
+                &from,
+                commanded,
+                matched.clone(),
+            )))),
+            to,
+        ),
         Ok(None) => {
             startup.warning(format!(
                 "{payload_path} states no tcspecial section, so it says where \
@@ -3235,9 +3246,10 @@ pub fn run(
     // The windows, made where windows are made -- which in a web page is not
     // this thread -- and run until they close: by Quit, by the close box, or
     // by a stop.
+    let said_by = said_by_of(&graph, payload_path, sim_path);
     let window_part = Vehicle {
-        payload_path: payload_path.to_string(),
         sim_path: sim_path.map(str::to_string),
+        said_by,
         mode,
         graph,
         links,
@@ -3258,13 +3270,62 @@ pub fn run(
     tcsos::process::exit(0);
 }
 
+/// The sources a simulator stands in for whose terminals have words for
+/// what they send -- a lander's `landed`, said `landed` or `not landed`, and
+/// its ratings -- each with its terminal, so that a panel says what arrived
+/// as tcs-sim's panel says what was sent.
+///
+/// Read from the simulator file the run's tcs-sim reads, this station being
+/// one that stands beside a simulator: a station flying a vehicle has no
+/// simulator file, and shows the bytes.
+///
+/// # Arguments
+///
+/// * `graph`        - The configuration, whose nodes are the sources.
+/// * `payload_path` - Its path, which names it among the configurations a
+///                    simulator file may serve.
+/// * `sim_path`     - The simulator file, if the run has one.
+///
+/// # Returns
+///
+/// Each such source's name and terminal; none where there is no simulator
+/// file or it cannot be read, which tcs-sim says for itself.
+fn said_by_of(
+    graph: &Graph,
+    payload_path: &str,
+    sim_path: Option<&str>,
+) -> BTreeMap<String, Terminal> {
+    let Some(file) = sim_path.and_then(|path| SimConfigFile::load(path).ok())
+    else {
+        return BTreeMap::new();
+    };
+    let file =
+        file.for_configuration(&tcsprotocol::sim_config::configuration_name(
+            std::path::Path::new(payload_path),
+        ));
+    graph
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            let terminal = file.terminal_joined(&node.name)?;
+            // An output alone: a terminal the ground drives, as the
+            // lander's restart, sends the ground nothing to say.
+            let worded = terminal.direction == Direction::Out
+                && (terminal.kind == Kind::Decision
+                    || terminal.said == Said::Ratings);
+            worded.then(|| (node.name.clone(), terminal))
+        })
+        .collect()
+}
+
 /// What the MOC's windows are made from: what [`run`] found and set up
 /// before any window was made.
 struct Vehicle {
-    /// The tcspecial configuration's path.
-    payload_path: String,
     /// The simulator file's path, if the set has one.
     sim_path: Option<String>,
+    /// The sources whose terminals have words for what they send: see
+    /// [`said_by_of`].
+    said_by: BTreeMap<String, Terminal>,
     /// The run's simulation mode.
     mode: Mode,
     /// The configuration.
@@ -3295,8 +3356,8 @@ struct Vehicle {
 /// If a window cannot be made.
 fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
     let Vehicle {
-        payload_path,
         sim_path,
+        said_by,
         mode,
         graph,
         links,
@@ -3306,7 +3367,6 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
         vehicle_at,
         mut startup,
     } = vehicle;
-    let payload_path = payload_path.as_str();
     let sim_path = sim_path.as_deref();
 
     let ui = MainWindow::new().unwrap();
@@ -3338,6 +3398,7 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
             .collect(),
     );
     let consolidated = consolidated_of(&graph);
+    let said_by = Arc::new(said_by);
 
     let count = rows_in_order.len();
     let model: Rc<VecModel<DHInfo>> = Rc::new(VecModel::from(rows_in_order));
@@ -3346,7 +3407,6 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
     let sizes = Sizes::of(&ui);
     let shape = grid_shape(&sizes, count);
     ui.window().set_size(window_size(&sizes, &shape, count));
-    eprintln!("{payload_path}: {count} source(s) sending to the ground");
 
     ui.set_ci_status(SharedString::from(DISCONNECTED_STATUS));
     ui.set_ci_address(SharedString::from(vehicle_at));
@@ -3392,11 +3452,6 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
         digest,
     ) {
         Ok(Some(beacons)) => {
-            eprintln!(
-                "Listening for beacons at {}, which {} sends from",
-                beacons.link().recv,
-                beacons.link().send
-            );
             // A station run as flight holds every beacon to flight code:
             // test code in the vehicle's run or build is asked about as a
             // configuration that differs is. Every beacon says it, so one
@@ -3494,14 +3549,10 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
         // Read only while this window is matched with the vehicle, and
         // counted in the window's counts whether read or dropped.
         gateway.gated_by(matched.clone());
-        eprintln!(
-            "receiving at {} from {}",
-            gateway.name(),
-            gateway.sources().join(", ")
-        );
         let rows = rows.clone();
         let units = units.clone();
         let consolidated = consolidated.clone();
+        let said_by = said_by.clone();
         let arrivals = arrivals.clone();
         let plot = plot.clone();
         let feed = pings
@@ -3509,7 +3560,16 @@ fn show_vehicle(vehicle: Vehicle, closed: tcs_ui::windows::Closed) {
             .filter(|(through, _)| through == gateway.name())
             .map(|(_, feed)| feed.clone());
         thread::spawn(move || {
-            serve(gateway, rows, units, consolidated, arrivals, feed, plot)
+            serve(
+                gateway,
+                rows,
+                units,
+                consolidated,
+                said_by,
+                arrivals,
+                feed,
+                plot,
+            )
         });
     }
 
@@ -3629,6 +3689,26 @@ mod screenshots;
 pub(crate) mod tests {
     use super::*;
     use std::path::Path;
+
+    /// The lander's sources that have words are found from the simulator
+    /// file beside lander-b, and only those: a value is shown as a number
+    /// already, and the sky's records have no words.
+    #[test]
+    fn the_landers_landed_and_ratings_are_said_as_tcs_sim_says_them() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let payload = root.join("examples/lander-b/lander-b.ytcs");
+        let sim = root.join("examples/lander-b/lander-b-sim.yaml");
+        let graph = Graph::load(payload.to_str().unwrap()).expect("lander-b");
+        let said_by = said_by_of(
+            &graph,
+            payload.to_str().unwrap(),
+            Some(sim.to_str().unwrap()),
+        );
+        let names: Vec<&str> = said_by.keys().map(String::as_str).collect();
+        assert_eq!(names, ["crashed", "landed", "ratings"]);
+        assert_eq!(said_by["landed"].said(b"0").as_deref(), Some("not landed"));
+        assert!(said_by_of(&graph, payload.to_str().unwrap(), None).is_empty());
+    }
 
     /// What QUERY_THREADS answered is shown with the process's memory first
     /// and a line for each thread, its node named by the panel's name where
@@ -4273,6 +4353,7 @@ vehicle:
                 rows,
                 Arc::new(BTreeMap::new()),
                 Arc::new(BTreeMap::new()),
+                Arc::new(BTreeMap::new()),
                 arrivals,
                 Some(feed),
                 None,
@@ -4355,6 +4436,7 @@ payloads:
                     gateway,
                     rows,
                     units,
+                    Arc::new(BTreeMap::new()),
                     Arc::new(BTreeMap::new()),
                     arrivals,
                     None,
@@ -4471,6 +4553,7 @@ vehicle:
                     rows,
                     Arc::new(BTreeMap::new()),
                     consolidated,
+                    Arc::new(BTreeMap::new()),
                     arrivals,
                     None,
                     None,

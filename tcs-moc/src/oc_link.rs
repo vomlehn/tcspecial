@@ -70,6 +70,11 @@ pub struct Arrival {
     /// again by each arrival, so that the receiving loop allocates nothing
     /// once its text has grown to the longest it has written.
     pub members: String,
+    /// What came from a source joined to a terminal with words of its own,
+    /// in those words -- `landed`, or a lander's ratings -- as tcs-sim's
+    /// panel says what it sent, and empty for any other. Written as the
+    /// datum is received, for the reason `members` is.
+    pub said: String,
 }
 
 impl Arrival {
@@ -78,13 +83,16 @@ impl Arrival {
     /// # Returns
     ///
     /// The time of day it arrived, and its data: a consolidation's members
-    /// on one line, a space between them, or the data as a number with
-    /// its unit or as hex.
+    /// on one line, a space between them; what it said in its terminal's
+    /// words; or the data as a number with its unit or as hex.
     pub fn panel_lines(&self) -> (String, String) {
         // A consolidation on the panel's one line, a space between its
         // members; its Configuration shows it a member to a line.
         if !self.members.is_empty() {
             return (self.at.time_of_day(), self.members.replace('\n', " "));
+        }
+        if !self.said.is_empty() {
+            return (self.at.time_of_day(), self.said.clone());
         }
         let (_, data) = self.data.panel_lines_of(self.unit);
         (self.at.time_of_day(), data)
@@ -97,6 +105,29 @@ pub type Arrivals = Arc<Mutex<Vec<Option<Arrival>>>>;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// What came from a source whose terminal has words is shown in them,
+    /// after the time, as tcs-sim shows what it sent.
+    #[test]
+    fn words_are_shown_in_place_of_the_bytes() {
+        let at = Timestamp::at(
+            tcsos::time::UNIX_EPOCH + tcsos::time::Duration::from_secs(3661),
+        );
+        let mut data = DHSample::new();
+        data.record(b"1");
+        let arrival = Arrival {
+            at,
+            data,
+            packets: 1,
+            unit: None,
+            members: String::new(),
+            said: "landed".to_string(),
+        };
+        assert_eq!(
+            arrival.panel_lines(),
+            ("01:01:01".to_string(), "landed".to_string())
+        );
+    }
 
     /// What came from a node that sends values is shown as the temperature.
     ///
@@ -125,6 +156,7 @@ mod tests {
             packets: 1,
             unit: Some(Unit::Kelvin),
             members: String::new(),
+            said: String::new(),
         };
         assert_eq!(
             arrival.panel_lines(),
@@ -138,6 +170,7 @@ mod tests {
             packets: 1,
             unit: None,
             members: String::new(),
+            said: String::new(),
         };
         assert_eq!(
             arrival.panel_lines(),
@@ -163,6 +196,7 @@ mod tests {
             packets: 7,
             unit: None,
             members: String::new(),
+            said: String::new(),
         };
 
         // The time is the ground's clock, as every time in the window is, and

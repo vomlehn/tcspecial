@@ -251,8 +251,11 @@ component PayloadPanel inherits Rectangle {
             // Each ends with an ellipsis where it is longer than the panel
             // is wide, as the configuration line does, rather than making
             // every panel as wide as the longest sample.
+            // The time, then a colon and what was sent, where anything
+            // was: a line with nothing sent yet ends at its time.
             if driving == "" : Text {
-                text: "Sent: " + last-sent-time + " " + last-sent-data;
+                text: "Sent: " + last-sent-time
+                    + (last-sent-data == "" ? "" : ": " + last-sent-data);
                 font-size: SimFonts.window;
                 overflow: elide;
                 min-width: 0px;
@@ -280,7 +283,8 @@ component PayloadPanel inherits Rectangle {
         recv-row := HorizontalLayout {
             Text {
                 text: triggered
-                    ? "Recv: " + last-recv-time + " " + last-recv-data
+                    ? "Recv: " + last-recv-time
+                        + (last-recv-data == "" ? "" : ": " + last-recv-data)
                     : "";
                 font-size: SimFonts.window;
                 overflow: elide;

@@ -134,7 +134,7 @@ pub const TERMINALS: &[Terminal] = &[
     // count, as `restart` is, so that two equal ratings are two.
     Terminal::input("rated", Kind::Decision),
     // Its latest ratings' records: see the module's "Ratings".
-    Terminal::output("ratings", Kind::Records),
+    Terminal::output("ratings", Kind::Records).said_as_ratings(),
 ];
 
 /// How many ratings the lander keeps, and sends: the latest.
@@ -186,6 +186,77 @@ impl RatingRecord {
             autoland: bytes[10] != 0,
         }
     }
+}
+
+impl RatingRecord {
+    /// The rating as a panel says it: its percentage, to the tenth its
+    /// field holds; who flew it, `Autoland` where Autoland helped and `by
+    /// hand` where nothing did; and the time of day it was rated, as every
+    /// time in a panel is said: `87.5%, Autoland, 10:03:12`.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where it is written, after what is there.
+    ///
+    /// # Errors
+    ///
+    /// Whatever `out` refuses.
+    pub fn write_said(
+        &self,
+        out: &mut impl std::fmt::Write,
+    ) -> std::fmt::Result {
+        let who = if self.autoland { "Autoland" } else { "by hand" };
+        write!(out, "{:.1}%, {who}, ", self.rating * 100.0)?;
+        crate::Timestamp::at(
+            tcsos::time::UNIX_EPOCH + Duration::from_millis(self.when),
+        )
+        .write_time_of_day(out)
+    }
+}
+
+/// Writes what a panel says a packet of `ratings` held: each rating, as
+/// [`RatingRecord::write_said`] says it, the latest first, separated by
+/// semicolons.
+///
+/// # Arguments
+///
+/// * `data` - The packet: whole records, [`STAR_RECORD`] bytes each.
+/// * `out`  - Where it is written, after what is there.
+///
+/// # Returns
+///
+/// Whether anything was written: nothing for a packet that is empty or not
+/// whole records, whose bytes say what is wrong better than words would.
+pub fn write_ratings_said(data: &[u8], out: &mut impl std::fmt::Write) -> bool {
+    let (records, rest) = data.as_chunks::<STAR_RECORD>();
+    if records.is_empty() || !rest.is_empty() {
+        return false;
+    }
+    for (n, record) in records.iter().enumerate() {
+        let separated = if n == 0 { Ok(()) } else { out.write_str("; ") };
+        if separated
+            .and_then(|()| RatingRecord::from_bytes(record).write_said(out))
+            .is_err()
+        {
+            return false;
+        }
+    }
+    true
+}
+
+/// What a panel says a packet of `ratings` held, as [`write_ratings_said`]
+/// writes it.
+///
+/// # Arguments
+///
+/// * `data` - The packet.
+///
+/// # Returns
+///
+/// The words, or `None` where nothing was written.
+pub fn ratings_said(data: &[u8]) -> Option<String> {
+    let mut said = String::new();
+    write_ratings_said(data, &mut said).then_some(said)
 }
 
 /// How many bytes one of the sky's records is.
@@ -689,6 +760,36 @@ fn landscape_kept(l: &Resolved) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A packet of ratings is said a rating at a time, the percentage to
+    /// the tenth, who flew it and when; one that is not whole records is
+    /// not said at all.
+    #[test]
+    fn ratings_are_said_as_they_read() {
+        let first = RatingRecord {
+            when: 3_661_000,
+            rating: 0.875,
+            autoland: true,
+        };
+        let second = RatingRecord {
+            when: 7_322_000,
+            rating: 0.5004,
+            autoland: false,
+        };
+        let mut packet = first.to_bytes().to_vec();
+        packet.extend_from_slice(&second.to_bytes());
+        assert_eq!(
+            ratings_said(&packet).as_deref(),
+            Some("87.5%, Autoland, 01:01:01; 50.0%, by hand, 02:02:02")
+        );
+        assert_eq!(ratings_said(&packet[..20]), None);
+        assert_eq!(ratings_said(&[]), None);
+        let ratings = TERMINALS.iter().find(|t| t.name == "ratings");
+        assert_eq!(
+            ratings.and_then(|t| t.said(&first.to_bytes())).as_deref(),
+            Some("87.5%, Autoland, 01:01:01")
+        );
+    }
 
     /// A star's record reads back as it was written, to its fields'
     /// precision, laid out as the module's "Sky" says.

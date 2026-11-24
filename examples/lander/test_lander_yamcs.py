@@ -351,8 +351,8 @@ class Shown(unittest.TestCase):
         readings.values.update({"to_joystick_3_4_x": -0.5,
                                 "to_joystick_3_4_y": 0.5,
                                 "to_fuel": 0.5})
-        self.assertEqual(readings.thrust_text("x", lander), "-6000")
-        self.assertEqual(readings.thrust_text("y", lander), "24000")
+        self.assertEqual(readings.thrust_text("x", lander), "-6.0")
+        self.assertEqual(readings.thrust_text("y", lander), "24.0")
         # No thrust down, and the bottom engine no lower than a tenth lit.
         readings.values["to_joystick_3_4_y"] = -1.0
         self.assertEqual(readings.thrust("y", lander), 0.0)
@@ -423,9 +423,9 @@ class Shown(unittest.TestCase):
     def test_ratings_are_listed_the_latest_first(self):
         """The ratings' records are kept by when, each once however often
         it comes, the latest first, no more than RATINGS_LISTED, each said
-        as tcs-sim's pane said it."""
+        as tcs-sim's and tcs-moc's panels say it."""
+        import calendar
         import struct
-        import time
 
         def record(when, tenths, autoland):
             return struct.pack(lander_yamcs.RATING_LAYOUT, when, tenths,
@@ -433,16 +433,17 @@ class Shown(unittest.TestCase):
 
         ratings = lander_yamcs.Ratings()
         self.assertEqual(ratings.lines(), [])
-        noon = int(time.mktime((2026, 11, 23, 12, 0, 0, 0, 0, -1))) * 1000
+        noon = calendar.timegm((2026, 11, 23, 12, 0, 0, 0, 0, 0)) * 1000
         ratings.take(record(noon + 60_000, 520, 1) + record(noon, 874, 0)
                      + b"\x01\x02")
         ratings.take(record(noon, 874, 0))
         self.assertEqual(ratings.lines(),
-                         ["12:01:00  52% w/ Autoland", "12:00:00  87%"])
+                         ["52.0%, Autoland, 12:01:00",
+                          "87.4%, by hand, 12:00:00"])
         for n in range(lander_yamcs.RATINGS_LISTED + 5):
             ratings.take(record(noon + 120_000 + n, 500, 0))
         self.assertEqual(len(ratings.lines()), lander_yamcs.RATINGS_LISTED)
-        self.assertNotIn("12:00:00  87%", ratings.lines())
+        self.assertNotIn("87.4%, by hand, 12:00:00", ratings.lines())
 
     def test_points_read_back(self):
         """Points written as the simulator file states them read back."""

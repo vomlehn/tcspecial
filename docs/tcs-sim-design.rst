@@ -835,8 +835,8 @@ Requirement
     Each component and each sensor draws from a generator of its own, seeded
     from the run's seed and its name, so that a run with the same seed
     varies the same way whatever order the payloads' threads ask in. The
-    seed is the ``tcs-sim`` section's; without one tcs-sim chooses it and
-    says which.
+    seed is the ``tcs-sim`` section's; without one tcs-sim chooses it, and
+    says nothing of it at its start, so a run to be had again states one.
 
 Requirement
     Every one of these is off unless stated, so a file that states none
@@ -1500,6 +1500,11 @@ Requirement
     that is missing, unreadable, or written for another tcspecial configuration
     costs it that half of what a panel can show and nothing else; it says so
     once on the way past, and the panel says so where the parameters are shown.
+    It also reads it to say what a source arrives with as tcs-sim says it
+    was sent: where the source's simulated payload is joined to a terminal
+    with words of its own -- a decision, said ``landed`` or ``not landed``,
+    and a lander's ratings -- both programs say it by that terminal's
+    ``Terminal::said``, in ``tcsprotocol``, the one place it is decided.
 
 The panels are laid out in a grid whose shape follows from how many there are.
 A row is filled before another is started under it, three panels across, which

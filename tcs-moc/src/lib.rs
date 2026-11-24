@@ -144,7 +144,7 @@ impl Sizes {
     fn for_tests() -> Self {
         Self {
             panel_width: 307.0,
-            panel_height: 204.0,
+            panel_height: 178.0,
             grid_spacing: 10.0,
             chrome_width: 36.0,
             chrome_height: 502.0,
@@ -581,8 +581,14 @@ static NO_MEMLOCK: tcsos::sync::OnceLock<bool> = tcsos::sync::OnceLock::new();
 /// The arguments, the configuration last.
 fn child_args(name: &str, payload_path: &str, no_memlock: bool) -> Vec<String> {
     let mut args = Vec::new();
-    if no_memlock && name == "tcspecial" {
-        args.push("--no-memlock".to_string());
+    if name == "tcspecial" {
+        // Its startup summary and its log's chatter are for somebody
+        // watching a vehicle start, and this window says what matters of
+        // the start itself; what stops a start is said whatever this says.
+        args.push("--quiet".to_string());
+        if no_memlock {
+            args.push("--no-memlock".to_string());
+        }
     }
     args.push(payload_path.to_string());
     args
@@ -696,7 +702,6 @@ fn installed_directory() -> Option<std::path::PathBuf> {
 /// Manages the tcs-sim subprocess
 struct ProcessManager {
     child: Arc<Mutex<Option<Child>>>,
-    name: Mutex<String>,
 }
 
 impl ProcessManager {
@@ -708,7 +713,6 @@ impl ProcessManager {
     fn new() -> Self {
         Self {
             child: Arc::new(Mutex::new(None)),
-            name: Mutex::new(String::new()),
         }
     }
 
@@ -738,23 +742,23 @@ impl ProcessManager {
             .unwrap_or_else(|e| panic!("Failed to start {name}: {e}"));
 
         *self.child.lock().unwrap() = Some(child);
-        *self.name.lock().unwrap() = name.to_string();
 
         let child_handle = self.child.clone();
         let name_clone = name.to_string();
 
         thread::spawn(move || {
-            eprintln!("start_child: started {}", name_clone);
             loop {
                 thread::sleep(Duration::from_millis(100));
                 let mut guard = child_handle.lock().unwrap();
                 if let Some(ref mut child) = *guard {
                     match child.try_wait() {
                         Ok(Some(status)) => {
-                            println!(
-                                "{} exited with status: {}",
-                                name_clone, status
-                            );
+                            // A child that ended well ended because it was
+                            // asked to; only one that failed has anything to
+                            // say about why the MOC is stopping.
+                            if !status.success() {
+                                eprintln!("{name_clone} failed: {status}");
+                            }
                             ask_to_stop();
                             break;
                         }
@@ -797,17 +801,12 @@ impl ProcessManager {
     ///
     /// # Panics
     ///
-    /// If a lock on the child or its name is poisoned.
+    /// If the lock on the child is poisoned.
     fn kill(&self) {
-        let name = self.name.lock().unwrap();
-        eprintln!("Kill child {}", *name);
-        drop(name);
-
         let mut guard = self.child.lock().unwrap();
         if let Some(ref mut child) = *guard {
             let _ = child.kill();
             let _ = child.wait();
-            println!("Process killed");
         }
         *guard = None;
     }
@@ -872,7 +871,6 @@ pub fn main() {
             exit(1);
         }
     };
-    eprintln!("payload configuration: {}", payload_path);
 
     // The run's simulator file and the mode it states, which the tcspecial
     // and tcs-sim this starts find and read the same way: see
@@ -1136,7 +1134,6 @@ fn ask_to_stop() {
 /// nothing else is waiting on the ports.
 pub(crate) fn stop_if_asked() {
     if STOPPING.load(tcsos::sync::atomic::Ordering::Relaxed) {
-        eprintln!("Stopping, and stopping what was started with it");
         close_windows();
     }
 }
@@ -1710,7 +1707,6 @@ mod tests {
                 "DHPanel",
                 "DHPanel::commands-row",
                 "DHPanel::last-recv-row",
-                "DHPanel::from-payload-row",
                 "DHPanel::counters-row",
             ] {
                 let found: Vec<_> = if found_what.contains("::") {
@@ -1953,14 +1949,19 @@ mod tests {
                 lines.iter().filter(|shown| *shown == label).count()
             };
 
-            // The one panel's two readings of what arrived.
-            for line in ["Last recv:", "From payload:"] {
-                assert_eq!(
-                    count(line),
-                    1,
-                    "a payload that {kind} has no {line} line: {lines:?}"
-                );
-            }
+            // The one panel's reading of what arrived, when and what on one
+            // line; the line that said what alone is gone.
+            assert_eq!(
+                count("Last recv:"),
+                1,
+                "a payload that {kind} has no Last recv: line: {lines:?}"
+            );
+            assert_eq!(
+                count("From payload:"),
+                0,
+                "a payload that {kind} still has a From payload: line: \
+                 {lines:?}"
+            );
 
             // And the spacecraft's own account of what it last sent and
             // received, which the panels showed and do not any more. The
@@ -2296,6 +2297,7 @@ mod tests {
             packets: 5,
             unit: None,
             members: String::new(),
+            said: String::new(),
         };
         let arrivals: Arrivals =
             Arc::new(Mutex::new(vec![None, Some(arrival)]));
@@ -2330,6 +2332,27 @@ mod tests {
         assert!(info.oc_data.is_empty());
     }
 
+    /// What a child's command line ends with after `before`: tcspecial
+    /// told to be quiet, its startup summary being for somebody watching a
+    /// vehicle start, and then the configuration.
+    ///
+    /// # Arguments
+    ///
+    /// * `name`   - The child.
+    /// * `before` - What comes first.
+    ///
+    /// # Returns
+    ///
+    /// The whole command line.
+    fn quiet<'a>(name: &str, before: &[&'a str]) -> Vec<&'a str> {
+        let mut args = before.to_vec();
+        if name == "tcspecial" {
+            args.push("--quiet");
+        }
+        args.push("tcspecial2.ytcs");
+        args
+    }
+
     /// Each child is started on the tcspecial configuration the MOC read, and
     /// told so by argument.
     ///
@@ -2344,8 +2367,9 @@ mod tests {
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args,
-                ["run", "--bin", name, "--", "tcspecial2.ytcs"],
-                "{name}: no mode, which the child reads for itself"
+                quiet(name, &["run", "--bin", name, "--"]),
+                "{name}: no mode, which the child reads for itself, and \
+                 tcspecial quiet"
             );
 
             // Nothing is put in the child's environment: the argument says it
@@ -2372,10 +2396,13 @@ mod tests {
     fn no_memlock_is_passed_on_to_tcspecial_alone() {
         assert_eq!(
             child_args("tcspecial", "v.ytcs", true),
-            ["--no-memlock", "v.ytcs"]
+            ["--quiet", "--no-memlock", "v.ytcs"]
         );
         assert_eq!(child_args("tcs-sim", "v.ytcs", true), ["v.ytcs"]);
-        assert_eq!(child_args("tcspecial", "v.ytcs", false), ["v.ytcs"]);
+        assert_eq!(
+            child_args("tcspecial", "v.ytcs", false),
+            ["--quiet", "v.ytcs"]
+        );
     }
 
     /// The file a child is started on is the one named on the MOC's own
@@ -2431,7 +2458,7 @@ mod tests {
                 "{name}"
             );
             let args: Vec<&OsStr> = command.get_args().collect();
-            assert_eq!(args, ["tcspecial2.ytcs"], "{name}");
+            assert_eq!(args, quiet(name, &[]), "{name}");
         }
     }
 

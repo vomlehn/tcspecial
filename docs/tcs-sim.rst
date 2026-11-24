@@ -732,7 +732,8 @@ temperature as if it changed at a steady rate between two readings.
 The random draws come from a generator for each component and each sensor,
 seeded from the run's seed and its name, so a run with the same seed varies
 the same way. The seed is a setting of the ``tcs-sim`` section; without one,
-tcs-sim chooses it and says which it chose, so a run worth repeating can be:
+tcs-sim chooses its own and does not say which, so a run worth repeating
+states one:
 
 .. code-block:: yaml
 
@@ -1014,21 +1015,24 @@ under `Starting and stopping a payload <tcspecial.html#starting-and-stopping-a-p
 under `Seeing what was read <tcspecial.html#seeing-what-was-read>`__ -- and then three lines:
 
 ``Sent``
-  When the last packet went, and the first few bytes of it. A part the
-  vehicle drives sends nothing, and this line says what it is doing instead,
-  in words, naming the heater it switches in the physical model: ``heating``
-  or ``off``, and ``disabled, so off`` while its panel has it disabled --
-  see `Starting and stopping a payload
+  When the last packet went, a colon, and what it was: a reading as its value in
+  its unit, a signal as its state -- a lander's ``landed`` or ``not landed`` --
+  a lander's ratings as each reads, ``87.5%, Autoland, 10:03:12``, and anything
+  else as its first few bytes, as in ``Sent: 10:00:03: 292.0875 K``. Nothing
+  sent yet ends the line at its time. A part the vehicle drives sends nothing,
+  and this line says what it is doing instead, in words, naming the heater it
+  switches in the physical model: ``heating`` or ``off``, and ``disabled, so
+  off`` while its panel has it disabled -- see `Starting and stopping a payload
   <tcspecial.html#starting-and-stopping-a-payload>`__. A switch joined to a
-  ``heater`` component's ``on`` is named by the component, as in
-  ``heater_1: heating``; one joined to a thermal mass's own ``heater_1`` or
-  ``heater_2``, as in the thermostat example, by the mass and the input, as
-  in ``zone.heater_2: off``, so that a zone's two heaters' panels never say
-  the same thing. A driven part that is not a heater says ``on`` where a
-  heater says ``heating``, or ``at`` the value it is held at.
+  ``heater`` component's ``on`` is named by the component, as in ``heater_1:
+  heating``; one joined to a thermal mass's own ``heater_1`` or ``heater_2``, as
+  in the thermostat example, by the mass and the input, as in ``zone.heater_2:
+  off``, so that a zone's two heaters' panels never say the same thing. A driven
+  part that is not a heater says ``on`` where a heater says ``heating``, or
+  ``at`` the value it is held at.
 
 ``Recv``
-  When the last packet arrived, and the first few bytes of it -- for a payload
+  When the last packet arrived, a colon, and what it was -- for a payload
   that answers requests. A payload that sends of its own accord is never
   spoken to, so this line is left blank for it rather than showing
   ``--:--:--`` for the whole run. The line stays so that every panel is the
@@ -1194,14 +1198,15 @@ window, drawn without opening it.
       button offers ``Disable``; no reading has gone yet.
 
 #. .. figure:: shots/tcs-sim-enable-3.png
-      :alt: The temp_1 panel three seconds later: Running, Sent: 10:00:03
+      :alt: The temp_1 panel three seconds later: Running, Sent: 10:00:03:
             292.0875 K, and Pkts: 3 sent.
 
       Three seconds on. ``Sent`` gives the time of the last reading and
       what it was: the zone's temperature, read back from the sensor's
       bytes as tcspecial's conversion reads them, in kelvin -- as tcs-moc
       shows the value made of it -- and ``Pkts`` counts three. A signal
-      shows as its text, ``1`` or ``0``, and what the vehicle sent a part
+      shows as its state, ``landed`` or ``not landed``, a lander's ratings
+      in words, and what the vehicle sent a part
       it drives as the value or whole number it drives it to; anything
       else, or anything that does not read as what it should be, as its
       bytes in hexadecimal.

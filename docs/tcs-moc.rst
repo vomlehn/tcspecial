@@ -173,20 +173,23 @@ handler nobody can speak for.
 
 ``Last recv``
   When the MOC last received anything from that source, on the port its data
-  arrives at. The MOC's own clock, and read for whether anything is still
-  coming: see `When data last arrived`_.
-
-``From payload``
-  What arrived, as the ground received it: a value in its unit, or its
-  first bytes in hexadecimal -- and a consolidator's datum by its members,
-  ``sun=21509 wheel=-7 ...``, as many as the panel has room for, with all
-  of them in its ``Configuration``.
+  arrives at, then a colon and what arrived, as in ``Last recv: 10:00:05:
+  294.8125 K``. The time is the MOC's own clock, and read for whether
+  anything is still coming: see `When data last arrived`_. What arrived is
+  as the ground received it: a value in its unit, or its first bytes in
+  hexadecimal -- and a consolidator's datum by its members, ``sun=21509
+  wheel=-7 ...``, as many as the panel has room for, with all of them in its
+  ``Configuration``. Where tcs-moc started tcs-sim, a source tcs-sim joins to
+  a terminal with words of its own is said in them, as tcs-sim's panel says
+  it: a lander's ``landed`` or ``not landed``, ``crashed`` or ``not
+  crashed``, and its ratings as ``87.5%, Autoland, 10:03:12``. Nothing
+  arrived yet ends the line at its time.
 
 ``Recv``
   How many packets have arrived from that payload, counted from the moment
   the MOC started: ``3 recv``.
 
-All three are the ground's end of it, counted and timed by the end that
+Both are the ground's end of it, counted and timed by the end that
 received them. The spacecraft's account of what it last sent and last
 received, and its count of the bytes it sent to its payload, were shown beside
 them and are gone: a panel is watched for what reached the ground, and the
@@ -296,17 +299,17 @@ Coming up and connecting
       Matched; every node asked about.
 
 5. Data arrives, each node's on a port of its own, and the panels are
-   repainted from it once a second: ``Last recv`` is when it came, ``From
-   payload`` what it was -- a temperature, in kelvin, for ``consensus_temp``
-   and the three conversions, and the byte each heater's switch reports,
-   ``01`` for on -- and ``Recv`` how many have come. The line under ``Last
+   repainted from it once a second: ``Last recv`` is when it came and,
+   after a colon, what it was -- a temperature, in kelvin, for
+   ``consensus_temp`` and the three conversions, and the byte each heater's
+   switch reports, ``01`` for on -- and ``Recv`` how many have come. The line under ``Last
    Response`` counts every packet from the vehicle, answers included, and
    says what became of them. The plot window, `The plot window`_, draws the
    same values over time.
 
    .. figure:: shots/tcs-moc-data.png
-      :alt: The window with data: each panel shows Last recv with a time,
-            From payload with 294.8125 K for consensus_temp and 01 for each
+      :alt: The window with data: each panel shows Last recv with a time
+            and, after a colon, 294.8125 K for consensus_temp and 01 for each
             heater's switch, and Recv: 5 recv. The line under Last Response
             counts the packets received, every one processed and none
             malformed or mismatched.
@@ -366,7 +369,8 @@ Commanding a node
 
    .. figure:: shots/tcs-moc-consolidation.png
       :alt: The housekeeping panel of the consolidator example, Active, its
-            From payload line reading "sun=21509 wheel=-7" and an ellipsis,
+            Last recv line reading its time, "sun=21509 wheel=-7" and an
+            ellipsis,
             the rest of its members cut off at the panel's edge.
 
       A consolidator's panel: its members, as many as fit.
@@ -920,7 +924,9 @@ Initiate restart
   had. The beacons do not say which kind of start
   it was: the checksum they carry says which configuration it is running,
   and the startup summary on tcspecial's error output says whether the
-  start was commanded.
+  start was commanded, where tcspecial was started by hand. Tcs-moc starts
+  its tcspecial with ``--quiet``, which leaves the summary unsaid, its own
+  window saying what a start did.
 
   A station that has sent a restart holds nothing back: every button goes
   on working as it did. The vehicle is what refuses a command that follows

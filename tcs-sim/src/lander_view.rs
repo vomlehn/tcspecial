@@ -1091,6 +1091,24 @@ fn plume_step(throttle: f64) -> f64 {
     (throttle * PLUME_STEPS).round() / PLUME_STEPS
 }
 
+/// A thrust as the readouts show it: in kilonewtons, to the tenth, so
+/// that a full lander's 24000 N reads `24.0`. Nought is never shown with
+/// a sign, which a thrust rounded from a small push the other way would
+/// otherwise carry.
+///
+/// # Arguments
+///
+/// * `newtons` - The thrust, in newtons.
+///
+/// # Returns
+///
+/// The text, without its unit, which the row's heading gives.
+pub fn kilonewtons(newtons: f64) -> String {
+    let tenths = (newtons / 100.0).round();
+    // Adding nought turns a negative zero into a positive one.
+    format!("{:.1}", tenths / 10.0 + 0.0)
+}
+
 /// The thrust of the lander's engines along each axis, as the pane shows
 /// it: the throttles it burns at, from those it is given -- see
 /// [`throttles`] -- times each axis's full thrust; nothing with the tank
@@ -2162,9 +2180,10 @@ pub struct Frame {
     pub acceleration_x: String,
     /// Y acceleration.
     pub acceleration_y: String,
-    /// X thrust, in newtons: see [`thrust`].
+    /// X thrust, in kilonewtons as [`kilonewtons`] shows it: see
+    /// [`thrust`].
     pub thrust_x: String,
-    /// Y thrust, in newtons.
+    /// Y thrust, likewise.
     pub thrust_y: String,
     /// Whether the pad's lights are lit.
     pub pad_lit: bool,
@@ -2226,8 +2245,8 @@ impl Watch {
         // last values sent down do: the lander reports its velocity and
         // acceleration as it hit, and its thrust is as last seen flying.
         if let (true, Some(flying)) = (crashed, self.flying) {
-            frame.thrust_x = format!("{:.0}", flying.thrust.0);
-            frame.thrust_y = format!("{:.0}", flying.thrust.1);
+            frame.thrust_x = kilonewtons(flying.thrust.0);
+            frame.thrust_y = kilonewtons(flying.thrust.1);
         }
         if let Some(explosion) = self.explosion.as_mut() {
             let t = simulated - explosion.began;
@@ -2431,8 +2450,8 @@ fn painted_from(f: &Resolved, out: &[f64], picture: &Drawn) -> Frame {
         velocity_y: format!("{:.2}", out[VELOCITY_Y]),
         acceleration_x: format!("{:.3}", out[ACCELERATION_X]),
         acceleration_y: format!("{:.3}", out[ACCELERATION_Y]),
-        thrust_x: format!("{:.0}", thrust(f, out).0),
-        thrust_y: format!("{:.0}", thrust(f, out).1),
+        thrust_x: kilonewtons(thrust(f, out).0),
+        thrust_y: kilonewtons(thrust(f, out).1),
         touchdown_x: Touchdown::of(out[VELOCITY_X].abs(), f.landing_drift),
         touchdown_y: Touchdown::of(-out[VELOCITY_Y], f.landing_speed),
         ..Frame::default()
@@ -2442,6 +2461,16 @@ fn painted_from(f: &Resolved, out: &[f64], picture: &Drawn) -> Frame {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// Thrust is shown in kilonewtons, to the tenth, and nought unsigned.
+    #[test]
+    fn thrust_is_shown_in_kilonewtons() {
+        assert_eq!(kilonewtons(24000.0), "24.0");
+        assert_eq!(kilonewtons(-6000.0), "-6.0");
+        assert_eq!(kilonewtons(4800.0), "4.8");
+        assert_eq!(kilonewtons(-20.0), "0.0");
+        assert_eq!(kilonewtons(0.0), "0.0");
+    }
 
     /// The lander example's figure: a body with its corners cut, a cabin on
     /// it with an antenna, a nozzle under it, and two splayed legs, each

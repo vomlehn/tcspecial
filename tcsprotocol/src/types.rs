@@ -201,11 +201,33 @@ impl Timestamp {
     /// The time as `hh:mm:ss` in UTC, or [`NO_TRANSFER_TIME`] for a clock
     /// fault.
     pub fn time_of_day(&self) -> String {
+        let mut said = String::new();
+        // Writing to a String cannot fail.
+        let _ = self.write_time_of_day(&mut said);
+        said
+    }
+
+    /// Writes the time of day as [`Timestamp::time_of_day`] says it, into
+    /// text a caller keeps, so that a loop that says many allocates nothing
+    /// once its text has room.
+    ///
+    /// # Arguments
+    ///
+    /// * `out` - Where it is written, after what is there.
+    ///
+    /// # Errors
+    ///
+    /// Whatever `out` refuses.
+    pub fn write_time_of_day(
+        &self,
+        out: &mut impl std::fmt::Write,
+    ) -> std::fmt::Result {
         if self.clock_failed() {
-            return NO_TRANSFER_TIME.to_string();
+            return out.write_str(NO_TRANSFER_TIME);
         }
         let within_a_day = (self.micros / 1_000_000) % 86_400;
-        format!(
+        write!(
+            out,
             "{:02}:{:02}:{:02}",
             within_a_day / 3600,
             (within_a_day % 3600) / 60,

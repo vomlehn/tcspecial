@@ -1372,23 +1372,23 @@ flies, until someone takes the joystick, unless someone flew any of the
 flight before it by hand.</p>
 <p><code>lander/lander_yamcs.py</code> is the ground station. It makes a
 landscape at random from a seed – <code>--seed N</code>, or one it
-chooses and says – and writes it into the run’s copy of the simulator
-file; starts one Yamcs with an instance for each vehicle, and between
-each instance and its vehicle a relay on every link that holds each
-datagram 1.3 s, the time light takes from the Moon, both ways; starts
-tcs-sim with both configurations and both tcspecials; and has each
-vehicle answer CONNECT, through the delay. Its window, the MOC’s, shows
-the landscape and the lander where it was said to be, the values, the
-fuel, the joystick as it was held, and whether it has landed or crashed,
-all 1.3 s behind tcs-sim’s. Its sky starts empty and fills in with
-tcs-sim’s stars as lander-a sends them down, a few to a packet, round
-and round, until the ground has them all and sends a quench up through
-lander-a’s <code>gateway_sky</code>; a packet lost, as UDP may lose one,
-just leaves fewer stars until a later pass. Its Restart button sends a
-command up to lander-b, whose gateway passes it to the payload that
-starts the lander again: it arrives 1.3 s later, and is seen 1.3 s after
-that. Closing tcs-sim’s window, or the MOC’s, stops everything. Yamcs’s
-web interface is at <a href="http://localhost:19090"
+chooses, which it writes at the head of the run’s copy of the simulator
+file – and writes it into that copy; starts one Yamcs with an instance
+for each vehicle, and between each instance and its vehicle a relay on
+every link that holds each datagram 1.3 s, the time light takes from the
+Moon, both ways; starts tcs-sim with both configurations and both
+tcspecials; and has each vehicle answer CONNECT, through the delay. Its
+window, the MOC’s, shows the landscape and the lander where it was said
+to be, the values, the fuel, the joystick as it was held, and whether it
+has landed or crashed, all 1.3 s behind tcs-sim’s. Its sky starts empty
+and fills in with tcs-sim’s stars as lander-a sends them down, a few to
+a packet, round and round, until the ground has them all and sends a
+quench up through lander-a’s <code>gateway_sky</code>; a packet lost, as
+UDP may lose one, just leaves fewer stars until a later pass. Its
+Restart button sends a command up to lander-b, whose gateway passes it
+to the payload that starts the lander again: it arrives 1.3 s later, and
+is seen 1.3 s after that. Closing tcs-sim’s window, or the MOC’s, stops
+everything. Yamcs’s web interface is at <a href="http://localhost:19090"
 class="uri">http://localhost:19090</a>.</p>
 <pre><code>make run-lander</code></pre>
 <p><code>lander/</code> also builds a second ground station,

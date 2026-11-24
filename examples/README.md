@@ -871,12 +871,12 @@ flies, until someone takes the joystick, unless someone flew any of the
 flight before it by hand.
 
 `lander/lander_yamcs.py` is the ground station. It makes a landscape at
-random from a seed -- `--seed N`, or one it chooses and says -- and writes
-it into the run's copy of the simulator file; starts one Yamcs with an
-instance for each vehicle, and between each instance and its vehicle a
-relay on every link that holds each datagram 1.3 s, the time light takes
-from the Moon, both ways; starts tcs-sim with both configurations and both
-tcspecials; and has each vehicle answer CONNECT, through the delay. Its
+random from a seed -- `--seed N`, or one it chooses, which it writes at the
+head of the run's copy of the simulator file -- and writes it into that copy;
+starts one Yamcs with an instance for each vehicle, and between each instance
+and its vehicle a relay on every link that holds each datagram 1.3 s, the time
+light takes from the Moon, both ways; starts tcs-sim with both configurations
+and both tcspecials; and has each vehicle answer CONNECT, through the delay. Its
 window, the MOC's, shows the landscape and the lander where it was said to
 be, the values, the fuel, the joystick as it was held, and whether it has
 landed or crashed, all 1.3 s behind tcs-sim's. Its sky starts empty and

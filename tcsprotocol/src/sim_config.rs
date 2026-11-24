@@ -47,7 +47,7 @@ use tcsos::time::Duration;
 use crate::node::physical::setting::{
     quantity, size_of, time_of, wander_of, Wander,
 };
-use crate::node::physical::terminal::{At, Direction, Kind};
+use crate::node::physical::terminal::{At, Direction, Kind, Terminal};
 use crate::node::physical::{Model, PhysicalProblem, WorldSection};
 use crate::simulate::Mode;
 use crate::verify::About;
@@ -2363,6 +2363,34 @@ impl SimConfigFile {
         self.simulated_payloads.iter().any(|payload| {
             payload.name == name && self.simulate_of(payload) == Ok(true)
         })
+    }
+
+    /// The terminal of the physical model the payload called `name` is
+    /// joined to, where it is joined to one, so that a ground station
+    /// showing what the payload sent can say it as the simulator does:
+    /// see `crate::node::physical::terminal::Terminal::said`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The payload's name.
+    ///
+    /// # Returns
+    ///
+    /// The terminal; or `None` for a payload this file does not name, one
+    /// joined to nothing or to several terminals (a GPIO payload's lines),
+    /// and a file whose model does not resolve, which is reported where the
+    /// file is checked.
+    pub fn terminal_joined(&self, name: &str) -> Option<Terminal> {
+        let payload =
+            self.simulated_payloads.iter().find(|p| p.name == name)?;
+        let connects = self.settings_of(payload).connects?;
+        let mut terminals = terminals_of(&connects);
+        let (Some(only), None) = (terminals.next(), terminals.next()) else {
+            return None;
+        };
+        let at = At::parse("connects", only).ok()?;
+        let model = self.physical().ok()??;
+        model.find(&at).ok().map(|(_, terminal)| terminal)
     }
 
     /// One payload's settings laid over its group's, where it names one.

@@ -533,18 +533,22 @@ handler nobody can speak for.</p>
 <dl class="docutils">
 <dt><tt class="docutils literal">Last recv</tt></dt>
 <dd>When the MOC last received anything from that source, on the port its data
-arrives at. The MOC's own clock, and read for whether anything is still
-coming: see <a class="reference internal" href="#when-data-last-arrived">When data last arrived</a>.</dd>
-<dt><tt class="docutils literal">From payload</tt></dt>
-<dd>What arrived, as the ground received it: a value in its unit, or its
-first bytes in hexadecimal -- and a consolidator's datum by its members,
-<tt class="docutils literal">sun=21509 <span class="pre">wheel=-7</span> ...</tt>, as many as the panel has room for, with all
-of them in its <tt class="docutils literal">Configuration</tt>.</dd>
+arrives at, then a colon and what arrived, as in <tt class="docutils literal">Last recv: 10:00:05:
+294.8125 K</tt>. The time is the MOC's own clock, and read for whether
+anything is still coming: see <a class="reference internal" href="#when-data-last-arrived">When data last arrived</a>. What arrived is
+as the ground received it: a value in its unit, or its first bytes in
+hexadecimal -- and a consolidator's datum by its members, <tt class="docutils literal">sun=21509
+<span class="pre">wheel=-7</span> ...</tt>, as many as the panel has room for, with all of them in its
+<tt class="docutils literal">Configuration</tt>. Where tcs-moc started tcs-sim, a source tcs-sim joins to
+a terminal with words of its own is said in them, as tcs-sim's panel says
+it: a lander's <tt class="docutils literal">landed</tt> or <tt class="docutils literal">not landed</tt>, <tt class="docutils literal">crashed</tt> or <tt class="docutils literal">not
+crashed</tt>, and its ratings as <tt class="docutils literal">87.5%, Autoland, 10:03:12</tt>. Nothing
+arrived yet ends the line at its time.</dd>
 <dt><tt class="docutils literal">Recv</tt></dt>
 <dd>How many packets have arrived from that payload, counted from the moment
 the MOC started: <tt class="docutils literal">3 recv</tt>.</dd>
 </dl>
-<p>All three are the ground's end of it, counted and timed by the end that
+<p>Both are the ground's end of it, counted and timed by the end that
 received them. The spacecraft's account of what it last sent and last
 received, and its count of the bytes it sent to its payload, were shown beside
 them and are gone: a panel is watched for what reached the ground, and the
@@ -632,15 +636,15 @@ of what the <tt class="docutils literal">CONNECT</tt> said, and each panel takes
 </div>
 </li>
 <li><p class="first">Data arrives, each node's on a port of its own, and the panels are
-repainted from it once a second: <tt class="docutils literal">Last recv</tt> is when it came, <tt class="docutils literal">From
-payload</tt> what it was -- a temperature, in kelvin, for <tt class="docutils literal">consensus_temp</tt>
-and the three conversions, and the byte each heater's switch reports,
-<tt class="docutils literal">01</tt> for on -- and <tt class="docutils literal">Recv</tt> how many have come. The line under <tt class="docutils literal">Last
+repainted from it once a second: <tt class="docutils literal">Last recv</tt> is when it came and,
+after a colon, what it was -- a temperature, in kelvin, for
+<tt class="docutils literal">consensus_temp</tt> and the three conversions, and the byte each heater's
+switch reports, <tt class="docutils literal">01</tt> for on -- and <tt class="docutils literal">Recv</tt> how many have come. The line under <tt class="docutils literal">Last
 Response</tt> counts every packet from the vehicle, answers included, and
 says what became of them. The plot window, <a class="reference internal" href="#the-plot-window">The plot window</a>, draws the
 same values over time.</p>
 <div class="figure">
-<img alt="The window with data: each panel shows Last recv with a time, From payload with 294.8125 K for consensus_temp and 01 for each heater's switch, and Recv: 5 recv. The line under Last Response counts the packets received, every one processed and none malformed or mismatched." src="shots/tcs-moc-data.png" />
+<img alt="The window with data: each panel shows Last recv with a time and, after a colon, 294.8125 K for consensus_temp and 01 for each heater's switch, and Recv: 5 recv. The line under Last Response counts the packets received, every one processed and none malformed or mismatched." src="shots/tcs-moc-data.png" />
 <p class="caption">Data in the panels.</p>
 </div>
 </li>
@@ -687,7 +691,7 @@ inputs have no panels of their own. Its <tt class="docutils literal">Configurati
 its latest datum, under &quot;latest datum&quot;, a member to a line, whether or
 not a <tt class="docutils literal">Query</tt> has been answered.</p>
 <div class="figure">
-<img alt="The housekeeping panel of the consolidator example, Active, its From payload line reading &quot;sun=21509 wheel=-7&quot; and an ellipsis, the rest of its members cut off at the panel's edge." src="shots/tcs-moc-consolidation.png" />
+<img alt="The housekeeping panel of the consolidator example, Active, its Last recv line reading its time, &quot;sun=21509 wheel=-7&quot; and an ellipsis, the rest of its members cut off at the panel's edge." src="shots/tcs-moc-consolidation.png" />
 <p class="caption">A consolidator's panel: its members, as many as fit.</p>
 </div>
 <div class="figure">
@@ -1156,7 +1160,9 @@ beacons again at #1 with the flag set, and runs with the configuration it
 had. The beacons do not say which kind of start
 it was: the checksum they carry says which configuration it is running,
 and the startup summary on tcspecial's error output says whether the
-start was commanded.</p>
+start was commanded, where tcspecial was started by hand. Tcs-moc starts
+its tcspecial with <tt class="docutils literal"><span class="pre">--quiet</span></tt>, which leaves the summary unsaid, its own
+window saying what a start did.</p>
 <p>A station that has sent a restart holds nothing back: every button goes
 on working as it did. The vehicle is what refuses a command that follows
 a restart. From the moment it takes one, and in the tcspecial that comes

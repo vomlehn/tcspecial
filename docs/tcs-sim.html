@@ -1047,7 +1047,8 @@ temperature as if it changed at a steady rate between two readings.</p>
 <p>The random draws come from a generator for each component and each sensor,
 seeded from the run's seed and its name, so a run with the same seed varies
 the same way. The seed is a setting of the <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section; without one,
-tcs-sim chooses it and says which it chose, so a run worth repeating can be:</p>
+tcs-sim chooses its own and does not say which, so a run worth repeating
+states one:</p>
 <pre class="code yaml literal-block">
 <span class="name tag">tcs-sim</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">ready</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;127.0.0.4:7907&quot;</span><span class="whitespace">
@@ -1295,19 +1296,22 @@ under <a class="reference external" href="tcspecial.html#starting-and-stopping-a
 under <a class="reference external" href="tcspecial.html#seeing-what-was-read">Seeing what was read</a> -- and then three lines:</p>
 <dl class="docutils">
 <dt><tt class="docutils literal">Sent</tt></dt>
-<dd>When the last packet went, and the first few bytes of it. A part the
-vehicle drives sends nothing, and this line says what it is doing instead,
-in words, naming the heater it switches in the physical model: <tt class="docutils literal">heating</tt>
-or <tt class="docutils literal">off</tt>, and <tt class="docutils literal">disabled, so off</tt> while its panel has it disabled --
-see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>. A switch joined to a
-<tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt> is named by the component, as in
-<tt class="docutils literal">heater_1: heating</tt>; one joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or
-<tt class="docutils literal">heater_2</tt>, as in the thermostat example, by the mass and the input, as
-in <tt class="docutils literal">zone.heater_2: off</tt>, so that a zone's two heaters' panels never say
-the same thing. A driven part that is not a heater says <tt class="docutils literal">on</tt> where a
-heater says <tt class="docutils literal">heating</tt>, or <tt class="docutils literal">at</tt> the value it is held at.</dd>
+<dd>When the last packet went, a colon, and what it was: a reading as its value in
+its unit, a signal as its state -- a lander's <tt class="docutils literal">landed</tt> or <tt class="docutils literal">not landed</tt> --
+a lander's ratings as each reads, <tt class="docutils literal">87.5%, Autoland, 10:03:12</tt>, and anything
+else as its first few bytes, as in <tt class="docutils literal">Sent: 10:00:03: 292.0875 K</tt>. Nothing
+sent yet ends the line at its time. A part the vehicle drives sends nothing,
+and this line says what it is doing instead, in words, naming the heater it
+switches in the physical model: <tt class="docutils literal">heating</tt> or <tt class="docutils literal">off</tt>, and <tt class="docutils literal">disabled, so
+off</tt> while its panel has it disabled -- see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>. A switch joined to a
+<tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt> is named by the component, as in <tt class="docutils literal">heater_1:
+heating</tt>; one joined to a thermal mass's own <tt class="docutils literal">heater_1</tt> or <tt class="docutils literal">heater_2</tt>, as
+in the thermostat example, by the mass and the input, as in <tt class="docutils literal">zone.heater_2:
+off</tt>, so that a zone's two heaters' panels never say the same thing. A driven
+part that is not a heater says <tt class="docutils literal">on</tt> where a heater says <tt class="docutils literal">heating</tt>, or
+<tt class="docutils literal">at</tt> the value it is held at.</dd>
 <dt><tt class="docutils literal">Recv</tt></dt>
-<dd><p class="first">When the last packet arrived, and the first few bytes of it -- for a payload
+<dd><p class="first">When the last packet arrived, a colon, and what it was -- for a payload
 that answers requests. A payload that sends of its own accord is never
 spoken to, so this line is left blank for it rather than showing
 <tt class="docutils literal"><span class="pre">--:--:--</span></tt> for the whole run. The line stays so that every panel is the
@@ -1463,12 +1467,13 @@ button offers <tt class="docutils literal">Disable</tt>; no reading has gone yet
 </div>
 </li>
 <li><div class="first figure">
-<img alt="The temp_1 panel three seconds later: Running, Sent: 10:00:03 292.0875 K, and Pkts: 3 sent." src="shots/tcs-sim-enable-3.png" />
+<img alt="The temp_1 panel three seconds later: Running, Sent: 10:00:03: 292.0875 K, and Pkts: 3 sent." src="shots/tcs-sim-enable-3.png" />
 <p class="caption">Three seconds on. <tt class="docutils literal">Sent</tt> gives the time of the last reading and
 what it was: the zone's temperature, read back from the sensor's
 bytes as tcspecial's conversion reads them, in kelvin -- as tcs-moc
 shows the value made of it -- and <tt class="docutils literal">Pkts</tt> counts three. A signal
-shows as its text, <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, and what the vehicle sent a part
+shows as its state, <tt class="docutils literal">landed</tt> or <tt class="docutils literal">not landed</tt>, a lander's ratings
+in words, and what the vehicle sent a part
 it drives as the value or whole number it drives it to; anything
 else, or anything that does not read as what it should be, as its
 bytes in hexadecimal.</p>

@@ -270,6 +270,19 @@ impl World {
         )
     }
 
+    /// The terminal at a place, as its component's type states it.
+    ///
+    /// # Arguments
+    ///
+    /// * `place` - A terminal of this world.
+    ///
+    /// # Returns
+    ///
+    /// The terminal.
+    pub fn terminal_of(&self, place: Place) -> &'static Terminal {
+        &self.terminals[place.component][place.terminal]
+    }
+
     /// Says what an output is at a moment of the wall clock, bringing the
     /// world up to it.
     pub fn read(&self, place: Place, now: Instant) -> f64 {

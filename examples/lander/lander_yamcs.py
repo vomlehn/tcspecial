@@ -754,9 +754,11 @@ class Ratings:
                 del self.by_when[when]
 
     def lines(self):
-        """The ratings as the window lists them, the latest first: the time
-        of day each was rated, and the rating as tcs-sim's pane said it,
-        *w/ Autoland* where Autoland helped.
+        """The ratings as the window lists them, the latest first, each as
+        tcs-sim's and tcs-moc's panels say a rating: its percentage, to the
+        tenth its field holds; who flew it, *Autoland* where Autoland helped
+        and *by hand* where nothing did; and the time of day it was rated,
+        in UTC as every panel's time is: ``87.5%, Autoland, 10:03:12``.
 
         Returns:
             Each as a line of text.
@@ -765,9 +767,9 @@ class Ratings:
             listed = sorted(self.by_when.items(), reverse=True)
         said = []
         for when, (rating, autoland) in listed:
-            at = time.strftime("%H:%M:%S", time.localtime(when / 1000))
-            with_autoland = " w/ Autoland" if autoland else ""
-            said.append(f"{at}  {rating * 100:.0f}%{with_autoland}")
+            at = time.strftime("%H:%M:%S", time.gmtime(when / 1000))
+            who = "Autoland" if autoland else "by hand"
+            said.append(f"{rating * 100:.1f}%, {who}, {at}")
         return said
 
 
@@ -1011,10 +1013,14 @@ class Readings:
             lander: The :class:`Lander`.
 
         Returns:
-            The thrust in whole newtons, or :data:`NOTHING_YET`.
+            The thrust in kilonewtons, to the tenth, as tcs-sim's pane shows
+            it -- nought never signed -- or :data:`NOTHING_YET`.
         """
         thrust = self.thrust(axis, lander)
-        return NOTHING_YET if thrust is None else f"{thrust:.0f}"
+        if thrust is None:
+            return NOTHING_YET
+        # Adding nought turns a negative zero into a positive one.
+        return f"{round(thrust / 100) / 10 + 0.0:.1f}"
 
     def arrived(self, nodes):
         """Whether every one of some nodes has said something.
@@ -1480,7 +1486,7 @@ def run_the_window(readings, lander, delay, stopped, restarter,
                                   lambda: touchdown("x"),
                                   lambda: touchdown("y")))
     below_acceleration = 1 + [row[0] for row in rows].index("Acceleration")
-    rows.insert(below_acceleration, ("Thrust", "N",
+    rows.insert(below_acceleration, ("Thrust", "kN",
                     lambda: readings.thrust_text("x", lander),
                     lambda: readings.thrust_text("y", lander)))
     shown = []
@@ -1691,7 +1697,6 @@ def main(argv):
         print(describe(seed, lander, crafts, options.http_port,
                        options.delay))
         return 0
-    print(f"seed {seed}: the landscape is in {sim_path}", flush=True)
     for craft in crafts:
         if craft.digest is None:
             print(f"lander_yamcs: no checksum for {craft.instance}'s "

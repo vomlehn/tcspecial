@@ -460,17 +460,11 @@ fn joined_to_the_world(
     };
 
     // What the world's and the sensors' random draws start from: the file's,
-    // or one of tcs-sim's own, said so that the run can be had again.
+    // or one of tcs-sim's own. A run is had again by stating a seed in the
+    // file; one tcs-sim chose is not said, since nobody asked for it.
     let seed = match sim_file.tcs_sim.as_ref().and_then(|t| t.seed) {
         Some(seed) => seed,
-        None => {
-            let seed: u64 = rand::random();
-            eprintln!(
-                "the physical model's noise starts from seed {seed}: state \
-                 seed: {seed} in the tcs-sim section to have it again"
-            );
-            seed
-        }
+        None => rand::random(),
     };
 
     // Keeping pace with the wall clock, which the vehicle at the other end
@@ -819,9 +813,6 @@ fn load(
         }
     };
 
-    for (name, attachment) in &joined {
-        eprintln!("{}", attachment.describe(name));
-    }
     for thermostat in &thermostats {
         eprintln!(
             "tcs-sim simulates the thermostat {}, switching the heaters from \
@@ -1029,7 +1020,6 @@ fn ready_socket(
     let at = sim_file.ready().map_err(|e| format!("{sim_path}: {e}"))?;
     let set_up_for = set_up_for(payload_paths, sim_path, mode)?;
     let socket = ready::bind(at).map_err(|e| format!("{sim_path}: {e}"))?;
-    eprintln!("answering whether it is ready at {at}");
     Ok((socket, set_up_for))
 }
 
@@ -1559,16 +1549,6 @@ pub fn main() {
                 process::exit(1);
             }
         }
-    }
-
-    eprintln!(
-        "Simulating {} payloads from {} and {}",
-        configs.len(),
-        payload_paths.join(", "),
-        sim_path
-    );
-    if let Some(description) = &sim_file.description {
-        eprintln!("Simulator configuration: {description}");
     }
 
     // Before any payload is simulated, so that nothing is left behind by a
@@ -3666,7 +3646,7 @@ mod tests {
         // the same from the first packet to the last.
         let quiet = payload_info_from(0, &handler("DH0"), &sim(1000, 1000, 12));
         let (sent, recv, pkts) = shown(quiet.clone());
-        assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
+        assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME}")]);
         assert!(
             recv.is_empty(),
             "a payload that sends on its own has a received line: {recv:?}"
@@ -3683,8 +3663,8 @@ mod tests {
         asked.segment_interval = Duration::ZERO;
         let (sent, recv, pkts) =
             shown(payload_info_from(0, &handler("DH0"), &asked));
-        assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME} ")]);
-        assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME} ")]);
+        assert_eq!(sent, vec![format!("Sent: {NO_TRANSFER_TIME}")]);
+        assert_eq!(recv, vec![format!("Recv: {NO_TRANSFER_TIME}")]);
         assert_eq!(pkts, vec!["Pkts: 0 sent / 0 recv".to_string()]);
 
         // And one that has sent and been spoken to shows when each happened
@@ -3704,12 +3684,12 @@ mod tests {
         let (sent, recv, pkts) = shown(moving);
         assert_eq!(
             sent,
-            vec!["Sent: 01:01:01 DE AD".to_string()],
+            vec!["Sent: 01:01:01: DE AD".to_string()],
             "the panel does not show the time and bytes of the last packet sent"
         );
         assert_eq!(
             recv,
-            vec!["Recv: 02:02:02 41 53 4B".to_string()],
+            vec!["Recv: 02:02:02: 41 53 4B".to_string()],
             "the panel does not show the time and bytes of the last packet \
              received"
         );

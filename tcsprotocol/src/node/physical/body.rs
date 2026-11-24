@@ -37,7 +37,8 @@ pub const TERMINALS: &[Terminal] = &[
     Terminal::input("flow", Kind::Value(Unit::KilogramPerSecond)).summing(),
     Terminal::output("altitude", Kind::Value(Unit::Metre)),
     Terminal::output("velocity", Kind::Value(Unit::MetrePerSecond)),
-    Terminal::output("contact", Kind::Decision),
+    Terminal::output("contact", Kind::Decision)
+        .said_as("contact", "no contact"),
 ];
 
 /// Everything it states, by the name a file writes, the

@@ -321,13 +321,13 @@ component DHPanel inherits Rectangle {
         // three rows of panels then wanted a window taller than a 1080 line
         // screen.
         //
-        // What arrived from the payload: when, and what. Two lines, because
-        // they are read for different things -- whether anything is still
-        // coming, and what it was.
+        // What arrived from the payload: when, then a colon and what, on
+        // one line, as tcs-sim's panels say what a payload sent. A line
+        // with nothing arrived yet ends at its time.
         //
-        // Both are the ground's own reading. There were two rows above these
+        // The ground's own reading. There were two rows above this
         // carrying the spacecraft's account of what it last sent and last
-        // received, which is a different claim: these say something reached
+        // received, which is a different claim: this says something reached
         // the ground.
         last-recv-row := HorizontalLayout {
             spacing: 4px;
@@ -343,26 +343,11 @@ component DHPanel inherits Rectangle {
                 font-size: Fonts.window;
                 vertical-alignment: center;
             }
-            Text {
-                text: oc-time;
-                font-size: Fonts.window;
-                vertical-alignment: center;
-            }
-        }
-
-        from-payload-row := HorizontalLayout {
-            spacing: 4px;
-            min-height: 14px;
-            Text {
-                text: "From payload:";
-                font-size: Fonts.window;
-                vertical-alignment: center;
-            }
             // Cut short with an ellipsis where it is wider than the panel,
             // as a consolidator's members on one line may be: the panel
             // keeps the grid's width, and Configuration shows them whole.
             Text {
-                text: oc-data;
+                text: oc-time + (oc-data == "" ? "" : ": " + oc-data);
                 font-size: Fonts.window;
                 vertical-alignment: center;
                 overflow: elide;
@@ -372,7 +357,7 @@ component DHPanel inherits Rectangle {
         }
 
         // How many packets have arrived from this payload, counted by the
-        // ground that received them -- as the two lines above are. It was a
+        // ground that received them -- as the line above is. It was a
         // byte count out of the spacecraft's own statistics, and the wrong
         // half of them: the bytes its handler had read from the ground, which
         // is the direction nobody sends in, so the line read "0 bytes" for a

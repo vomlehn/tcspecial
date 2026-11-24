@@ -229,8 +229,8 @@ Requirement
 Requirement
     A consolidator's datum is shown by its members, each ``input=value``,
     as ``defaults`` writes a default, in the order of its ``world-in``: on
-    the panel's ``From payload`` line, cut short with an ellipsis where the
-    panel is too narrow for them, and whole, a member to a line, under
+    the panel's ``Last recv`` line, after its time, cut short with an ellipsis
+    where the panel is too narrow for them, and whole, a member to a line, under
     "latest datum" at the top of its ``Configuration``. Every other node's
     datum is shown as before, a value in its unit or its first bytes in
     hexadecimal. The layout the members are read by is the configuration's
@@ -749,7 +749,7 @@ window.
 
 So the shape follows from the count alone: three handlers are one row of three,
 and the five of the shipped thermostat are a row of three and a row of
-one, in a 977x1134 window. A test reads that size out of this document and
+one, in a 977x1056 window. A test reads that size out of this document and
 checks it against the one the program opens at, as one does for tcs-sim.
 
 This replaced a rule that chose the shape nearest square among those at least

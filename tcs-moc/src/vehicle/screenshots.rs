@@ -967,7 +967,16 @@ impl Station {
             let plot = plot.clone();
             let feed = pings.map(|(_, feed)| feed);
             tcsos::thread::spawn(move || {
-                serve(receiver, rows, units, consolidated, arrivals, feed, plot)
+                serve(
+                    receiver,
+                    rows,
+                    units,
+                    consolidated,
+                    Arc::new(BTreeMap::new()),
+                    arrivals,
+                    feed,
+                    plot,
+                )
             });
         }
 

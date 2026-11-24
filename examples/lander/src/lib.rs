@@ -239,7 +239,6 @@ pub fn main() {
 /// What stopped it before its window opened.
 fn run(asked: &Asked) -> Result<(), String> {
     let seed = asked.seed.unwrap_or_else(landscape::any_seed);
-    eprintln!("lander-station: the landscape is made from seed {seed}");
     let sim_path = write_run(seed)?;
     let sim = sim_path.to_string_lossy().into_owned();
     // The run's mode, as its simulator file states it, which the delay is

@@ -60,7 +60,8 @@ bottom of the display or higher than 60% of the display's height. Below the
 lines, the display is filled 50% grey with a little brown, ``#857a6c``.
 
 The landscape is made at random for each run, from a seed. The ground
-station takes the seed as ``--seed N``, or chooses one and says which, so
+station takes the seed as ``--seed N``, or chooses one, which it writes at
+the head of that run's copy of the simulator file and nowhere else, so
 that any landscape can be had again. It makes the pad and the terrain from
 the seed, keeping every rule above, and writes them into that run's copy of
 the simulator file, which tcs-sim and the ground's window both read: the
@@ -226,9 +227,9 @@ pane at the left of its payload panels:
   three quarters of it, "close" within it, and "too fast" past it, in
   bold, in Okabe-Ito's bluish green, orange and vermillion; the velocity
   is shown in the same colour, always beside those words. The values are
-  each named and with its unit, the thrust in newtons: the throttle the
-  lander burns at times the axis's full thrust, nought with the tank
-  empty. From a crash until the lander starts again they stand at what
+  each named and with its unit, the thrust in kilonewtons, to the tenth:
+  the throttle the lander burns at times the axis's full thrust, nought
+  with the tank empty. From a crash until the lander starts again they stand at what
   it crashed with: the lander reports the velocity and acceleration it
   hit with while it is down, and the thrust stands as it was last seen
   flying. Those are the last values sent down, so the ground's window
@@ -291,9 +292,10 @@ second and shows:
   throttles, and standing from a crash at what it was before it, as
   tcs-sim's does; and the fuel left;
 * at the top right of the landscape, over the sky, the lander's latest
-  landing ratings as they come down, the latest first: the time of day
-  each was rated and the rating as tcs-sim's pane said it, *w/ Autoland*
-  where Autoland helped (see "The ratings, sent down");
+  landing ratings as they come down, the latest first, each as tcs-sim's
+  and tcs-moc's panels say one: ``87.5%, Autoland, 10:03:12``, the rating,
+  who flew it (``by hand`` where Autoland did not help) and the time of day
+  it was rated (see "The ratings, sent down");
 * a joystick like tcs-sim's, its two lines at the X and Y values the
   joystick sent down, or its plus when they are nought; the pointer does
   nothing there;

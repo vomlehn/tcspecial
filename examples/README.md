@@ -65,13 +65,14 @@ its group, not both -- for tcs-sim to simulate it; `simulate: false` would
 leave it to the real device. Every simulator file also has a `tcs-sim` section
 giving the address at which
 tcs-sim says it has made its simulated devices, a port no other example uses,
-so that tcs-moc starts tcspecial only once they are there. The `make run-*`
-targets give every program `--simulate=all`, the run being one with
-simulated and dummy devices only: a program started without `--simulate`
-gets the flight setting, `none`, and refuses every simulated and dummy
-device. A `network` or `device-file` payload is a real device under any
+so that tcs-moc starts tcspecial only once they are there. Every simulator
+file states the run's simulation mode in a `tcspecial` section, which every
+program reads there: `simulate: all`, the run being one with simulated and
+dummy devices only, but for `ping` and `ping-yamcs`, which run as a flight
+does, `simulate: none`. A run with no simulator file gets the flight
+setting, `none`, and refuses every simulated and dummy device. A `network` or `device-file` payload is a real device under any
 mode, whether or not tcs-sim answers at its far end. See "Simulated, Dummy or
-Real Devices: --simulate" in the manual.
+Real Devices: simulate" in the manual.
 
 The examples' programs -- `beacon`, `lorem_gateway` and `ping_gateway.py` --
 are quiet unless given `-v` or `--verbose`: they print what they are for and
@@ -119,8 +120,9 @@ tcsx --no-memlock ping -v   # one whose ground station is its own
 ```
 
 `--no-memlock` is for a desk whose limit on locked memory is too small for
-tcspecial to lock its memory into RAM, and `--simulate=MODE` gives another
-simulation mode than `all`. Arguments after the name go to the example's
+tcspecial to lock its memory into RAM. The simulation mode is each example's
+simulator file's; a run in another mode is one with a simulator file that
+states it, named by `PAYLOAD_SIM_YAML`. Arguments after the name go to the example's
 own ground station. The examples through Yamcs use the Yamcs release
 `YAMCS_HOME` names, or, where it names none, the one their ground station
 fetches the first time and keeps in `~/.cache/tcspecial`; Yamcs needs Java.
@@ -322,11 +324,11 @@ cargo run --bin tcspecial -- examples/ping/ping.xtcs   # in one terminal
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another
 ```
 
-It gives tcspecial no `--simulate`, the flight setting, and so it is run as
+Its simulator file states `simulate: none`, the flight setting, and so it is run as
 flight itself: a beacon saying `test` -- from a tcspecial built with
-`visual` or `bit-errors`, say -- puts `TEST CODE` first on the window's
+`visual`, say -- puts `TEST CODE` first on the window's
 line, and the pings go on. `ping_yamcs.py` does the same; `thermostat_yamcs.py`
-runs tcspecial with `--simulate=all` and expects test code.
+runs tcspecial under `simulate: all` and expects test code.
 
 Its ports are all in the seven thousands, which no other example uses.
 
@@ -697,7 +699,8 @@ sets from the simulator file's `ambient_temp`, read by
 
 It starts Yamcs, then tcs-sim -- every payload sending from the start, as
 though its panel's button had been pressed -- and, once tcs-sim says it is
-ready, tcspecial, each with `--simulate=all`; has Yamcs send CONNECT until
+ready, tcspecial, each reading `simulate: all` from the run's simulator
+file; has Yamcs send CONNECT until
 the vehicle answers with the configuration's checksum; and reads the
 parameters back over Yamcs's REST API. Its window shows the beacon panel
 above the thermostat's: the zone's temperature, each reading, and each line

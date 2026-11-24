@@ -1,7 +1,7 @@
 //! The SPI endpoint where the system has no spidev: a web page. Built so
 //! that a configuration with SPI peripherals loads, and its nodes run, where they are
-//! simulated -- reached over UDP at their `sim_address`, as on Linux under
-//! `--simulate` -- and refused, saying so, where one would be opened.
+//! simulated -- reached over UDP at their `sim_address`, as on Linux in a
+//! simulated run -- and refused, saying so, where one would be opened.
 
 use tcsprotocol::{SpiConfig, TcsError, TcsResult};
 

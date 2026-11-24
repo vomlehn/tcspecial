@@ -3,6 +3,13 @@
 description: Simulator settings for ping-yamcs.ytcs, which has no payloads to
   simulate
 
+# The run's simulation mode, which tcspecial reads here: none, the flight
+# setting, since every payload is a real device -- this one has none tcs-sim
+# stands in for -- and the example is run as a flight is. See "Simulation
+# Modes" in docs/tcspecial-design.rst.
+tcspecial:
+  simulate: none
+
 # Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.

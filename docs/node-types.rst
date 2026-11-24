@@ -206,7 +206,7 @@ a ``pub mod`` in ``node/payload/mod.rs``, holds:
 - ``judged``, which looks at what is at the node's endpoint and says whether
   it is a simulated device (tcs-sim's), a dummy device (the kernel's) or a
   real one. The judgement is made from what is there, never from a file,
-  and ``--simulate`` decides which are allowed;
+  and the run's simulation mode decides which are allowed;
 - its tests.
 
 The type is then made known to the rest of tcsprotocol:

@@ -156,7 +156,7 @@ impl Flying {
         Flying { child, log: None }
     }
 
-    /// Starts tcspecial on a configuration, `--simulate=all`, its output
+    /// Starts tcspecial on a configuration, simulating all, its output
     /// written to `log` and shown if the test fails.
     ///
     /// # Arguments
@@ -176,7 +176,13 @@ impl Flying {
         let out = tcsos::fs::File::create(log).expect("tcspecial's log");
         let child = Process::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(configuration)
-            .arg("--simulate=all")
+            .env(
+                "PAYLOAD_SIM_YAML",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/simulate/all-sim.yaml"
+                ),
+            )
             .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())

@@ -19,6 +19,7 @@ import sys
 import threading
 
 from tcsprotocol.configuration import find_built
+from tcsprotocol.simulate import SIM_PATH_VAR
 
 #: prctl's option for the signal a process is sent when its parent dies.
 PR_SET_PDEATHSIG = 1
@@ -137,13 +138,14 @@ class Vehicle(Child):
         program: The tcspecial program to run.
         args:    Its arguments.
         verbose: Whether to say on stderr that it stopped by itself.
+        env:     Its environment, or ``None`` for this program's.
     """
 
-    def __init__(self, program, args, verbose=False):
-        super().__init__(program, args, "tcspecial", verbose)
+    def __init__(self, program, args, verbose=False, env=None):
+        super().__init__(program, args, "tcspecial", verbose, env)
 
     @staticmethod
-    def for_configuration(path, program=None, verbose=False, simulate=None,
+    def for_configuration(path, program=None, verbose=False, sim=None,
                           memlock=True):
         """tcspecial on this configuration: the one named, or the build's.
 
@@ -155,8 +157,11 @@ class Vehicle(Child):
             path:     The configuration file.
             program:  The tcspecial to run, or ``None`` for the build's.
             verbose:  Whether to let tcspecial print its startup summary.
-            simulate: The ``--simulate`` mode to give it, or ``None`` for
-                      none, which is the flight setting.
+            sim:      The run's simulator file, named to it by
+                      ``PAYLOAD_SIM_YAML``, which states the run's
+                      simulation mode; ``None`` for it to find its own, the
+                      one beside the configuration, or none, which is the
+                      flight setting.
             memlock:  Whether it is to lock its memory into RAM, as it does
                       unless given ``--no-memlock``: a desk whose limit is
                       too small for the lock runs it without.
@@ -170,8 +175,8 @@ class Vehicle(Child):
         """
         program = program or built("tcspecial", "say --no-vehicle")
         args = [] if verbose else ["--quiet"]
-        if simulate is not None:
-            args.append(f"--simulate={simulate}")
         if not memlock:
             args.append("--no-memlock")
-        return Vehicle(program, args + [str(path)], verbose)
+        env = None if sim is None else dict(os.environ,
+                                            **{SIM_PATH_VAR: str(sim)})
+        return Vehicle(program, args + [str(path)], verbose, env)

@@ -8,6 +8,27 @@
     "description": {
       "type": "string"
     },
+    "tcspecial": {
+      "description": "What every program of the run -- tcspecial, tcs-sim, tcs-moc and the ground's -- is told of it: its simulation mode. Unstated is the flight setting, none.",
+      "type": "object",
+      "properties": {
+        "simulate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "none",
+            "some",
+            "all",
+            null,
+            ""
+          ],
+          "description": "The run's simulation mode: none, the flight setting, where every payload must be a real device and nothing on the ground may simulate the link; some, where at least one payload is a simulated or dummy device and one is not; or all, where every payload is. Blank, or unstated, is none. Never given on a command line, so that the file says what kind of run it is."
+        }
+      },
+      "additionalProperties": false
+    },
     "tcs-sim": {
       "description": "What tcs-sim itself is told. Required: tcs-sim does not start without it, and a harness cannot wait for a simulator without knowing where to ask.",
       "type": "object",
@@ -38,7 +59,7 @@
       "additionalProperties": false
     },
     "gateway": {
-      "description": "Bit errors on the link to the ground, for a test of a ground station against a link that loses packets: every packet up or down is lost whole with the chance that at least one of its bits flips, 1 - (1 - p)^bits. Applied by a tcspecial built with the bit-errors feature, which never flies, under --simulate=some or all; any other tcspecial refuses a file that states a rate. Unstated is a link that loses nothing.",
+      "description": "Bit errors on the link to the ground, for a test of a ground station or a vehicle against a link that loses packets: every packet up or down is lost whole with the chance that at least one of its bits flips, 1 - (1 - p)^bits. Simulated by the ground -- tcs-moc, lander-station and tcs-relay, which the Yamcs examples' grounds start -- under simulate: some or all, and refused there under none, the flight setting; tcspecial never reads it. Unstated is a link that loses nothing.",
       "type": "object",
       "properties": {
         "bit_error_rate": {
@@ -55,7 +76,7 @@
             "string",
             "null"
           ],
-          "description": "What the bit errors' random numbers start from: a whole number; random, for one drawn from a source of randomness, which tcspecial reports as it starts; or nothing, for the default, 1, so that a run's losses can be had again packet for packet."
+          "description": "What the bit errors' random numbers start from: a whole number; random, for one drawn from a source of randomness, which the ground reports as it starts; or nothing, for the default, 1, so that a run's losses can be had again packet for packet."
         }
       },
       "additionalProperties": false

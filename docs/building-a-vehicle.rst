@@ -18,7 +18,7 @@ This guide builds one vehicle, a small lunar lander's science deck, a stage
 at a time, from the minimal example to a configuration a mission could start
 from. Each stage adds one thing and says why it is added the way it is. Every
 stage is a configuration that ``tcs-verify`` passes and that runs on a desk
-under ``--simulate=all``, and a test holds every one of them to that, so the
+under ``simulate: all``, and a test holds every one of them to that, so the
 files the guide shows are the files that work.
 
 It is a companion to the manuals, not a replacement: each stage names the

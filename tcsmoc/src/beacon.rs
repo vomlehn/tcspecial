@@ -620,7 +620,7 @@ pub enum Mismatch {
     /// tcsprotocol that work them out differently.
     Links(LinkDigest, LinkDigest),
     /// tcspecial says it has test code in its run or its build, and this
-    /// station is run as flight, under `--simulate=none`: see
+    /// station is run as flight, under `simulate: none`: see
     /// [`Beacons::flying`].
     TestCode,
 }
@@ -693,7 +693,7 @@ impl Mismatch {
             Mismatch::TestCode => out.push_str(
                 "TEST CODE: tcspecial says it has test code in its run or \
                  its build, and this MOC is run as flight, \
-                 --simulate=none",
+                 simulate: none",
             ),
         }
     }
@@ -1048,7 +1048,7 @@ pub struct Beacons {
     /// read, which every beacon's is compared with: see
     /// [`Beacons::with_links`]. `None` where it has none.
     links: Option<LinkDigest>,
-    /// Whether this station is run as flight, under `--simulate=none`, so
+    /// Whether this station is run as flight, under `simulate: none`, so
     /// that a beacon saying `test` is a mismatch: see [`Beacons::flying`].
     flying: bool,
     /// When the last beacon arrived.
@@ -1280,7 +1280,7 @@ impl Beacons {
     }
 
     /// Holds every beacon to flight code: this station is run as flight,
-    /// under `--simulate=none`, and a vehicle whose beacon says `test` has
+    /// under `simulate: none`, and a vehicle whose beacon says `test` has
     /// test code in its run or its build, which is said as a mismatch
     /// would be -- on the console, in the window's line, and to whoever is
     /// asked whether to go on. Every beacon says it, so a station that
@@ -1358,6 +1358,9 @@ impl Beacons {
                 }
                 Arrived::Nothing
             }
+            // Lost to a bit error, where a test asks the link to lose
+            // packets: see crate::loss.
+            Ok((size, _)) if crate::loss::lost(size) => Arrived::Nothing,
             Ok((size, _)) => {
                 // Written over what the last beacon said: this one is what
                 // a beacon says now.
@@ -1815,7 +1818,7 @@ mod tests {
         assert_eq!(mismatch, Some(Mismatch::TestCode));
         let said = mismatch.expect("test code").said();
         assert!(said.starts_with("TEST CODE"), "{said}");
-        assert!(said.contains("--simulate=none"), "{said}");
+        assert!(said.contains("simulate: none"), "{said}");
         assert_eq!(Mismatch::of(&flight, Some(digest), ours, true), None);
         assert_eq!(Mismatch::of(&test, Some(digest), ours, false), None);
 

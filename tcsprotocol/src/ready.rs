@@ -138,7 +138,7 @@ impl State {
     }
 }
 
-/// Gives the byte that says a `--simulate` mode in an answer.
+/// Gives the byte that says a simulation mode in an answer.
 ///
 /// # Arguments
 ///
@@ -230,7 +230,7 @@ pub struct SetUpFor {
     /// The digest of its simulator file: see
     /// `crate::config_digest::digest_of_simulator_file`.
     pub simulator: ConfigDigest,
-    /// Its `--simulate` mode.
+    /// Its simulation mode.
     pub mode: Mode,
 }
 
@@ -261,7 +261,7 @@ impl SetUpFor {
         }
         if self.mode != theirs.mode {
             differ.push(format!(
-                "the mode: --simulate={} here, --simulate={} in the simulator",
+                "the mode: simulate: {} here, simulate: {} in the simulator",
                 self.mode, theirs.mode
             ));
         }
@@ -411,7 +411,7 @@ mod tests {
         };
         assert_eq!(
             ours.differences(&theirs),
-            ["the mode: --simulate=all here, --simulate=some in the simulator"]
+            ["the mode: simulate: all here, simulate: some in the simulator"]
         );
     }
 }

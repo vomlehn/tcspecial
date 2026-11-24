@@ -12,8 +12,10 @@ Homepage: https://github.com/vomlehn/tcspecial
 Description: tcspecial's test ground station and payload simulator
  tcs-moc, a test mission operations center with a window per payload, and
  tcs-sim, which simulates the payloads a configuration describes. tcs-moc
- starts the tcspecial installed beside it and tcs-sim, both with the
- simulation mode it was given. Also the test segsend, which deletes each
+ starts the tcspecial installed beside it and tcs-sim, each reading the
+ simulation mode from the run's simulator file. tcs-relay holds and loses
+ datagrams between a Yamcs ground and a vehicle, as the Yamcs examples'
+ simulated link. Also the test segsend, which deletes each
  filled telemetry log segment it is given, and the five test app programs,
  under /opt/tcs/libexec, that the app node types are tested with.
  Verification tools, never flown.

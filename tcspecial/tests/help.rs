@@ -12,7 +12,12 @@ fn help_says_how_it_is_run() {
             .expect("tcspecial runs");
         assert!(ran.status.success(), "{flag}");
         let said = String::from_utf8_lossy(&ran.stdout);
-        for option in ["--simulate=", "--no-memlock", "--quiet", "--types"] {
+        for option in [
+            "simulate: none, some or all",
+            "--no-memlock",
+            "--quiet",
+            "--types",
+        ] {
             assert!(said.contains(option), "{flag}: {option}: {said}");
         }
     }

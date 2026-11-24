@@ -1062,7 +1062,7 @@ simulator file they share, named by ``--simulator=FILE`` or
 
 .. code-block:: console
 
-   $ tcs-sim --simulate=all --simulator=lander-sim.yaml \
+   $ tcs-sim --simulator=lander-sim.yaml \
        lander-a.ytcs lander-b.ytcs
 
 Requirement

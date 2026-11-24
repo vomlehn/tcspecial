@@ -9,13 +9,10 @@ ROOT = ..
 #   make run-simple RUST_LOG=debug
 RUST_LOG = info
 
-# The run's simulation mode, given to every program a run target starts:
-# none, some or all. All by default, because these targets run on a desk with
-# simulated and dummy devices, and a program that leaves the flag out gets
-# none -- the flight setting -- and refuses every one. See "Simulation Modes" in
-# docs/tcspecial-design.rst.
-#   make run-simple SIMULATE=some
-SIMULATE = all
+# The run's simulation mode is not given here: it is each example's
+# simulator file's, simulate: none, some or all in its tcspecial section,
+# which every program a run target starts reads there. See "Simulation Modes"
+# in docs/tcspecial-design.rst.
 
 # Whether the tcspecial a run target starts locks its memory into RAM, which
 # it does unless given --no-memlock. NO_MEMLOCK=1 gives it, for a desk whose
@@ -105,7 +102,7 @@ define tcsx
 	cd $(ROOT) && cargo build -q $(addprefix --bin ,$(2))
 	cd $(ROOT) && RUST_LOG=$(RUST_LOG) YAMCS_HOME="$(YAMCS_HOME)" \
 		TCSX_EXAMPLES=examples TCSX_BIN=$(DEBUG_DIR) \
-		examples/tcsx --simulate=$(SIMULATE) $(MEMLOCK_FLAG) $(1) $(3)
+		examples/tcsx $(MEMLOCK_FLAG) $(1) $(3)
 endef
 
 # Running tcs-moc on one of the examples.
@@ -263,7 +260,7 @@ run-ping: check-tkinter
 # pings three times, prints each answer and its times, and stops them.
 .PHONY: run-ping-yamcs
 run-ping-yamcs: check-tkinter
-	$(call tcsx,ping-yamcs,tcspecial tcs-verify segsend)
+	$(call tcsx,ping-yamcs,tcspecial tcs-verify tcs-relay segsend)
 
 # The memusage example: tcspecial's memory, and each of its threads'
 # stacks, watched through Yamcs. YAMCS_HOME is where a Yamcs release is
@@ -295,7 +292,7 @@ run-memusage:
 .PHONY: run-thermostat-yamcs
 run-thermostat-yamcs: check-tkinter
 	$(call tcsx,thermostat-yamcs,tcspecial tcs-sim tcs-verify \
-		segsend)
+		tcs-relay segsend)
 
 # The lander example: two tcspecials, lander-a flying the X axis and
 # lander-b the Y, and one tcs-sim simulating both, the lander flown from its
@@ -308,7 +305,7 @@ run-thermostat-yamcs: check-tkinter
 # prints what arrives for a minute; --seed N has a landscape again.
 .PHONY: run-lander
 run-lander: check-tkinter
-	$(call tcsx,lander,tcspecial tcs-sim tcs-verify segsend)
+	$(call tcsx,lander,tcspecial tcs-sim tcs-verify tcs-relay segsend)
 
 # The lander example again, watched by its ground station in Rust,
 # lander-station, rather than through Yamcs: no Yamcs, no Python, and the

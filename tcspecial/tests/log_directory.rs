@@ -52,7 +52,10 @@ fn a_missing_log_directory_is_named_with_what_to_do() {
     let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .arg(&configuration)
         .arg("--quiet")
-        .arg("--simulate=all")
+        .env(
+            "PAYLOAD_SIM_YAML",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/simulate/all-sim.yaml"),
+        )
         .arg("--no-memlock")
         .env_remove("RUST_LOG")
         .output()

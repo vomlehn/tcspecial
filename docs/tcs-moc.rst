@@ -19,9 +19,13 @@ is in Running the Programs, in `the tcspecial manual
 
 .. code-block:: console
 
-   $ tcs-moc --simulate=all examples/thermostat/thermostat.ytcs
+   $ tcs-moc examples/thermostat/thermostat.ytcs
 
-``--simulate`` is given to the tcspecial and the tcs-sim it starts.
+The simulation mode is the simulator file's -- the one ``PAYLOAD_SIM_YAML``
+names, or the one beside the configuration -- which the tcspecial and the
+tcs-sim it starts read too; the example's states ``all``. Bit errors the
+file's ``gateway`` section asks for are lost in tcs-moc's own links, and
+refused under ``simulate: none``.
 ``--no-memlock`` is given to the tcspecial alone, which then runs without
 locking its memory into RAM: for a desk whose limit on locked memory is too
 small for the lock, as "Locking memory" in the tcspecial manual says.
@@ -85,7 +89,7 @@ the beacon box
   ``Connect`` carrying another checksum leaves it set. The message line says
   ``, FLIGHT`` or ``, TEST`` after the digest, which is the beacon's flight
   check: whether tcspecial found test code in its run or its build. Under
-  ``--simulate=none``, a beacon saying ``test`` puts ``TEST CODE`` first on
+  ``simulate: none``, a beacon saying ``test`` puts ``TEST CODE`` first on
   the line and asks whether to go on, as a configuration that differs does,
   without ending the match. While the flag is set
   the message line also ends ``, RESTARTED, NOT YET MATCHED``, which is how
@@ -608,7 +612,7 @@ file, drawn as a dashed rule and labelled at its right end, as ``ambient
 288.15 K (simulated world)`` in the thermostat example: what the zone drifts
 towards when nothing heats it. It is read from the file, not sent by the
 vehicle, and so is not drawn in tcs-cfge's diagram. A flight run, with
-``--simulate=none``, has no simulated world and draws none.
+``simulate: none``, has no simulated world and draws none.
 
 The buttons at the top choose the span: the last ``10 s``, ``1 min`` or
 ``10 min``, which fill from the left and then scroll, the newest at the right

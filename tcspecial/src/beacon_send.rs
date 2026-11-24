@@ -442,12 +442,6 @@ impl BeaconSend {
         // Recorded before it is sent, as a command response is, so that a
         // beacon the send fails on is still known to have been produced.
         self.log.record(data);
-        // Lost on the way down, in a test of a lossy link: never in a build
-        // that flies, where this is `false`. See runtime::bit_errors.
-        if crate::runtime::bit_errors::lost(data.len()) {
-            trace!("send_beacon: lost to a bit error");
-            return Ok(());
-        }
         match out {
             Out::Socket {
                 socket,

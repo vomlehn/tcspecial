@@ -171,6 +171,8 @@ fn write_run(seed: u64) -> Result<PathBuf, String> {
 /// # Arguments
 ///
 /// * `sim_path` - The run's simulator file.
+/// * `mode`     - The simulation mode it states, which tcs-sim must be
+///                set up for.
 ///
 /// # Returns
 ///
@@ -179,9 +181,11 @@ fn write_run(seed: u64) -> Result<PathBuf, String> {
 /// # Errors
 ///
 /// Where it cannot be started, or is not ready in time.
-fn start_simulator(sim_path: &Path) -> Result<tcsos::process::Child, String> {
+fn start_simulator(
+    sim_path: &Path,
+    mode: Mode,
+) -> Result<tcsos::process::Child, String> {
     let sim = sim_path.to_string_lossy().into_owned();
-    let mode = Mode::All;
     let ours = SetUpFor {
         configuration: tcsprotocol::config_digest::digest_of_files(&VEHICLES)
             .map_err(|e| format!("{}: {e}", VEHICLES.join(", ")))?,
@@ -193,13 +197,9 @@ fn start_simulator(sim_path: &Path) -> Result<tcsos::process::Child, String> {
         .map_err(|e| format!("{sim}: {e}"))?
         .ready()
         .map_err(|e| format!("{sim}: {e}"))?;
-    let mut args = vec![
-        "--sending".to_string(),
-        format!("{}={mode}", tcsprotocol::simulate::FLAG),
-        format!("--simulator={sim}"),
-    ];
+    let mut args = vec!["--sending".to_string(), format!("--simulator={sim}")];
     args.extend(VEHICLES.iter().map(|v| v.to_string()));
-    let child = station::start("tcs-sim", &args)?;
+    let child = station::start("tcs-sim", &args, sim_path)?;
     eprintln!("lander-station: waiting for tcs-sim to say at {at} it is ready");
     tcsmoc::simulator::wait(at, &ours, WAIT_FOR_SIMULATOR)
         .map_err(|e| e.to_string())?;
@@ -241,6 +241,22 @@ fn run(asked: &Asked) -> Result<(), String> {
     let seed = asked.seed.unwrap_or_else(landscape::any_seed);
     eprintln!("lander-station: the landscape is made from seed {seed}");
     let sim_path = write_run(seed)?;
+    let sim = sim_path.to_string_lossy().into_owned();
+    // The run's mode, as its simulator file states it, which the delay is
+    // simulation by: the ground's, and refused in a flight run.
+    let mode = tcsprotocol::simulate::mode_of(&sim)?;
+    if !asked.delay.is_zero() {
+        tcsmoc::simulation::allow(
+            &format!("--delay={}", asked.delay.as_secs_f64()),
+            mode,
+            Some(&sim),
+        )?;
+    }
+    // Bit errors on the link, where the file asks for them: the ground's
+    // simulation too. See tcsmoc::loss.
+    if let Some(armed) = tcsmoc::loss::arm_for(Some(&sim), mode)? {
+        eprintln!("lander-station: {armed}");
+    }
     let figures = landscape::lander_of(
         &tcsos::fs::read_to_string(&sim_path)
             .map_err(|e| format!("{}: {e}", sim_path.display()))?,
@@ -252,15 +268,14 @@ fn run(asked: &Asked) -> Result<(), String> {
     let units = crafts.iter().flat_map(Craft::units).collect();
     let station = Station::open(&crafts, asked.delay)?;
 
-    let mut children = vec![start_simulator(&sim_path)?];
+    let mut children = vec![start_simulator(&sim_path, mode)?];
     for craft in &crafts {
-        let mut args =
-            vec![format!("{}={}", tcsprotocol::simulate::FLAG, Mode::All)];
+        let mut args = Vec::new();
         if asked.no_memlock {
             args.push("--no-memlock".to_string());
         }
         args.push(craft.path.to_string_lossy().into_owned());
-        children.push(station::start("tcspecial", &args)?);
+        children.push(station::start("tcspecial", &args, &sim_path)?);
     }
 
     let note = format!(

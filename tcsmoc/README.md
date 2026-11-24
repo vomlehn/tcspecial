@@ -38,7 +38,7 @@ part for each:
 - **Waiting for the simulator.** `simulator::wait` asks tcs-sim, at the
   address its simulator file gives as `tcs-sim.ready`, until it has made its
   simulated devices and is set up for the same configuration, simulator file and
-  `--simulate` mode, so that a harness starts tcspecial only once there is
+  simulation mode, so that a harness starts tcspecial only once there is
   something for it to find. It says what it last heard when it gives up.
 
 - **A vehicle on a cFS software bus.** `bus` is the ground's end of a vehicle

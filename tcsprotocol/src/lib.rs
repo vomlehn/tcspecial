@@ -83,8 +83,8 @@ pub mod sim_grouped;
 /// The shapes simulator files and physical models were written in before
 /// that, refused by line.
 pub mod sim_reshaped;
-/// The simulation mode, `--simulate`, as tcspecial, tcs-sim and tcs-moc take
-/// it.
+/// The simulation mode, as a run's simulator file states it, which
+/// tcspecial, tcs-sim, tcs-moc and the ground's programs read.
 pub mod simulate;
 /// Configurations kept on board, named by their checksum.
 pub mod store;

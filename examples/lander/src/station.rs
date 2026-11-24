@@ -418,12 +418,15 @@ fn installed(name: &str) -> Option<PathBuf> {
     Some(dir.join(name))
 }
 
-/// Starts a program, which ends when the station does.
+/// Starts a program, which ends when the station does, on the run's
+/// simulator file: named by `PAYLOAD_SIM_YAML`, which is where tcspecial
+/// finds it, and the run's simulation mode in it.
 ///
 /// # Arguments
 ///
 /// * `name` - The program: `tcs-sim` or `tcspecial`.
 /// * `args` - Its arguments.
+/// * `sim`  - The run's simulator file.
 ///
 /// # Returns
 ///
@@ -432,7 +435,7 @@ fn installed(name: &str) -> Option<PathBuf> {
 /// # Errors
 ///
 /// Where it cannot be started, naming it.
-pub fn start(name: &str, args: &[String]) -> Result<Child, String> {
+pub fn start(name: &str, args: &[String], sim: &Path) -> Result<Child, String> {
     let mut command = match installed(name) {
         Some(program) => Command::new(program),
         None => {
@@ -441,7 +444,9 @@ pub fn start(name: &str, args: &[String]) -> Result<Child, String> {
             cargo
         }
     };
-    command.args(args);
+    command
+        .args(args)
+        .env(tcsprotocol::simulate::SIM_PATH_VAR, sim);
     tcsos::child::dies_with_parent(
         &mut command,
         tcsos::child::Ending::Terminate,

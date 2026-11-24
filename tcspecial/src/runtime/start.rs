@@ -40,7 +40,7 @@ use crate::telemetry_log::TelemetryLog;
 static STOPPING: tcsos::local::Local<AtomicBool> =
     tcsos::local::Local::new(AtomicBool::new(false), || AtomicBool::new(false));
 
-/// The run's simulation mode, `--simulate`, once `run_graph` has been given
+/// The run's simulation mode, from its simulator file, once `run_graph` has been given
 /// it: none until then, the flight setting.
 ///
 /// Held for the process, as the quiet flag is, because it is one fact about the
@@ -101,7 +101,7 @@ pub fn summary(line: impl std::fmt::Display) {
 /// # Arguments
 ///
 /// * `path`    - The configuration on tcspecial's command line.
-/// * `mode`    - The run's simulation mode, `--simulate`.
+/// * `mode`    - The run's simulation mode, from its simulator file.
 /// * `checked` - That every check for test code has been made, which the
 ///               beacons say the outcome of: see `crate::flight_checks`.
 ///
@@ -164,7 +164,7 @@ pub fn run_graph(
     // from what is at the end of its endpoint and before anything is opened,
     // and the run refused here if the mode is not met: opening is not always
     // harmless, and a check made after opening would already have done what
-    // --simulate=all exists to prevent. Said in the summary whatever the
+    // simulate: all exists to prevent. Said in the summary whatever the
     // answer, because what kind of run this is is what somebody watching it
     // start needs to know first.
     let refused = judged_against(graph, mode);
@@ -894,7 +894,7 @@ fn listen_for_stop() {
 /// # Arguments
 ///
 /// * `path`    - The configuration file.
-/// * `mode`    - The run's simulation mode, `--simulate`.
+/// * `mode`    - The run's simulation mode, from its simulator file.
 /// * `checked` - That every check for test code has been made.
 ///
 /// # Returns

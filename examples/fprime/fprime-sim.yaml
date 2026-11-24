@@ -8,6 +8,12 @@
 # channel climb.
 description: Simulator settings for the payloads of fprime.ytcs
 
+# The run's simulation mode, which tcspecial, tcs-sim and tcs-moc all read
+# here: all, every payload a simulated or dummy device, as on a desk with no
+# hardware. See "Simulation Modes" in docs/tcspecial-design.rst.
+tcspecial:
+  simulate: all
+
 # Where tcs-sim answers whether it has made its simulated devices, which
 # whatever starts the run asks before it starts tcspecial. A port no other
 # example uses, so that two can be run at once.

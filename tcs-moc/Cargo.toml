@@ -11,11 +11,6 @@ tcsmoc = { path = "../tcsmoc" }
 # The panels this window is made of, and what to show on them.
 tcs-ui = { path = "../tcs-ui" }
 tcsprotocol = { path = "../tcsprotocol" }
-# No payload types: nothing here reaches a payload through tcspecial's code.
-# With its defaults this would turn every type back on in any build that
-# named tcs-moc and tcspecial together, which is how a vehicle's build would
-# come to contain types it was built without.
-tcspecial = { path = "../tcspecial", default-features = false }
 # Asked about the payload set before anything opens: see main.
 tcsverify = { path = "../tcsverify" }
 # What it found, said in the window that opens before the main one.

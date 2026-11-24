@@ -49,6 +49,7 @@ use crate::node::physical::setting::{
 };
 use crate::node::physical::terminal::{At, Direction, Kind};
 use crate::node::physical::{Model, PhysicalProblem, WorldSection};
+use crate::simulate::Mode;
 use crate::verify::About;
 use crate::{
     one_host, ConfigFormat, DHConfig, DHType, EndpointConfig, NetworkProtocol,
@@ -1520,6 +1521,11 @@ pub fn configuration_name(path: &std::path::Path) -> String {
 pub struct SimConfigFile {
     #[serde(default)]
     pub description: Option<String>,
+    /// What the run's programs -- tcspecial, tcs-sim, tcs-moc and the
+    /// ground's -- are told of the run: its simulation mode. Unstated is
+    /// the flight setting, `none`. See [`SimTcspecial`].
+    #[serde(default)]
+    pub tcspecial: Option<SimTcspecial>,
     /// What tcs-sim itself is configured with: where it answers whether it is
     /// ready. Optional as the file parses, so that the editor and tcs-verify
     /// read a file without one, and required by everything that uses it --
@@ -1527,9 +1533,10 @@ pub struct SimConfigFile {
     #[serde(default, rename = "tcs-sim")]
     pub tcs_sim: Option<SimTcsSim>,
     /// Bit errors on the link to the ground, for a test of a ground station
-    /// against a link that loses packets: read by a tcspecial built with the
-    /// `bit-errors` feature, which never flies, and refused by any other.
-    /// Unstated is a link that loses nothing. See [`SimGateway`].
+    /// or a vehicle against a link that loses packets: simulated by the
+    /// ground -- tcs-moc, lander-station, `tcs-relay` -- and refused there
+    /// in a flight run; tcspecial never reads it. Unstated is a link that
+    /// loses nothing. See [`SimGateway`].
     #[serde(default)]
     pub gateway: Option<SimGateway>,
     /// The groups of settings, in name order.
@@ -1564,6 +1571,65 @@ pub struct SimConfigFile {
     /// and not the vehicle. See [`SimTcsCfge`].
     #[serde(default, rename = "tcs-cfge")]
     pub tcs_cfge: Option<SimTcsCfge>,
+}
+
+/// The simulator file's `tcspecial` section: what every program of a run
+/// is told of it.
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct SimTcspecial {
+    /// The run's simulation mode, `none`, `some` or `all`: see
+    /// [`crate::simulate`]. Unstated, or blank, is `none`, the flight
+    /// setting.
+    #[serde(default, deserialize_with = "simulation_mode")]
+    pub simulate: Option<Mode>,
+}
+
+impl SimConfigFile {
+    /// The run's simulation mode, as the file's `tcspecial` section states
+    /// it.
+    ///
+    /// # Returns
+    ///
+    /// The mode; [`Mode::None`], the flight setting, where the file states
+    /// none.
+    pub fn mode(&self) -> Mode {
+        self.tcspecial
+            .and_then(|section| section.simulate)
+            .unwrap_or(Mode::None)
+    }
+}
+
+/// Reads a simulation mode: `none`, `some`, `all`, or nothing.
+///
+/// # Arguments
+///
+/// * `d` - The deserializer, at the setting.
+///
+/// # Returns
+///
+/// The mode; `None` for a setting left out or blank.
+///
+/// # Errors
+///
+/// A message for any other word, naming the three modes.
+fn simulation_mode<'de, D>(d: D) -> Result<Option<Mode>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let said = Option::<crate::Scalar>::deserialize(d)?;
+    let Some(said) = said else { return Ok(None) };
+    let text = said.as_str();
+    if text.is_empty() {
+        return Ok(None);
+    }
+    Mode::from_name(text).map(Some).ok_or_else(|| {
+        serde::de::Error::custom(format!(
+            "simulate: {text} is not a simulation mode: give one of {}, or \
+             nothing for none, the flight setting",
+            Mode::NAMES.join(", ")
+        ))
+    })
 }
 
 /// The simulator file's `tcs-cfge` section.
@@ -1623,9 +1689,10 @@ pub struct SimTcsSim {
 ///
 /// Every packet that crosses the link, up or down, is lost whole with the
 /// chance that at least one of its bits flips: `1 - (1 - p)^bits` for a
-/// packet of `bits` bits at `bit_error_rate` `p`. tcspecial applies it, in a
-/// build with the `bit-errors` feature and under `--simulate=some` or `all`;
-/// see "Test Code Never Flies" in `docs/tcspecial-design.rst`.
+/// packet of `bits` bits at `bit_error_rate` `p`. The ground applies it, as
+/// simulation of its own, under `simulate: some` or `all`: see
+/// `tcsmoc::loss`, and "Simulation Done by the Ground" in
+/// `docs/tcspecial-design.rst`.
 #[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct SimGateway {

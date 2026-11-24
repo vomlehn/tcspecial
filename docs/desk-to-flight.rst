@@ -16,15 +16,18 @@ here for the first time.
    :depth: 1
    :local:
 
-1. Fly with the flight setting, ``--simulate=none``
-===================================================
-*Do:* start tcspecial with no ``--simulate`` flag, or with
-``--simulate=none``, which is the same.
+1. Fly with the flight setting, ``simulate: none``
+==================================================
+*Do:* keep no simulator file beside the flight configuration
+(``NAME-sim.yaml``) and leave ``PAYLOAD_SIM_YAML`` unset, or have the one
+there state ``simulate: none`` in its ``tcspecial`` section, which is the
+same. The simulator file a desk ran with states ``all``; it does not go to
+the vehicle.
 
 *Why:* under ``none`` every payload must be a real device, and tcspecial
 refuses to start at the first one that is a simulated or a dummy device,
 naming it. A configuration whose bus number is wrong then fails on the
-ground instead of driving the wrong hardware. The flag is not part of the
+ground instead of driving the wrong hardware. The mode is not part of the
 configuration, so the checksum is the same under every mode.
 
 *Check:* the startup summary says the mode and how each payload was judged.

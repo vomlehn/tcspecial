@@ -3,7 +3,7 @@
 //!
 //! A web page cannot lock memory into RAM: the browser keeps its pages as
 //! it pleases. [`lock_all`] says so, as a refusal, and tcspecial treats it
-//! as it treats any refused lock -- under `--simulate`, as fatal -- so the
+//! as it treats any refused lock -- in a simulated run, as fatal -- so the
 //! page starts tcspecial with `--no-memlock`, as a desk does on Linux whose
 //! limit on locked memory is too small.
 

@@ -3,6 +3,12 @@
 description: Simulator settings for the payloads of thermostat.ytcs and
   thermostat-yamcs.ytcs
 
+# The run's simulation mode, which tcspecial, tcs-sim and tcs-moc all read
+# here: all, every payload a simulated or dummy device, as on a desk with no
+# hardware. See "Simulation Modes" in docs/tcspecial-design.rst.
+tcspecial:
+  simulate: all
+
 tcs-sim:
   ready: 127.0.0.4:7907
 

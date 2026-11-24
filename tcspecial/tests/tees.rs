@@ -157,7 +157,13 @@ fn a_tee_sends_each_datum_both_ways() {
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&configuration)
             .arg("--quiet")
-            .arg("--simulate=all")
+            .env(
+                "PAYLOAD_SIM_YAML",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/simulate/all-sim.yaml"
+                ),
+            )
             .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())

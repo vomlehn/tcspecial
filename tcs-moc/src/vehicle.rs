@@ -945,7 +945,7 @@ fn simulator_for(
 ) -> Result<(), String> {
     if mode.is_flight() {
         eprintln!(
-            "--simulate={mode}: tcs-sim is not started, a run like a flight \
+            "simulate: {mode}: tcs-sim is not started, a run like a flight \
              having no simulated devices"
         );
         return Ok(());
@@ -994,7 +994,7 @@ fn simulator_for(
                 .map_err(|e| e.to_string());
         }
         None => {
-            pm_tcs_sim.start_child(tcs_sim, payload_path, mode);
+            pm_tcs_sim.start_child(tcs_sim, payload_path);
             eprintln!("waiting for tcs-sim to say at {at} that it is ready");
         }
     }
@@ -3225,7 +3225,7 @@ pub fn run(
         stop(&startup);
     }
     let pm_tcspecial = Arc::new(ProcessManager::new());
-    pm_tcspecial.start_child(tcspecial, payload_path, mode);
+    pm_tcspecial.start_child(tcspecial, payload_path);
 
     // Noticed by the panels' timer, on the event loop: see
     // `crate::stop_if_asked`. Asked for here, on the MOC's own thread, which

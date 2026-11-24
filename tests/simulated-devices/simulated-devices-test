@@ -20,8 +20,8 @@ bin/mkgpio), and the run says which it left out and why.
 
 Started in the order a test harness starts a run (see "Waiting for the
 Simulator" in docs/tcspecial-design.rst): tcs-sim with every payload sending,
-waited for until it has made its simulated devices; then tcspecial,
---simulate=all. The ground sends CONNECT until it is answered, and then listens
+waited for until it has made its simulated devices; then tcspecial, the
+simulator file stating simulate: all. The ground sends CONNECT until it is answered, and then listens
 at each payload's telemetry port. A payload passes if its data arrives, and the
 device file's must be the start of tcs-sim's text. When tcs-sim is stopped, by a
 signal as a harness stops it, every simulated device it made must be gone.
@@ -209,6 +209,8 @@ def write_configuration(run, made):
 
     sim = [
         "description: Simulator settings for simulated-devices.ytcs",
+        "tcspecial:",
+        "  simulate: all",
         "tcs-sim:",
         f'  ready: "127.0.0.1:{READY}"',
         "simulated_payloads:",
@@ -400,8 +402,8 @@ def main():
     try:
         print(f"tcs-sim, on {configuration}...")
         sim = start(started, run, "tcs-sim.log", f"{debug}/tcs-sim",
-                    "--simulate=all", "--sending", configuration)
-        waited = subprocess.run([f"{debug}/tcs-sim", "--simulate=all",
+                    "--sending", configuration)
+        waited = subprocess.run([f"{debug}/tcs-sim",
                                  f"--wait={PATIENCE}", configuration])
         if waited.returncode != 0:
             print(f"tcs-sim did not get ready: see {run}/tcs-sim.log")
@@ -411,7 +413,7 @@ def main():
         # Unlocked, since a desk may not let it lock its memory: see the
         # manual's "Locking memory".
         flight = start(started, run, "tcspecial.log", f"{debug}/tcspecial",
-                       "--simulate=all", "--no-memlock", configuration)
+                       "--no-memlock", configuration)
 
         said = subprocess.run([f"{debug}/tcs-verify", "--digest",
                                configuration], capture_output=True,

@@ -606,6 +606,11 @@ impl GatewayReceiver {
                     self.name
                 )
             })?;
+            // Lost to a bit error, where a test asks the link to lose
+            // packets: see crate::loss. Nothing arrived from it.
+            if crate::loss::lost(length) {
+                continue;
+            }
             return Ok(Some(Arrival { source: at, length }));
         }
         Ok(None)

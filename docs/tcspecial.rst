@@ -1432,9 +1432,9 @@ tcs-sim window <tcs-sim.html#the-tcs-sim-window>`__); a file left by one killed
 outright holds a prefix of the text, and the next start replaces it. Where
 something else is already at ``path`` -- a real device, or a file the simulator
 did not write -- the simulator leaves it alone and says so, rather than writing
-over it. A device-file payload is a real device under every ``--simulate`` mode,
+over it. A device-file payload is a real device under every simulation mode,
 whether or not tcs-sim's file of text is what it opens: see `Simulated, Dummy or
-Real Devices: --simulate`_.
+Real Devices: simulate`_.
 
 Three other types are reached through a device file too and are not devices in
 this sense: a serial line, a bus and a SPI peripheral each have terms of their
@@ -1568,7 +1568,7 @@ source for world data, when what goes through them is moc data both ways.
                   '"0"'. gpio_out and gpio_inout only
    sim_address    where tcs-sim answers for the lines over UDP when they
                   are simulated, a loopback address and port:
-                  127.0.0.1:5204. Optional; used under --simulate=some or
+                  127.0.0.1:5204. Optional; used under simulate: some or
                   all instead of the chip, and not under none
 
 **How lines are watched.** A ``gpio_in`` reports what its lines are every
@@ -1703,9 +1703,9 @@ bus device, ``gpio-sim`` for discrete lines, ``iio_dummy`` for a sensor -- and
 generic HDLC has none: the line itself needs a card, a ``wanxl``, a
 ``pci200syn``, a ``pc300too`` or a FarSync. A node that gives ``sim_address``,
 a loopback address and port, is reached there over UDP instead under
-``--simulate=some`` or ``all``, and tcs-sim sends its frames there; one that
+``simulate: some`` or ``all``, and tcs-sim sends its frames there; one that
 does not is hardware, and tcs-sim refuses to simulate it. See `Simulated, Dummy
-or Real Devices: --simulate`_.
+or Real Devices: simulate`_.
 
 An rpmsg Payload
 ----------------
@@ -2061,7 +2061,7 @@ read the same way; what the type adds is what it is, and one attribute:
 .. code-block:: text
 
    sim_address    a loopback address and port: 127.0.0.1:5201. Under
-                  --simulate=some or all tcspecial reaches the sensor there
+                  simulate: some or all tcspecial reaches the sensor there
                   over UDP instead of opening its bus, and tcs-sim answers
                   with the temperature of the thermal mass the simulator
                   file joins it to; under none, the flight setting, the bus
@@ -4460,7 +4460,7 @@ on to the child, and a child whose supervisor has gone ends too. ``ps``
 shows both, the child the supervisor's. The supervisor exits 0 when its
 child was told to stop and stopped, and 1 when it gives up: the command
 line's configuration refused before anything was opened, which would be
-refused again at every start, or, under ``--simulate``, any failure of it.
+refused again at every start, or, in a simulated run, any failure of it.
 In flight, a command line's configuration that fails as it opens is
 started again, after a delay that doubles from a second to a minute.
 
@@ -4468,7 +4468,7 @@ Something must still start the supervisor again if it ends: a power cycle
 and a machine that hangs end it too. The ``tcspecial`` package's systemd
 unit does that. It runs
 ``/opt/tcs/bin/tcspecial /etc/opt/tcs/tcspecial/tcspecial.ytcs`` in
-``/var/opt/tcs/tcspecial``, with no ``--simulate`` and so the flight
+``/var/opt/tcs/tcspecial``, with no simulator file and so the flight
 setting, and starts it again a second after it exits, however often it
 does. It is installed and not enabled, and does nothing until a
 configuration is at that path: no package ships one, because a vehicle that
@@ -4604,22 +4604,22 @@ What the programs take without the Makefile
 -------------------------------------------
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.ytcs
+   $ cargo run --bin tcspecial -- tests/manual/thermostat.ytcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcs-sim -- --simulate=all tests/manual/thermostat.ytcs
+       cargo run --bin tcs-sim -- tests/manual/thermostat.ytcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcs-moc -- --simulate=all tests/manual/thermostat.ytcs
+       cargo run --bin tcs-moc -- tests/manual/thermostat.ytcs
 
 Every tcspecial configuration above may end in ``.xtcs`` instead, and the same
 commands then run the same set in the other format:
 
 .. code-block:: console
 
-   $ cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.xtcs
+   $ cargo run --bin tcspecial -- tests/manual/thermostat.xtcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcs-sim -- --simulate=all tests/manual/thermostat.xtcs
+       cargo run --bin tcs-sim -- tests/manual/thermostat.xtcs
    $ PAYLOAD_SIM_YAML=examples/thermostat/thermostat-sim.yaml \
-       cargo run --bin tcs-moc -- --simulate=all tests/manual/thermostat.xtcs
+       cargo run --bin tcs-moc -- tests/manual/thermostat.xtcs
 
 The extension is what says how to read a file -- see `Configuration File
 Formats`_ -- and it is read rather than guessed at, so a name ending in
@@ -4646,7 +4646,7 @@ configurations. See the `tcs-sim manual <tcs-sim.html>`__.
 
 .. code-block:: console
 
-   $ cargo run --bin tcs-sim -- --simulate=all \
+   $ cargo run --bin tcs-sim -- \
        --simulator=lander-sim.yaml lander-a.ytcs lander-b.ytcs
 
 The configuration file is the only argument tcspecial takes. Where it serves
@@ -5188,14 +5188,14 @@ to, and a refused lock says both the limit and how much was mapped.
 When the lock fails
 ^^^^^^^^^^^^^^^^^^^
 
-What happens depends on ``--simulate``:
+What happens depends on the simulation mode:
 
-* In flight -- ``--simulate=none``, or no ``--simulate`` at all -- the
+* In flight -- ``simulate: none``, or no simulator file at all -- the
   failure is logged and said in the startup summary as ``memory: not
   locked:`` and the reason, and the vehicle runs unlocked. A vehicle that
   would not start for want of a setting would be lost for want of it.
 
-* Under ``--simulate=some`` or ``all`` it stops tcspecial with the fatal
+* Under ``simulate: some`` or ``all`` it stops tcspecial with the fatal
   status, saying why on its error output; the supervisor stops too. A desk
   is meant to be set up as a vehicle is, and a vehicle that cannot have its
   memory on a desk would not have it in flight either.
@@ -5206,13 +5206,13 @@ stack of a node's thread -- ends tcspecial at once, saying how many bytes it
 could not have. In flight it ends with the bad status, and the supervisor
 gives up that configuration for the one beneath it on the configuration
 stack, which probably has fewer nodes and needs less, in a fresh process,
-since what the failed one locked is not reliably given back. Under
-``--simulate`` it ends with the fatal status.
+since what the failed one locked is not reliably given back. In a
+simulated run it ends with the fatal status.
 
 ``--no-memlock``
 ^^^^^^^^^^^^^^^^
 
-``--no-memlock`` runs tcspecial without the lock, under any ``--simulate``;
+``--no-memlock`` runs tcspecial without the lock, in any simulation mode;
 the startup summary says ``memory: not locked, as --no-memlock asks``.
 Without it the memory is always locked. It is for a desk that cannot be
 given the limit, and is what tcspecial's own tests give: memory that runs
@@ -5611,26 +5611,40 @@ overrides the quieter default as well.
 
    $ make runmocy RUST_LOG=debug
    $ RUST_LOG=tcspecial::ci=trace \
-       cargo run --bin tcspecial -- --simulate=all tests/manual/thermostat.ytcs
+       cargo run --bin tcspecial -- tests/manual/thermostat.ytcs
 
-Simulated, Dummy or Real Devices: ``--simulate``
-------------------------------------------------
+Simulated, Dummy or Real Devices: ``simulate``
+----------------------------------------------
 Nothing in a configuration says whether a payload is a real device, a dummy
 device the kernel makes under a real device's name or a simulated device
 tcs-sim makes, and ``/dev/i2c-7`` can be the kernel's I2C stub on one host
-and a real bus on the next. So each run says which kind of run it is, with
-``--simulate``, given to tcspecial, tcs-sim and tcs-moc alike:
+and a real bus on the next. So each run says which kind of run it is, in its
+simulator file, as ``simulate`` in a ``tcspecial`` section, which tcspecial,
+tcs-sim, tcs-moc and the ground stations all read:
 
-``--simulate=none``
+.. code-block:: yaml
+
+   tcspecial:
+     simulate: all
+
+``none``
     Every payload must be a real device. This is the flight setting, and it
-    is what a program started without the flag gets.
-``--simulate=some``
+    is what a run gets with no simulator file, or one that states no mode.
+``some``
     At least one payload is a simulated or dummy device and at least one is
     a real device: a configuration being debugged against part of its
     hardware.
-``--simulate=all``
+``all``
     Every payload is a simulated or dummy device, so that nothing exercises
     hardware at all.
+
+The run's simulator file is the one ``PAYLOAD_SIM_YAML`` names, and
+otherwise the one beside the configuration, ``NAME-sim.yaml``. Every shipped
+example's states ``all``, but for ``ping`` and ``ping-yamcs``, which run as
+a flight does and state ``none``. Keep no simulator file beside a
+configuration that flies: the file decides the mode, and nothing on the
+command line does. ``--simulate``, which once gave the mode, is refused,
+saying where it is stated now.
 
 tcspecial decides for itself what each payload is, from what is at the end
 of its endpoint, before it opens anything, and says so as it starts:
@@ -5669,7 +5683,7 @@ temperature sensors ``i2c_tmass`` and ``spi_tmass``, are simulated as the
 thermal mass they are fixed to. And the three GPIO types, whose dummy chip
 needs root to make, may be simulated without it: tcs-sim answers for their
 lines over UDP, see `A GPIO Payload`_. A node of one of those types may give
-``sim_address``, a loopback address and port. Under ``--simulate=some`` or
+``sim_address``, a loopback address and port. Under ``simulate: some`` or
 ``all`` tcspecial reaches it there over UDP instead of opening the device,
 and tcs-sim answers there, a simulated device; under ``none`` the device is
 opened, so the configuration that flies is the one that was tested. The
@@ -5686,12 +5700,13 @@ attribute was once called ``stand_in``, which is refused, naming
            clock_type: external
            sim_address: "127.0.0.1:7950"
 
-The Makefiles' run targets give every program ``--simulate=$(SIMULATE)``,
-which is ``all`` unless the command line says otherwise:
+The Makefiles' run targets give no mode: each program reads it from the
+simulator file, so a run in another mode is a simulator file that states it,
+named by ``TCSPECIAL_SIM_FILE`` or ``PAYLOAD_SIM_YAML``:
 
 .. code-block:: console
 
-   $ make runmocy SIMULATE=some
+   $ make runmocy TCSPECIAL_SIM_FILE=mine-some-sim.yaml
 
 Waiting for the simulator
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -5711,7 +5726,7 @@ in a ``tcs-sim`` section, which every simulator file needs:
 
 Use an address no other run uses: a tcs-sim left running holds it, and a second
 one started on the same address is refused, naming it. tcs-sim does not start
-under ``--simulate=none``, there being nothing for it to do.
+under ``simulate: none``, there being nothing for it to do.
 
 tcs-moc does the waiting itself. Under ``some`` or ``all`` it asks at that
 address first; a simulator already running on the same configuration,
@@ -5726,8 +5741,8 @@ waiting:
 
 .. code-block:: console
 
-   $ tcs-sim --simulate=all x.ytcs &
-   $ tcs-sim --wait --simulate=all x.ytcs && tcspecial --simulate=all x.ytcs
+   $ tcs-sim x.ytcs &
+   $ tcs-sim --wait x.ytcs && tcspecial x.ytcs
 
 ``--wait`` waits thirty seconds, or as many as ``--wait=<seconds>`` says, and
 exits with a failure saying what it last heard: nothing, which is a tcs-sim not
@@ -5834,8 +5849,7 @@ programs, not for embedded systems.
 .. code-block:: console
 
    $ cargo build -p tcspecial --features visual
-   $ target/debug/tcspecial --visual --simulate=all \
-       examples/simple-app/simple-app.ytcs
+   $ target/debug/tcspecial --visual examples/simple-app/simple-app.ytcs
 
 The window draws the configuration as tcs-cfge does -- the three working panes,
 every node where the editor puts it, every link along its route, and the
@@ -5857,10 +5871,10 @@ which stops as it does on an interrupt; if tcspecial stops first, the windows
 close.
 
 The window is for a run with simulated or dummy devices, so ``--visual`` wants
-``--simulate=some`` or ``--simulate=all`` beside it. Under
-``--simulate=none``, which is the flight setting and what a run without
-``--simulate`` gets, it is refused before anything is read: a window there
-would be a window opened in flight.
+a simulator file stating ``simulate: some`` or ``simulate: all`` -- the
+example's states ``all``. Under ``simulate: none``, which is the flight
+setting and what a run without a simulator file gets, it is refused before
+anything is opened: a window there would be a window opened in flight.
 
 A tcspecial built without the feature refuses ``--visual``, saying how to
 build one that has it.
@@ -5868,10 +5882,11 @@ build one that has it.
 A lossy link to the ground
 --------------------------
 
-A tcspecial built with the ``bit-errors`` feature can lose packets on its link
-to the ground, to test a ground station against a link that drops them. Never
-build a tcspecial that flies this way. The rate is a test setting, so it is in
-the simulator file, beside the others, in a section of its own:
+The ground can lose packets on its link to the vehicle, to test a ground
+station or a vehicle against a link that drops them. tcspecial does not: no
+build of it holds anything that loses a packet, so none can fly. The rate is
+in the run's simulator file, beside its other settings, in a section of its
+own:
 
 .. code-block:: yaml
 
@@ -5879,13 +5894,16 @@ the simulator file, beside the others, in a section of its own:
      bit_error_rate: 1e-5
      seed: 42
 
+tcs-moc and lander-station lose packets in their own links. A ground
+through Yamcs -- ``thermostat_yamcs.py``, ``ping_yamcs.py``,
+``lander_yamcs.py`` -- starts ``tcs-relay`` between Yamcs and the vehicle,
+which loses them there, and holds them for the lander's delay as well:
+
 .. code-block:: console
 
-   $ cargo build -p tcspecial --features bit-errors
-   $ target/debug/tcspecial --simulate=all examples/thermostat/thermostat.ytcs
+   $ PAYLOAD_SIM_YAML=lossy-sim.yaml target/debug/tcs-moc \
+       examples/thermostat/thermostat.ytcs
 
-tcspecial reads the simulator file tcs-sim and tcs-moc read: the one
-``PAYLOAD_SIM_YAML`` names, and otherwise the one beside the configuration.
 ``bit_error_rate`` is flips per bit, from 0 to 1. Each packet up or down -- a
 command, an answer, a beacon, the gateway's data either way -- is lost whole
 with the chance that at least one of its bits flips, ``1 - (1 - p)^bits``: at
@@ -5896,38 +5914,33 @@ the random numbers start:
   packets;
 * a whole number: that number, to have again the losses of a run that used
   it;
-* ``random``: one drawn from the system's source of randomness, for losses
-  no run has had before.
+* ``random``: one drawn from the clock, for losses no run has had before.
 
-The startup summary says the seed and which of the three it was, so that a
-run with a random seed can be had again by stating the seed it drew. A
-tcspecial its supervisor starts again draws again, and says the new one.
+The ground says the seed and which of the three it was as it starts, so that
+a run with a random seed can be had again by stating the seed it drew.
 
-Like ``--visual`` it wants ``--simulate=some`` or ``--simulate=all``: under
-``--simulate=none`` a simulator file that states a rate is refused. A
-tcspecial built without the feature refuses a simulator file that states one,
-saying how to build one that has it, since a test that asked for a lossy link
-and was given a perfect one would pass for the wrong reason.
+It is simulation, so the ground refuses it under ``simulate: none``, the
+flight setting, as it refuses the lander's delay: a ground that lost packets
+in a flight would be as wrong as a vehicle that did.
 
 Test code and the flight check
 ------------------------------
 
-``--visual`` and bit errors are *test code*: there for testing, and
+``--visual`` is *test code*: there for testing, and
 never to fly. tcspecial checks for test code before it sends its first beacon,
 and every beacon then says what it found, in the field after the restart
 flag:
 
-* ``flight``: the run is under ``--simulate=none`` and the build has no
+* ``flight``: the run is under ``simulate: none`` and the build has no
   feature that never flies.
-* ``test``: anything else -- a run under ``--simulate=some`` or ``all``, or a
-  build with the ``visual`` or ``bit-errors`` feature, whether or not either
-  is asked for.
+* ``test``: anything else -- a run under ``simulate: some`` or ``all``, or a
+  build with the ``visual`` feature, whether or not it is asked for.
 
 It is in every beacon, not said once, because any packet can be lost.
 
 After starting tcspecial for a flight, wait long enough for it to start, then
 check the flight check of a beacon heard since: it must say ``flight``. tcs-moc
-started under ``--simulate=none`` does this for you: a beacon saying ``test``
+run under ``simulate: none`` does this for you: a beacon saying ``test``
 puts ``TEST CODE`` first on its beacon line and asks whether to go on. A
 station that has heard no beacon has not heard the check.
 

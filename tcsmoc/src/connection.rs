@@ -220,7 +220,10 @@ impl UdpConnection {
     fn answer(&mut self, deadline: Option<Instant>) -> TcsResult<Telemetry> {
         loop {
             let (size, from) = self.socket.recv_from(&mut self.recv_buffer)?;
-            if came_from(&self.expected, &from) {
+            // Lost to a bit error, where a test asks the link to lose
+            // packets: see crate::loss. Waited past, as one never sent is.
+            if came_from(&self.expected, &from) && crate::loss::lost(size) {
+            } else if came_from(&self.expected, &from) {
                 let packet = &self.recv_buffer[..size];
                 let Some(framing) = self.framing.as_ref() else {
                     return Ok(Telemetry::read(packet)?);
@@ -238,13 +241,13 @@ impl UdpConnection {
                     ))
                 })?;
                 return Ok(Telemetry::read(data)?);
+            } else {
+                eprintln!(
+                    "a datagram came from {from} and not from {}, where the \
+                     command went -- ignored",
+                    self.remote_addr
+                );
             }
-
-            eprintln!(
-                "a datagram came from {from} and not from {}, where the \
-                 command went -- ignored",
-                self.remote_addr
-            );
 
             match deadline {
                 None => continue,
@@ -275,7 +278,11 @@ impl Connection for UdpConnection {
             }
             None => packed,
         };
-        self.socket.send_to(packet, self.remote_addr)?;
+        // Lost to a bit error, where a test asks the link to lose packets:
+        // gone as a command on a lossy link goes, with nothing said.
+        if !crate::loss::lost(packet.len()) {
+            self.socket.send_to(packet, self.remote_addr)?;
+        }
         Ok(())
     }
 

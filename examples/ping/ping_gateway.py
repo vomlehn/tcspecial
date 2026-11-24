@@ -384,7 +384,7 @@ def main(argv):
         links = links_of(setup.config)
         if links is not None:
             beacons.with_links(links)
-        # Run as flight: tcspecial is given no --simulate, the flight
+        # Run as flight: tcspecial has no simulator file, the flight
         # setting, so a beacon saying it has test code is said as a mismatch
         # -- and the pings go on.
         beacons.flying()

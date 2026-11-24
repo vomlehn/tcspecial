@@ -612,7 +612,8 @@ fn on_the_chip(
 ) -> TcsResult<Lines> {
     Err(TcsError::Endpoint(format!(
         "{what}: the GPIO chip {} cannot be reached here, where only \
-         simulated lines can be: run with --simulate",
+         simulated lines can be: state simulate: some or all in the \
+         simulator file",
         config.path
     )))
 }

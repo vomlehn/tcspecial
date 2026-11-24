@@ -14,7 +14,8 @@ answers as the device would -- over UDP, or on a kernel dummy device -- with
 the packets, timings and errors its simulator configuration asks for. It is
 started with tcspecial and tcs-moc, as Running the Programs, in `the tcspecial
 manual <tcspecial.html#running-the-programs>`__, describes, and tcspecial's
-``--simulate`` says which payloads it stands in for.
+simulation mode, stated in the simulator file, says which payloads it
+stands in for.
 
 .. figure:: tcs-sim-between.svg
    :alt: tcs-sim, tcspecial and tcs-moc side by side, from left to right,
@@ -119,7 +120,7 @@ real too.
 
 Before it simulates anything, tcs-sim compares each payload's ``simulate``
 with what is at the payload's endpoint, by the same rules tcspecial judges a
-payload by (see `Simulated, Dummy or Real Devices: --simulate <tcspecial.html#simulated-dummy-or-real-devices-simulate>`__), and will
+payload by (see `Simulated, Dummy or Real Devices: simulate <tcspecial.html#simulated-dummy-or-real-devices-simulate>`__), and will
 not start on a disagreement: ``simulate: true`` where the configuration
 points at real hardware, or ``simulate: false`` where it points at a
 simulated or dummy device. A simulated device tcs-sim makes itself, a
@@ -849,8 +850,7 @@ at least one of its bits flips.
      seed                 where the random numbers start: left out, or
                           blank, for the default, 1; a whole number for that
                           number, to lose again the packets a run lost; or
-                          random, for one drawn from the system's source of
-                          randomness, never the clock
+                          random, for one drawn from the clock
 
 .. code-block:: yaml
 
@@ -858,16 +858,13 @@ at least one of its bits flips.
      bit_error_rate: 1e-5    # a 100-byte packet lost about one time in 125
      seed: random
 
-tcs-sim reads the section and does nothing with it. A tcspecial built with
-the ``bit-errors`` feature, which never flies, reads the file tcs-sim reads
--- the one ``PAYLOAD_SIM_YAML`` names, and otherwise the one beside the
-configuration -- and loses the packets itself; its startup summary says the
-rate and the seed, so a run with a random one can be had again. Like every
-piece of test code it is refused under ``--simulate=none``, and a tcspecial
-built without the feature refuses a file that states a rate rather than
-passing a test of a lossy link over a perfect one. See `A lossy link to the
-ground <tcspecial.html#a-lossy-link-to-the-ground>`__ in the tcspecial
-manual.
+tcs-sim reads the section and does nothing with it, and neither does
+tcspecial: the ground loses the packets -- tcs-moc and lander-station in
+their own links, and ``tcs-relay`` between Yamcs and the vehicle for the
+Yamcs examples -- and says the rate and the seed as it starts, so a run
+with a random one can be had again. It is the ground's simulation, refused
+under ``simulate: none``. See `A lossy link to the ground
+<tcspecial.html#a-lossy-link-to-the-ground>`__ in the tcspecial manual.
 
 The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line
@@ -882,7 +879,7 @@ the file, which is beside none of them, so it is named, with
 
 .. code-block:: console
 
-   $ tcs-sim --simulate=all --simulator=lander-sim.yaml \
+   $ tcs-sim --simulator=lander-sim.yaml \
        lander-a.ytcs lander-b.ytcs
 
 Each payload the file names is a payload of exactly one of the

@@ -62,12 +62,30 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
     path
 }
 
+/// The fixture simulator file that states only a mode.
+///
+/// # Arguments
+///
+/// * `mode` - The mode: `none`, `some` or `all`.
+///
+/// # Returns
+///
+/// Its path.
+fn sim(mode: &str) -> String {
+    format!(
+        "{}/tests/simulate/{mode}-sim.yaml",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
 /// Runs tcspecial with a limit on locked memory of [`LIMIT`] until it
 /// ends or `seconds` pass, when it is stopped.
 ///
 /// # Arguments
 ///
-/// * `args`    - Its arguments, the configuration last.
+/// * `mode`    - The simulation mode its simulator file states; `None` for
+///               no simulator file.
+/// * `args`    - Its arguments, before the configuration.
 /// * `seconds` - How long it may run.
 ///
 /// # Returns
@@ -78,7 +96,11 @@ fn configuration(dir: &std::path::Path) -> std::path::PathBuf {
 /// # Panics
 ///
 /// If it cannot be started.
-fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
+fn run(
+    mode: Option<&str>,
+    args: &[&str],
+    seconds: u64,
+) -> (bool, Option<i32>, String) {
     let dir = tempfile::tempdir().expect("a directory");
     let log = dir.path().join("tcspecial.log");
     let path = configuration(dir.path());
@@ -87,6 +109,11 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
         .args(args)
         .arg(&path)
         .env_remove("RUST_LOG")
+        .env_remove("PAYLOAD_SIM_YAML");
+    if let Some(mode) = mode {
+        command.env("PAYLOAD_SIM_YAML", sim(mode));
+    }
+    command
         .stdout(Stdio::null())
         .stderr(tcsos::fs::File::create(&log).expect("a log"));
     tcsos::process::limit_locked_memory(&mut command, LIMIT);
@@ -116,12 +143,12 @@ fn run(args: &[&str], seconds: u64) -> (bool, Option<i32>, String) {
     )
 }
 
-/// Under `--simulate`, a lock the limit refuses stops tcspecial, saying
+/// In a simulated run, a lock the limit refuses stops tcspecial, saying
 /// the limit, and what to change.
 #[test]
 fn a_refused_lock_stops_a_desk_run() {
-    for mode in ["--simulate=all", "--simulate=some"] {
-        let (by_itself, status, said) = run(&[mode], 20);
+    for mode in ["all", "some"] {
+        let (by_itself, status, said) = run(Some(mode), &[], 20);
         assert!(by_itself, "{mode}: it stops by itself: {said}");
         assert_ne!(status, Some(0), "{mode}: {said}");
         assert!(said.contains("cannot be locked"), "{mode}: {said}");
@@ -135,7 +162,7 @@ fn a_refused_lock_stops_a_desk_run() {
 /// unlocked.
 #[test]
 fn a_refused_lock_is_run_without_in_flight() {
-    let (by_itself, _, said) = run(&[], 3);
+    let (by_itself, _, said) = run(None, &[], 3);
     assert!(!by_itself, "it runs on: {said}");
     assert!(said.contains("memory: not locked: "), "{said}");
     assert!(said.contains("1024 KiB"), "{said}");
@@ -145,8 +172,8 @@ fn a_refused_lock_is_run_without_in_flight() {
 /// so.
 #[test]
 fn no_memlock_asks_for_none() {
-    for mode in ["--simulate=all", "--simulate=none"] {
-        let (by_itself, _, said) = run(&[mode, "--no-memlock"], 3);
+    for mode in ["all", "none"] {
+        let (by_itself, _, said) = run(Some(mode), &["--no-memlock"], 3);
         assert!(!by_itself, "{mode}: it runs on: {said}");
         assert!(
             said.contains("memory: not locked, as --no-memlock asks"),

@@ -13,8 +13,8 @@
 #
 # Started in the order a test harness starts a run (see "Waiting for the
 # Simulator" in docs/tcspecial-design.rst): tcs-sim, which is waited for until
-# it has made its simulated devices; tcspecial on the configuration,
-# --simulate=all; and F´'s ground system. Then pytest, with F´'s test API,
+# it has made its simulated devices; tcspecial on the configuration, the
+# simulator file stating simulate: all; and F´'s ground system. Then pytest, with F´'s test API,
 # starts BridgeTest, which opens the same configuration and connects to the
 # ground system, and holds the bridge to what docs/tcspecial-design.rst asks of
 # it: see BridgeTest/test. Whatever was started is stopped however the run ends,
@@ -83,15 +83,14 @@ export PAYLOAD_SIM_YAML=$sim
 # Every payload sending from the start, there being nobody at its window to
 # press its button.
 start "$run" "$run/tcs-sim.log" "$top/target/debug/tcs-sim" \
-	--simulate=all --sending "$configuration"
-"$top/target/debug/tcs-sim" --simulate=all --wait="$patience" \
-	"$configuration"
+	--sending "$configuration"
+"$top/target/debug/tcs-sim" --wait="$patience" "$configuration"
 
 echo "tcspecial, on $configuration..."
 # Unlocked, since a desk may not let it lock its memory: see the manual's
 # "Locking memory".
 start "$run" "$run/tcspecial.log" "$top/target/debug/tcspecial" \
-	--simulate=all --no-memlock "$configuration"
+	--no-memlock "$configuration"
 
 # From BridgeTest/, whose fprime-gds.yml says how BridgeTest frames what it
 # sends, as the tests that read it there do.

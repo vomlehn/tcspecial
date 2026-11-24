@@ -27,9 +27,6 @@ tcslog = "0.3.1"
 # For the visual window only: see the `visual` feature.
 slint = { version = "1.18", optional = true }
 tcs-diagram = { path = "../tcs-diagram", optional = true }
-# A seed for the bit errors drawn from the system's source of randomness,
-# where the simulator file says `seed: random`: only with bit-errors.
-getrandom = { version = "0.3", optional = true }
 
 [build-dependencies]
 # Compiles the visual window's markup, and only for a build that has it.
@@ -76,14 +73,6 @@ default = [
 # flies -- it brings a window toolkit into the flight software -- so a
 # tcspecial without it says so when it is asked for one. See src/visual.
 visual = ["dep:slint", "dep:slint-build", "dep:tcs-diagram"]
-# Bit errors on the link to the ground, asked for by the simulator file's
-# `gateway` section: every packet up or down is dropped as a bit error would
-# drop it, for testing a ground station against a lossy link. Test code: not
-# a default and never in a build that flies, refused under --simulate=none
-# even where it is built, and a tcspecial without it refuses a simulator
-# file that asks for it. A build with it says
-# `test` in every beacon. See src/runtime/bit_errors.rs.
-bit-errors = ["dep:getrandom"]
 device-file = []
 serial = []
 i2c = []

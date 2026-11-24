@@ -8,8 +8,12 @@
 # configuration is named in a drop-in (`systemctl edit tcspecial`) that sets
 # ExecStart and the condition to the .xtcs file.
 #
-# No --simulate on the command line: left out it is none, the flight setting,
-# under which tcspecial refuses every simulated and dummy device.
+# No simulator file: the simulation mode is the one a simulator file
+# states, as simulate: in its tcspecial section, and with none -- nothing
+# named by PAYLOAD_SIM_YAML, and no NAME-sim.yaml beside the configuration --
+# it is none, the flight setting, under which tcspecial refuses every
+# simulated and dummy device. Put no simulator file beside a flight
+# configuration.
 
 [Unit]
 Description=tcspecial flight software: the vehicle's payloads as a graph

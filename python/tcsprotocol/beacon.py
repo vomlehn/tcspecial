@@ -35,7 +35,7 @@ BEACON_NAME = "tcspecial"
 RESTART_FLAG = "restart"
 NORMAL_FLAG = "normal"
 #: What the flight check's field says of a run with no test code in it: one
-#: under ``--simulate=none``, from a build with no feature that never flies.
+#: under ``simulate: none``, from a build with no feature that never flies.
 FLIGHT_CHECK = "flight"
 #: What it says of a run that has test code in it or in its build, or whose
 #: sender has not said: the value that claims less.

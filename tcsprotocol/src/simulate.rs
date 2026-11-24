@@ -1,11 +1,16 @@
 //! The simulation mode: how many of a run's payloads may be simulated or
 //! dummy devices.
 //!
-//! Given to tcspecial, tcs-sim and tcs-moc as `--simulate=<mode>` and never
-//! written in a configuration, so that the file flown is the file tested,
-//! byte for byte. Read here, once, so that the three programs take the flag
-//! the same way and refuse the same mistakes in the same words. See
-//! "Simulation Modes" in `docs/tcspecial-design.rst`.
+//! Stated in the run's simulator file, as `simulate` in its `tcspecial`
+//! section, and never in a configuration, so that the file flown is the
+//! file tested, byte for byte. A run with no simulator file, or one that
+//! states no mode, has `none`, the flight setting. Not given on a command
+//! line: a simulator file is where everything simulated about a run is
+//! said, and the ground's programs read the mode there too, to refuse the
+//! simulation they do themselves -- a delay on the link, say -- in a flight
+//! run. Found and read here, once, by [`run_for`], so that every program
+//! finds the same file the same way and refuses the same mistakes in the
+//! same words. See "Simulation Modes" in `docs/tcspecial-design.rst`.
 //!
 //! What the mode is checked against is here too: whether each payload is a
 //! real device, a dummy device or a simulated device, [`judge`], found from
@@ -29,14 +34,19 @@ use crate::graph::Node;
 use crate::node::payload;
 use crate::types::{DHType, EndpointConfig};
 
-/// The flag, as it is written before its `=`.
+/// The flag the mode was once given by, refused now: see [`refuse_flag`].
 pub const FLAG: &str = "--simulate";
+
+/// The environment variable naming the run's simulator file, which every
+/// program of the run looks at before the file beside the configuration.
+pub const SIM_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
 
 /// How many of a run's payloads may be simulated or dummy devices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     /// Every payload must be a real device: the flight setting, and the
-    /// setting a run gets when the flag is left out.
+    /// setting a run gets when its simulator file states none, or there is
+    /// no simulator file.
     None,
     /// At least one payload is a simulated or dummy device and at least one
     /// is not.
@@ -47,10 +57,10 @@ pub enum Mode {
 }
 
 impl Mode {
-    /// Every mode, in the words the flag takes.
+    /// Every mode, in the words the simulator file takes.
     pub const NAMES: [&'static str; 3] = ["none", "some", "all"];
 
-    /// Names this mode as the flag takes it.
+    /// Names this mode as the simulator file takes it.
     ///
     /// # Returns
     ///
@@ -63,16 +73,16 @@ impl Mode {
         }
     }
 
-    /// Reads the mode a flag's word names.
+    /// Reads the mode a word names.
     ///
     /// # Arguments
     ///
-    /// * `name` - The word after `--simulate=`.
+    /// * `name` - The word after `simulate:`.
     ///
     /// # Returns
     ///
     /// The mode, or `None` for a word that names none.
-    fn from_name(name: &str) -> Option<Mode> {
+    pub fn from_name(name: &str) -> Option<Mode> {
         match name {
             "none" => Some(Mode::None),
             "some" => Some(Mode::Some),
@@ -93,62 +103,119 @@ impl fmt::Display for Mode {
     }
 }
 
-/// Takes `--simulate=<mode>` out of a program's arguments, giving the mode and
-/// what is left.
-///
-/// The mode is `none` when the flag is not there, so that a flight launch
-/// that leaves it out gets the flight setting. A mode that is not one of the
-/// three, a `--simulate` with no mode, and the flag given twice are each
-/// refused, naming the three modes: a second `--simulate` is more likely a
-/// mistake about which run this is than something meant to override the
-/// first.
+/// Refuses `--simulate`, which no program takes now, saying where the mode
+/// is stated instead: a run started the old way would otherwise go ahead in
+/// a mode nobody meant.
 ///
 /// # Arguments
 ///
 /// * `args` - The program's arguments.
 ///
+/// # Errors
+///
+/// A message saying where the mode is stated now, where any argument is
+/// `--simulate` or begins `--simulate=`.
+pub fn refuse_flag(args: &[String]) -> Result<(), String> {
+    let given = args.iter().find(|arg| {
+        arg.as_str() == FLAG
+            || arg.strip_prefix(FLAG).is_some_and(|a| a.starts_with('='))
+    });
+    match given {
+        Some(arg) => Err(format!(
+            "{arg}: the simulation mode is no longer given on the command \
+             line: state it in the run's simulator file, as simulate: \
+             <mode> in its tcspecial section, where the mode is one of {}; \
+             with none stated, or no simulator file, a run is none, the \
+             flight setting",
+            Mode::NAMES.join(", ")
+        )),
+        None => Ok(()),
+    }
+}
+
+/// What a run is, as its simulator file says: the file, where there is one,
+/// and the mode it states.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Run {
+    /// The simulation mode: [`Mode::None`] where there is no file or it
+    /// states none.
+    pub mode: Mode,
+    /// The simulator file's path, where there is one.
+    pub sim: Option<String>,
+}
+
+/// Finds a run's simulator file and reads its mode.
+///
+/// The file is the one [`SIM_PATH_VAR`] names, and otherwise the one beside
+/// the configuration, found by
+/// [`crate::config::sim_path_beside`]. A run with neither has no simulator
+/// file, and is `none`, the flight setting.
+///
+/// # Arguments
+///
+/// * `config` - The configuration's path.
+///
 /// # Returns
 ///
-/// The mode, and the arguments without the flag, in their order.
+/// The run.
 ///
 /// # Errors
 ///
-/// A message naming the three modes, for a mode that is not one of them, a
-/// `--simulate` with no mode, or the flag given twice.
-pub fn take_mode(args: Vec<String>) -> Result<(Mode, Vec<String>), String> {
-    let modes = Mode::NAMES.join(", ");
-    let mut mode = None;
-    let mut rest = Vec::with_capacity(args.len());
-    for arg in args {
-        let Some(after) = arg.strip_prefix(FLAG) else {
-            rest.push(arg);
-            continue;
-        };
-        let Some(name) = after.strip_prefix('=') else {
-            if after.is_empty() {
-                return Err(format!(
-                    "{FLAG} needs a mode, written {FLAG}=<mode>, \
-                     where the mode is one of {modes}"
-                ));
-            }
-            // Some other flag that begins the same way: not this one's to
-            // judge.
-            rest.push(arg);
-            continue;
-        };
-        let Some(this) = Mode::from_name(name) else {
-            return Err(format!(
-                "{FLAG}={name} is not a simulation mode: give one of {modes}"
-            ));
-        };
-        if mode.is_some() {
-            return Err(format!(
-                "{FLAG} is given twice: give it once, with one of {modes}"
-            ));
-        }
-        mode = Some(this);
-    }
-    Ok((mode.unwrap_or(Mode::None), rest))
+/// Where a file is named but cannot be read, or is found and cannot be
+/// read: what it states cannot be known, so neither can the mode.
+pub fn run_for(config: &str) -> Result<Run, String> {
+    let named = tcsos::env::var(SIM_PATH_VAR)
+        .ok()
+        .filter(|named| !named.is_empty());
+    let Some(sim) = named.or_else(|| crate::config::sim_path_beside(config))
+    else {
+        return Ok(Run {
+            mode: Mode::None,
+            sim: None,
+        });
+    };
+    let mode = mode_of(&sim)?;
+    Ok(Run {
+        mode,
+        sim: Some(sim),
+    })
+}
+
+/// Reads the mode a simulator file states.
+///
+/// # Arguments
+///
+/// * `sim` - The simulator file's path.
+///
+/// # Returns
+///
+/// The mode; [`Mode::None`] where it states none.
+///
+/// # Errors
+///
+/// Where the file cannot be read, saying that the mode cannot be known.
+pub fn mode_of(sim: &str) -> Result<Mode, String> {
+    crate::sim_config::SimConfigFile::load(sim)
+        .map(|file| file.mode())
+        .map_err(|why| {
+            format!(
+                "{sim} cannot be read, so the run's simulation mode, which \
+                 it states, cannot be known: {why}"
+            )
+        })
+}
+
+/// How a mode is stated, for a message saying what to state.
+///
+/// # Arguments
+///
+/// * `mode` - The mode.
+///
+/// # Returns
+///
+/// The words, as `simulate: all`.
+pub fn stated(mode: Mode) -> String {
+    format!("simulate: {mode}")
 }
 
 /// What a payload was found to be.
@@ -688,7 +755,9 @@ fn judged_at(host: &Host, endpoint: &EndpointConfig) -> Judged {
 /// there and the mode, and saying what would satisfy the mode. Empty where
 /// the run may go ahead.
 pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
-    let flag = format!("{FLAG}={mode}");
+    let flag = stated(mode);
+    let (none, some, all) =
+        (stated(Mode::None), stated(Mode::Some), stated(Mode::All));
     match mode {
         Mode::None => payloads
             .iter()
@@ -696,8 +765,9 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
             .map(|(name, judged)| {
                 format!(
                     "{name}: {}, {}, and {flag}, the flight setting, allows \
-                     only real devices: point {} at the hardware, or give \
-                     {FLAG}=some or {FLAG}=all for a run that is not a flight",
+                     only real devices: point {} at the hardware, or state \
+                     {some} or {all} in the simulator file's tcspecial \
+                     section for a run that is not a flight",
                     judged.found,
                     judged.kind(),
                     judged.attribute
@@ -732,22 +802,22 @@ pub fn refusals(mode: Mode, payloads: &[(&str, &Judged)]) -> Vec<String> {
                     "{flag} wants at least one payload that is a real device \
                      and one that is not, and this configuration has no \
                      payloads the mode counts (network and device-file \
-                     payloads are real devices, and not counted): give \
-                     {FLAG}=all or {FLAG}=none"
+                     payloads are real devices, and not counted): state \
+                     {all} or {none}"
                 )]
             } else if unreal == 0 {
                 vec![format!(
                     "{flag} wants at least one payload that is a simulated or \
-                     dummy device, and none of the {} is one ({}): give \
-                     {FLAG}=none for a run on hardware alone, or simulate one \
-                     of them",
+                     dummy device, and none of the {} is one ({}): state \
+                     {none} for a run on hardware alone, or simulate one of \
+                     them",
                     payloads.len(),
                     names(payloads)
                 )]
             } else if unreal == payloads.len() {
                 vec![format!(
                     "{flag} wants at least one payload that is a real device, \
-                     and none is ({}): give {FLAG}=all for a run on simulated \
+                     and none is ({}): state {all} for a run on simulated \
                      and dummy devices alone",
                     names(payloads)
                 )]
@@ -884,40 +954,85 @@ mod tests {
         of.iter().map(|arg| arg.to_string()).collect()
     }
 
+    /// `--simulate`, in any of its old forms, is refused, saying where
+    /// the mode is stated now; anything else, and a flag that only begins
+    /// the same way, is not.
     #[test]
-    fn left_out_it_is_the_flight_setting() {
-        let (mode, rest) = take_mode(args(&["tcspecial", "x.ytcs"])).unwrap();
-        assert_eq!(mode, Mode::None);
-        assert!(mode.is_flight());
-        assert_eq!(rest, args(&["tcspecial", "x.ytcs"]));
-    }
-
-    #[test]
-    fn each_mode_is_taken_out_wherever_it_is() {
-        for name in Mode::NAMES {
-            let flag = format!("--simulate={name}");
-            let (mode, rest) =
-                take_mode(args(&["tcspecial", &flag, "x.ytcs"])).unwrap();
-            assert_eq!(mode.name(), name);
-            assert_eq!(rest, args(&["tcspecial", "x.ytcs"]));
-            let (after, _) =
-                take_mode(args(&["tcspecial", "x.ytcs", &flag])).unwrap();
-            assert_eq!(after, mode);
-        }
-    }
-
-    #[test]
-    fn a_mistaken_mode_is_refused_naming_the_three() {
+    fn the_old_flag_is_refused_saying_where_the_mode_is_now() {
         for wrong in [
-            &["p", "--simulate=most"][..],
+            &["p", "--simulate=all"][..],
+            &["p", "x.ytcs", "--simulate=none"],
             &["p", "--simulate"],
             &["p", "--simulate="],
-            &["p", "--simulate=all", "--simulate=all"],
-            &["p", "--simulate=all", "--simulate=none"],
         ] {
-            let said = take_mode(args(wrong)).unwrap_err();
+            let said = refuse_flag(&args(wrong)).unwrap_err();
+            assert!(said.contains("tcspecial section"), "{said}");
             assert!(said.contains("none, some, all"), "{said}");
         }
+        assert!(refuse_flag(&args(&["p", "x.ytcs"])).is_ok());
+        assert!(refuse_flag(&args(&["p", "--simulated-x"])).is_ok());
+    }
+
+    /// A simulator file states the mode in its tcspecial section; a file
+    /// without one, or with it blank, is none; and a word that is no mode
+    /// is refused, naming the three.
+    #[test]
+    fn the_simulator_file_states_the_mode() {
+        let dir = tempfile::tempdir().expect("a directory");
+        let file = |name: &str, text: &str| {
+            let path = dir.path().join(name);
+            tcsos::fs::write(&path, text).expect("written");
+            path.to_string_lossy().into_owned()
+        };
+        for name in Mode::NAMES {
+            let sim = file(
+                &format!("{name}-sim.yaml"),
+                &format!("tcspecial:\n  simulate: {name}\n"),
+            );
+            assert_eq!(mode_of(&sim).expect("it reads").name(), name);
+        }
+        let none = file("unstated-sim.yaml", "description: no section\n");
+        assert_eq!(mode_of(&none), Ok(Mode::None));
+        let blank = file("blank-sim.yaml", "tcspecial:\n  simulate:\n");
+        assert_eq!(mode_of(&blank), Ok(Mode::None));
+        let wrong = file("wrong-sim.yaml", "tcspecial:\n  simulate: most\n");
+        let said = mode_of(&wrong).unwrap_err();
+        assert!(said.contains("none, some, all"), "{said}");
+        assert!(mode_of("/no/such-sim.yaml").is_err());
+        let xml = file(
+            "x-sim.xml",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<simulator>\n  \
+             <tcspecial><simulate>some</simulate></tcspecial>\n\
+             </simulator>\n",
+        );
+        assert_eq!(mode_of(&xml), Ok(Mode::Some));
+    }
+
+    /// With no simulator file beside a configuration and none named, a run
+    /// is the flight setting; the one beside it states its mode.
+    #[test]
+    fn a_run_without_a_simulator_file_is_flight() {
+        if tcsos::env::var(SIM_PATH_VAR).is_ok_and(|v| !v.is_empty()) {
+            // The environment names one, which this test cannot unname
+            // without changing every other test's.
+            return;
+        }
+        let dir = tempfile::tempdir().expect("a directory");
+        let config = dir.path().join("x.ytcs");
+        let config = config.to_string_lossy().into_owned();
+        assert_eq!(
+            run_for(&config),
+            Ok(Run {
+                mode: Mode::None,
+                sim: None
+            })
+        );
+        let sim = dir.path().join("x-sim.yaml");
+        tcsos::fs::write(&sim, "tcspecial:\n  simulate: some\n")
+            .expect("written");
+        let run = run_for(&config).expect("it reads");
+        assert_eq!(run.mode, Mode::Some);
+        assert_eq!(run.sim, Some(sim.to_string_lossy().into_owned()));
     }
 
     /// Makes the judgement of an I2C payload on the stub's adapter.
@@ -980,7 +1095,7 @@ mod tests {
             said[1]
         );
         assert!(
-            said[0].contains("--simulate=some or --simulate=all"),
+            said[0].contains("state simulate: some or simulate: all"),
             "{}",
             said[0]
         );
@@ -995,10 +1110,10 @@ mod tests {
         assert_eq!(
             said,
             [
-                "b: /dev/i2c-1 is a real adapter (gmbus), and --simulate=all \
+                "b: /dev/i2c-1 is a real adapter (gmbus), and simulate: all \
                  allows only simulated and dummy devices: fix it",
                 "c: nothing is at /dev/i2c-9, so whether it is a real device \
-                 cannot be told, and --simulate=all allows only simulated and \
+                 cannot be told, and simulate: all allows only simulated and \
                  dummy devices: fix it",
             ]
         );
@@ -1014,9 +1129,9 @@ mod tests {
         assert!(refusals(Mode::Some, &[("a", &s), ("b", &h)]).is_empty());
         assert!(refusals(Mode::Some, &[("a", &s), ("c", &u)]).is_empty());
         let said = refusals(Mode::Some, &[("a", &s), ("b", &s)]);
-        assert!(said[0].contains("give --simulate=all"), "{said:?}");
+        assert!(said[0].contains("state simulate: all"), "{said:?}");
         let said = refusals(Mode::Some, &[("b", &h)]);
-        assert!(said[0].contains("give --simulate=none"), "{said:?}");
+        assert!(said[0].contains("state simulate: none"), "{said:?}");
         assert_eq!(refusals(Mode::Some, &[]).len(), 1);
     }
 

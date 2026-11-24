@@ -55,6 +55,12 @@ pub struct Simulator {
     pub path: PathBuf,
     /// What the file says it is, kept so that saving does not drop it.
     pub description: Option<String>,
+    /// The `tcspecial` section -- the run's simulation mode, `simulate` --
+    /// kept so that saving does not drop it: an editor that wrote it away
+    /// would turn a simulated run into the flight setting, which refuses
+    /// every simulated device.
+    #[serde(default)]
+    pub tcspecial: Settings,
     /// The `tcs-sim` section -- where tcs-sim answers whether it is ready --
     /// kept so that saving does not drop it, as the masses are. Without one
     /// tcs-sim will not start, and an editor that wrote it away would be the
@@ -445,6 +451,9 @@ impl tcsprotocol::sim_grouped::SimEntry for Entry {
 struct File {
     #[serde(default)]
     description: Option<String>,
+    /// The run's simulation mode, kept as written.
+    #[serde(default)]
+    tcspecial: BTreeMap<String, Scalar>,
     #[serde(default, rename = "tcs-sim")]
     tcs_sim: BTreeMap<String, Scalar>,
     /// Bit errors on the link to the ground, kept as written.
@@ -708,6 +717,11 @@ pub fn read(path: &Path) -> Result<Simulator, Trouble> {
             })
             .collect();
     }
+    simulator.tcspecial = file
+        .tcspecial
+        .into_iter()
+        .map(|(name, value)| (name, value.as_str().to_string()))
+        .collect();
     simulator.tcs_sim = file
         .tcs_sim
         .into_iter()
@@ -829,6 +843,16 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
         out.push_str(&folded("description: ", description));
     }
 
+    // The run's simulation mode, as the file said it: before everything
+    // else the file says, being what every program of the run reads first.
+    let said = stated(&simulator.tcspecial);
+    if !said.is_empty() {
+        out.push_str("\ntcspecial:\n");
+        for (field, value) in said {
+            out.push_str(&format!("  {field}: {}\n", setting(value)));
+        }
+    }
+
     // What tcs-sim itself is told, as the file said it. A section with
     // nothing in it is one the simulator refuses, and what it must say -- an
     // address no other run uses -- is not the editor's to invent.
@@ -840,8 +864,9 @@ pub fn to_yaml(simulator: &Simulator, payloads: &[(String, String)]) -> String {
         }
     }
 
-    // Bit errors on the link to the ground, as the file said them: test
-    // settings, which the editor offers no window for and does not drop.
+    // Bit errors on the link to the ground, as the file said them: the
+    // ground's simulation, which the editor offers no window for and does
+    // not drop.
     let said = stated(&simulator.gateway);
     if !said.is_empty() {
         out.push_str("\ngateway:\n");
@@ -1340,6 +1365,35 @@ mod tests {
             written.contains("thermostat-common: [cabinet]"),
             "{written}"
         );
+    }
+
+    /// The run's simulation mode goes back out as it came in, and every
+    /// program's reader takes it from what the editor wrote.
+    #[test]
+    fn the_simulation_mode_survives_the_editor() {
+        let where_ = tempfile::tempdir().expect("a directory");
+        let path = where_.path().join("vehicle-sim.yaml");
+        let given = concat!(
+            "tcspecial:\n",
+            "  simulate: some\n",
+            "\n",
+            "tcs-sim:\n",
+            "  ready: \"127.0.0.1:7999\"\n",
+        );
+        std::fs::write(&path, given).expect("written");
+        let read_in = read(&path).expect("it reads");
+        assert_eq!(read_in.tcspecial["simulate"], "some");
+        let written = to_yaml(&read_in, &[]);
+        assert!(
+            written.contains("\ntcspecial:\n  simulate: some\n"),
+            "{written}"
+        );
+        let file = tcsprotocol::sim_config::SimConfigFile::parse(
+            &written,
+            tcsprotocol::format::ConfigFormat::Yaml,
+        )
+        .expect("the simulator reads it");
+        assert_eq!(file.mode(), tcsprotocol::simulate::Mode::Some);
     }
 
     /// The gateway section's bit errors go back out as they came in, and

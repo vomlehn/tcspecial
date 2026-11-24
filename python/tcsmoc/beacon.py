@@ -483,7 +483,7 @@ AGREES_AGAIN = ("tcspecial is serving the configuration this MOC read again, "
 #: What is said of a beacon saying ``test`` to a station run as flight:
 #: ``tcsmoc::beacon::Mismatch::TestCode``.
 TEST_CODE = ("TEST CODE: tcspecial says it has test code in its run or its "
-             "build, and this MOC is run as flight, --simulate=none")
+             "build, and this MOC is run as flight, simulate: none")
 
 
 def mismatch(beacon, expected, links, flying=False):
@@ -743,7 +743,7 @@ class Beacons:
 
     def flying(self):
         """Holds every beacon to flight code -- ``Beacons::flying``: this
-        station is run as flight, under ``--simulate=none``, and a vehicle
+        station is run as flight, under ``simulate: none``, and a vehicle
         whose beacon says ``test`` has test code in its run or its build,
         which is said as a mismatch would be. Every beacon says it, so a
         station that missed the first beacons hears it in the next. Only

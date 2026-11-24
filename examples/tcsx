@@ -1,7 +1,7 @@
 #!/bin/sh
 # tcsx: run one of tcspecial's examples, or list them.
 #
-#   tcsx [--no-memlock] [--simulate=MODE] [NAME [ARGUMENT...]]
+#   tcsx [--no-memlock] [NAME [ARGUMENT...]]
 #
 # With no NAME it lists the examples, saying what each needs beyond what is
 # installed. With one it runs
@@ -13,8 +13,9 @@
 #
 #   --no-memlock     tcspecial does not lock its memory into RAM, as a desk
 #                    whose limit on locked memory is too small needs
-#   --simulate=MODE  the simulation mode every program is given: all, the
-#                    default, as on a desk with no hardware, some or none
+#
+# The simulation mode is each example's simulator file's, simulate: in its
+# tcspecial section, which every program the example starts reads there.
 #
 # The examples are those tcspecial-examples installs, in
 # ../share/examples/tcspecial from the directory tcsx is in, and the
@@ -35,7 +36,7 @@ set -eu
 
 # Prints how to call this command.
 usage() {
-	echo "usage: tcsx [--no-memlock] [--simulate=MODE] [NAME [ARGUMENT...]]"
+	echo "usage: tcsx [--no-memlock] [NAME [ARGUMENT...]]"
 }
 
 # Says what is wrong and stops.
@@ -101,11 +102,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 bin=${TCSX_BIN:-$here}
 examples=${TCSX_EXAMPLES:-$here/../share/examples/tcspecial}
 memlock=
-simulate=all
 while [ $# -gt 0 ]; do
 	case $1 in
 	--no-memlock) memlock=--no-memlock ;;
-	--simulate=*) simulate=${1#--simulate=} ;;
 	-h | --help)
 		usage
 		exit 0
@@ -185,7 +184,7 @@ simple-app)
 	# the line and stops at its end, in the foreground; then the vehicle
 	# is stopped, with the payload program it started.
 	# shellcheck disable=SC2086
-	"$bin/tcspecial" --quiet --simulate="$simulate" $memlock \
+	"$bin/tcspecial" --quiet $memlock \
 		examples/simple-app/simple-app.ytcs &
 	vehicle=$!
 	trap 'pkill -P $vehicle || :; kill -INT $vehicle 2> /dev/null || :
@@ -234,7 +233,7 @@ memusage)
 	;;
 *)
 	# shellcheck disable=SC2086
-	"$bin/tcs-moc" --simulate="$simulate" $memlock \
+	"$bin/tcs-moc" $memlock \
 		"examples/$name/$name.ytcs"
 	;;
 esac

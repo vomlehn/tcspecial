@@ -69,10 +69,12 @@ sys.path.insert(0, str(HERE.parent / "ping-common"))
 
 from tcsmoc.beacon import Schedule, links_of  # noqa: E402
 from tcsmoc.processes import Vehicle  # noqa: E402
+from tcsmoc.relay import Relays, loss_asked, relay_instances  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
     Yamcs, YamcsBeacons, command_settings, connect, first_beacon,
     write_yamcs, yamcs_home)
 from tcsprotocol import configuration, ping, ping_packet  # noqa: E402
+from tcsprotocol import simulate  # noqa: E402
 from tcsprotocol import yamcs as generated  # noqa: E402
 from ping_ground import Exchange, Pinger, report  # noqa: E402
 from ping_window import run_the_window, the_one  # noqa: E402
@@ -82,6 +84,9 @@ HTTP_PORT = 16090
 
 #: The Yamcs instance this example runs.
 INSTANCE = "ping"
+
+#: The program that writes Yamcs's configuration, as each file says.
+WRITER = "ping_yamcs.py"
 
 #: The ping command's arguments, as ``tcsprotocol/xtce/ping.xtce`` names
 #: them, by the field of :class:`tcsprotocol.ping_packet.Ping` that each
@@ -169,6 +174,13 @@ class Setup:
 
     def __init__(self, options):
         self.path = Path(options.configuration).resolve()
+        # The run's simulation mode, from its simulator file where it has
+        # one: none, the flight setting, where it has none, as the shipped
+        # example has none. See tcsprotocol.simulate.
+        self.mode, self.sim = simulate.run_for(self.path)
+        #: Whether the simulator file asks for bit errors on the link,
+        #: which relays between Yamcs and the vehicle lose packets for.
+        self.lossy = loss_asked(self.sim, self.mode)
         self.config = configuration.load(self.path)
         said = self.config.tcspecial
         if said.get("gateway") != "yamcs":
@@ -393,6 +405,7 @@ def main(argv):
         return 2
     yamcs = Yamcs(options.yamcs, run_dir, options.http_port, INSTANCE)
     vehicle = None
+    started = []
     try:
         if not options.no_yamcs:
             try:
@@ -401,13 +414,27 @@ def main(argv):
                 print(f"ping_yamcs: {why}", file=sys.stderr)
                 return 2
             write_yamcs(setup.config, run_dir, options.http_port, home,
-                        INSTANCE, "ping_yamcs.py")
+                        INSTANCE, WRITER)
+            # Bit errors on the link, where the simulator file asks for
+            # them: relays between Yamcs and the vehicle that lose what a
+            # lossy link would. The ground's simulation, refused in a flight
+            # run. See tcsmoc.relay.
+            if setup.lossy:
+                line = Relays(0.0, setup.sim, verbose=options.verbose)
+                for listen, forward, both in relay_instances(
+                        run_dir, [INSTANCE], WRITER):
+                    (line.both_ways if both else line.one_way)(listen,
+                                                               forward)
+                line.start()
+                started.append(line)
+                status("bit errors on the link, from "
+                       f"{setup.sim}: tcs-relay loses what they lose")
             status(f"starting Yamcs on {run_dir}")
             yamcs.start()
             status(f"Yamcs is at http://localhost:{options.http_port}")
         if not options.no_vehicle:
             vehicle = Vehicle.for_configuration(
-                setup.path, options.tcspecial, options.verbose,
+                setup.path, options.tcspecial, options.verbose, setup.sim,
                 memlock=not options.no_memlock)
             vehicle.start()
         if not connect(yamcs, setup.digest, say=status):
@@ -420,8 +447,7 @@ def main(argv):
                                Schedule.for_interval(setup.beacon_interval),
                                setup.digest, setup.beacon_interval,
                                links=links_of(setup.config),
-                               # tcspecial is given no --simulate: flight.
-                               flying=True)
+                               flying=setup.mode == simulate.FLIGHT)
         pinger = YamcsPinger(yamcs, setup.ping_command, setup.ping_reply)
         if options.pings is None:
             return run_the_window(setup, beacons, pinger,
@@ -437,6 +463,8 @@ def main(argv):
     finally:
         if vehicle is not None:
             vehicle.stop()
+        for relays in started:
+            relays.stop()
         if not options.no_yamcs:
             yamcs.stop()
 

@@ -132,6 +132,24 @@
     </xs:sequence>
   </xs:complexType>
 
+  <!-- What every program of the run is told of it: its simulation mode,
+       none (the flight setting, and what a file that states none has),
+       some or all. -->
+  <xs:simpleType name="mode">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="none"/>
+      <xs:enumeration value="some"/>
+      <xs:enumeration value="all"/>
+      <xs:enumeration value=""/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:complexType name="tcspecial">
+    <xs:all>
+      <xs:element name="simulate" type="mode" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
   <!-- What tcs-sim itself is told: the UDP address, as address:port, at
        which it answers whether it has made its simulated devices, required
        by tcs-sim to start and by a harness to wait for it; the thermostat node
@@ -152,6 +170,7 @@
     <xs:complexType>
       <xs:all>
         <xs:element name="description" type="xs:string" minOccurs="0"/>
+        <xs:element name="tcspecial" type="tcspecial" minOccurs="0"/>
         <xs:element name="tcs-sim" type="tcs-sim" minOccurs="0"/>
         <xs:element name="simulated_payload_groups" type="groups"
                     minOccurs="0"/>

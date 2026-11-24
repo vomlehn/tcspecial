@@ -36,7 +36,7 @@ class SetUpFor:
     """What a simulator is set up for, which a harness compares with its own.
 
     ``configuration`` and ``simulator`` are the two MD5 digests, as 16 bytes;
-    ``mode`` is the ``--simulate`` mode's word.
+    ``mode`` is the simulation mode's word, as the simulator file states it.
     """
 
     configuration: bytes
@@ -66,8 +66,8 @@ class SetUpFor:
             )
         if self.mode != theirs.mode:
             differ.append(
-                f"the mode: --simulate={self.mode} here, "
-                f"--simulate={theirs.mode} in the simulator"
+                f"the mode: simulate: {self.mode} here, "
+                f"simulate: {theirs.mode} in the simulator"
             )
         return differ
 

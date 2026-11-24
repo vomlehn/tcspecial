@@ -283,7 +283,8 @@ real device
 
 simulation mode
     How many of a run's payloads may be simulated or dummy devices: ``none``,
-    ``some`` or ``all``, given to each program as ``--simulate``. See
+    ``some`` or ``all``, stated in the run's simulator file, which each
+    program reads. See
     `Simulation Modes`_.
 
 The Node Architecture
@@ -1112,7 +1113,7 @@ Requirement
     shortage is then a failure to load, not a process killed mid-pass when
     a buffer is first written. On another kernel, its own call for this
     does the same. The supervisor locks nothing. ``--no-memlock`` asks for
-    no lock, under any ``--simulate``, and the startup summary says so;
+    no lock, in any simulation mode, and the startup summary says so;
     without it the memory is always locked.
 
     **Built** (2026-11-15): ``runtime::memory::lock``, called by the child
@@ -1160,7 +1161,7 @@ Requirement
     than the desks the tests run on have.
 
 Requirement
-    Under ``--simulate=some`` or ``all`` -- a desk, a test bench -- a lock
+    Under ``simulate: some`` or ``all`` -- a desk, a test bench -- a lock
     that fails, at either moment, stops tcspecial at once, saying why on
     its error output: the child exits with the fatal status, the
     supervisor stops, nothing falls back and nothing runs unlocked. A desk
@@ -4764,7 +4765,7 @@ Requirement
 Requirement
     Where the supervisor cannot start a child, it says why in its log, and
     tries again after a delay in flight, as it does for a bottom that
-    fails, and stops under ``--simulate``. A process that carried on after
+    fails, and stops in a simulated run. A process that carried on after
     being told to restart would be flying something the ground believes
     has gone, so the old child never carries on: it has exited before the
     new one is started.
@@ -7291,8 +7292,8 @@ Requirement
     | restart, having taken a RESTART  | starts a child on the new top, the   |
     |                                  | configuration the RESTART pushed     |
     +----------------------------------+--------------------------------------+
-    | fatal: a lock that failed under  | stops, the stack unchanged, saying   |
-    | ``--simulate``, the command      | why                                  |
+    | fatal: a lock that failed in a   | stops, the stack unchanged, saying   |
+    | simulated run, the command       | why                                  |
     | line's configuration refused     |                                      |
     | before anything was opened       |                                      |
     +----------------------------------+--------------------------------------+
@@ -7326,8 +7327,8 @@ Requirement
     When the bottom fails otherwise -- as it opens, or as it runs -- there
     is nothing to pop: the supervisor starts it again after a delay that
     doubles at each failure, from one second to at most a minute, and goes
-    back to one second once the bottom has stayed up for a minute. Under
-    ``--simulate`` it stops instead: a desk is not helped by trying for
+    back to one second once the bottom has stayed up for a minute. In a
+    simulated run it stops instead: a desk is not helped by trying for
     ever, and a test that starts a failing tcspecial is owed an answer. A configuration that fails at once is then
     not started thousands of times an hour, and one that recovers is not
     kept waiting.
@@ -8073,9 +8074,9 @@ see `Payloads`_ -- and it states what tcspecial itself is configured with in
 its ``tcspecial`` section: where commands are taken, where beacons go, the
 beacon interval, and where the telemetry log is written.
 
-How many of the payloads it reaches may be simulated or dummy devices is said on
-the command line too, by ``--simulate``, and is not part of the configuration;
-see `Simulation Modes`_.
+How many of the payloads it reaches may be simulated or dummy devices is said
+in the run's simulator file, as ``simulate`` in its ``tcspecial`` section, and
+is not part of the configuration; see `Simulation Modes`_.
 
 Which payload types it can reach at all is decided when it is built; see
 `Which Node Types Are Built`_.
@@ -8758,10 +8759,10 @@ Requirement
     every time it starts, window or not.
 
 Requirement
-    ``--visual`` is refused under ``--simulate=none``, in every build and before
-    anything is read or opened, saying to give ``--simulate=some`` or
-    ``--simulate=all`` with it. ``none`` is the flight setting and what a run
-    that leaves ``--simulate`` out gets (see `Simulation Modes`_), so a window
+    ``--visual`` is refused under ``simulate: none``, in every build and before
+    anything is opened, saying to state ``simulate: some`` or ``simulate:
+    all`` in the simulator file. ``none`` is the flight setting and what a run
+    without a simulator file gets (see `Simulation Modes`_), so a window
     there would be a window opened in flight; a run with no simulated or dummy
     devices that is not flight is a mistake about which run it is. The refusal
     comes before the build's own, so that what a flight launch meets does not
@@ -9974,7 +9975,7 @@ Requirement
     simulated device the RS-485 terms are left unapplied, which is said as
     tcspecial starts, and the simulator at the far end receives and sends the
     bus's bytes. Only the turnaround and its delays go unexercised. Under
-    ``--simulate=none`` no simulated device starts, so a flight line always has
+    ``simulate: none`` no simulated device starts, so a flight line always has
     the mode applied and read back.
 
 **A line's terms**
@@ -10706,8 +10707,10 @@ what is wrong with them.
 Simulation Modes
 ----------------
 Implemented, except that the mode and the judgements are not yet written
-to the telemetry log: they are said in the startup summary only. The mode is
-read by ``tcsprotocol::simulate::take_mode``, a payload is judged by
+to the telemetry log: they are said in the startup summary only. The run's
+simulator file is found and its mode read by
+``tcsprotocol::simulate::run_for``, the old flag is refused by
+``tcsprotocol::simulate::refuse_flag``, a payload is judged by
 ``tcsprotocol::simulate::judge`` and its type's ``judged`` in
 ``tcsprotocol::node::payload``, and the mode is checked by
 ``tcsprotocol::simulate::refusals``, which tcspecial and tcs-sim both call.
@@ -10723,8 +10726,10 @@ the simulator file says which payloads are meant to be simulated, with
 says which kind of run a run is meant to be.
 
 Requirement
-    Tcspecial, tcs-sim and tcs-moc each take ``--simulate=<mode>``, and the mode
-    is one of three:
+    The mode is stated in the run's simulator file, as ``simulate`` in its
+    ``tcspecial`` section, and every program of the run -- tcspecial,
+    tcs-sim, tcs-moc, and the ground's own programs -- reads it there. It is
+    one of three:
 
     * ``none``: every payload must be a real device. This is the flight
       setting.
@@ -10737,22 +10742,46 @@ Requirement
       undoes.
 
 Requirement
-    The mode is ``none`` when the flag is not given, in all three programs. A
-    flight launch that leaves the flag out then gets the flight setting, and a
-    test run that leaves it out is refused at its first simulated or dummy
-    device, saying which flag it wants. Of the two mistakes, that is the cheap
-    one.
+    The run's simulator file is the one ``PAYLOAD_SIM_YAML`` names, and
+    otherwise the one beside the configuration and named for it,
+    ``NAME-sim.yaml``. Every program finds it the same way, through
+    ``tcsprotocol::simulate::run_for`` -- in Python,
+    ``tcsprotocol.simulate.run_for`` -- so that no two programs of a run can
+    read different files.
 
 Requirement
-    The mode is a flag and not part of the configuration. The configuration
-    flown is then the configuration tested, byte for byte, and its digest is
-    the same under every mode, so a ``CONNECT`` agrees about it whichever mode
-    the ground station was started in.
+    The mode is ``none`` where there is no simulator file, or the file states
+    no mode, in every program. A flight vehicle, which has no simulator file,
+    then gets the flight setting, and a test run whose file states no mode is
+    refused at its first simulated or dummy device, saying which mode to
+    state. Of the two mistakes, that is the cheap one.
+
+    A stray simulator file beside a flight configuration would put the
+    vehicle in the mode it states, without anybody asking for it on a
+    command line. Two things stand against that: under ``all`` every real
+    device is refused, so a vehicle with its hardware attached does not
+    start; and every beacon says ``test`` under ``some`` or ``all`` (see
+    `Test Code Never Flies`_), which the MOC is told of on every beacon. A
+    flight configuration has no simulator file beside it, and the packages'
+    service says so.
 
 Requirement
-    A mode that is not one of the three, or the flag given twice, is refused,
-    naming the three modes. A second ``--simulate`` is more likely a mistake
-    about which run this is than something meant to override the first.
+    The mode is in the simulator file and not in the configuration. The
+    configuration flown is then the configuration tested, byte for byte, and
+    its digest is the same under every mode, so a ``CONNECT`` agrees about
+    it whichever mode the run was started in. Nor is the mode on any
+    program's command line: the simulator file is where everything simulated
+    about a run is said, and the ground's own simulation -- see `Simulation
+    Done by the Ground`_ -- is held to the same mode read from the same
+    place.
+
+Requirement
+    A mode that is not one of the three is refused as the file is read,
+    naming the three modes; a file that cannot be read is refused too, since
+    what mode it meant cannot be known. ``--simulate``, which once gave the
+    mode, is refused by every program, saying where the mode is stated now:
+    a run started the old way would otherwise go ahead in whatever mode its
+    file states.
 
 Requirement
     A payload, for the mode, is a node of an interface type other than the
@@ -10856,7 +10885,7 @@ Requirement
     A refusal names the node, what it reaches, what was found there and the
     mode that forbids it, and says what would satisfy the mode. For example::
 
-       temp_1: /dev/i2c-1 is a real adapter (i915 gmbus), and --simulate=all
+       temp_1: /dev/i2c-1 is a real adapter (i915 gmbus), and simulate: all
        allows only simulated and dummy devices: point path at the i2c-stub
        bus, which bin/mki2c makes.
 
@@ -10930,7 +10959,7 @@ Requirement
     carry the bytes but not the clock, the channel or the sysfs around them; and
     the temperature sensors ``i2c_tmass`` and ``spi_tmass``, whose simulated
     device is the thermal mass they are fixed to, which tcs-sim answers with the
-    temperature of. Under ``--simulate=some`` or ``all``, tcspecial reaches such
+    temperature of. Under ``simulate: some`` or ``all``, tcspecial reaches such
     a node over UDP at its ``sim_address`` instead of opening the device, by the
     rule of which end speaks first that a UDP payload has, and tcs-sim answers
     there as a UDP payload.
@@ -10999,8 +11028,8 @@ Requirement
     The comparison is tcs-sim's, and tcspecial does not read the simulator
     file. The flight software's inputs are its configuration and its flags,
     and a simulator's file among them would be a file a flight could be
-    wrong about. Tcspecial's own check, of each endpoint against
-    ``--simulate``, is unchanged and stays the last one: only tcspecial opens
+    wrong about. Tcspecial's own check, of each endpoint against the
+    simulation mode, is unchanged and stays the last one: only tcspecial opens
     the hardware.
 
 What Each Program Does With the Mode
@@ -11029,9 +11058,11 @@ Requirement
     the hardware, because only tcspecial opens it.
 
 Requirement
-    Tcs-moc takes the mode and gives the same one to both programs it starts,
-    so that the two cannot disagree in a run tcs-moc started. Each program run
-    by hand is given the flag by whoever runs it, as each is given its files.
+    Tcs-moc reads the mode from the run's simulator file, and both programs
+    it starts read it from the same file, found the same way, so that the
+    three cannot disagree in a run tcs-moc started. Each program run by hand
+    finds the file as tcs-moc does: the one ``PAYLOAD_SIM_YAML`` names, or
+    the one beside its configuration.
 
 Requirement
     Under ``none``, tcs-moc starts tcspecial and not tcs-sim. A run that is like
@@ -11039,41 +11070,38 @@ Requirement
     device that is missing.
 
 Requirement
-    Tcspecial does not start tcs-sim, and so does not pass the mode on to it.
+    Tcspecial does not start tcs-sim.
     Flight software that cannot start a simulator cannot start one by mistake,
     and the code for finding and launching one would be flown although it
     served only testing.
 
 Test Code Never Flies
 ---------------------
-Implemented: the checks are ``tcspecial::flight_checks``, the bit errors
-``tcspecial::runtime::bit_errors``, the beacon's field
+Implemented: the checks are ``tcspecial::flight_checks``, the beacon's field
 ``tcsprotocol::beacon::FlightCheck``, and the ground's alarm
 ``tcsmoc::beacon::Beacons::flying``.
 
 *Test code* is code in tcspecial that exists for testing and must never run
-aboard: the visual window (``--visual``, see `The Visual Window`_) and bit
-errors on the link to the ground (the simulator file's ``gateway``
-section). The simulation mode
-is what says a run is flight, so each piece of test code is held to it; and
-the ground, which cannot see the build, is told in every beacon what the
-vehicle found.
+aboard: the visual window (``--visual``, see `The Visual Window`_). The
+simulation mode is what says a run is flight, so test code is held to it;
+and the ground, which cannot see the build, is told in every beacon what the
+vehicle found. What simulates the link to the ground -- a delay, bit errors
+-- is not test code in tcspecial, because it is not in tcspecial at all:
+see `Simulation Done by the Ground`_.
 
 Requirement
     Each piece of test code is in tcspecial only with a Cargo feature that
-    is not a default and is never in a build that flies: ``visual`` and
-    ``bit-errors``. A build without it has none of the test code's workings
-    -- the bit errors, in a build without their feature, are a function
-    that answers that no packet is lost, which the compiler takes out --
-    so a flight build has nothing to switch on by mistake.
-    ``tcspecial::flight_checks::NEVER_FLIES`` names every such feature, and
-    a build that has any of them says so as a warning every time it starts.
+    is not a default and is never in a build that flies: ``visual``. A build
+    without it has none of the test code's workings, so a flight build has
+    nothing to switch on by mistake. ``tcspecial::flight_checks::NEVER_FLIES``
+    names every such feature, and a build that has any of them says so as a
+    warning every time it starts.
 
 Requirement
-    Each piece of test code is refused under ``--simulate=none``, the flight
-    setting and what a run that leaves the flag out gets, even in a build
-    that has it, before anything is read or opened, saying to give
-    ``--simulate=some`` or ``--simulate=all`` with it. Asked of a build
+    Each piece of test code is refused under ``simulate: none``, the flight
+    setting and what a run without a simulator file gets, even in a build
+    that has it, before anything is opened, saying to state ``simulate:
+    some`` or ``simulate: all`` in the simulator file. Asked of a build
     without its feature, it is refused, saying how to build one that has it.
     A build that has the feature and is not asked for it runs.
 
@@ -11086,7 +11114,7 @@ Requirement
 
 Requirement
     Every beacon carries the *flight check*: ``flight`` where the run is
-    under ``--simulate=none`` and the build has no feature that never flies,
+    under ``simulate: none`` and the build has no feature that never flies,
     and ``test`` otherwise -- a run under ``some`` or ``all``, or a build
     with test code in it, whether or not that is asked for: such a build is
     not the one that was meant to fly. In every beacon, not in a message
@@ -11095,7 +11123,7 @@ Requirement
     Telemetry`_.
 
 Requirement
-    A ground station run as flight -- tcs-moc under ``--simulate=none`` --
+    A ground station run as flight -- tcs-moc under ``simulate: none`` --
     holds every beacon to flight code. A beacon saying ``test`` is said as a
     mismatch is, ``TEST CODE`` first on the beacon line and on the console,
     and the operator is asked whether to go on. It does not end the match
@@ -11110,49 +11138,60 @@ Requirement
     the check, and a vehicle it cannot hear is not one it may take for
     flight code.
 
-Bit errors on the link
-~~~~~~~~~~~~~~~~~~~~~~
-Requirement
-    A simulator file's ``gateway`` section states ``bit_error_rate``, ``p``
-    in flips per bit, and tcspecial, in a build with the ``bit-errors``
-    feature and under ``--simulate=some`` or ``all``, loses each packet
-    crossing the link to the ground as ``p`` flips per bit would: a packet
-    of ``n`` bits is lost with probability ``1 - (1 - p)^n``, and a packet
-    with a flipped bit is dropped whole, as a link whose check fails drops
-    it. ``p`` is from 0 to 1. ``n`` is the packet as tcspecial reads or
-    writes it, eight bits a byte, without what the transport adds.
+Simulation Done by the Ground
+-----------------------------
+Implemented: the check is ``tcsmoc::simulation::allow`` (in Python,
+``tcsmoc.simulation.allow``), the bit errors ``tcsmoc::loss``, and the
+relays ``tcs_moc::relay``, the ``tcs-relay`` program, which
+``python/tcsmoc/relay.py`` starts.
+
+What stands for something that is not there on the link between the ground
+and the vehicle -- the light time to the Moon, a link that loses packets --
+is simulated by the ground's software, never by tcspecial. None of it can
+then reach the flight software: tcspecial holds no delay, no injector, no
+random numbers and no rate. But a ground that delayed or lost what crosses
+its link in a flight would be as wrong as a vehicle that did, so the
+ground's simulation is held to the run's simulation mode, read from the same
+simulator file every program reads (see `Simulation Modes`_).
 
 Requirement
-    Up and down alike: the commands arriving and the gateway's data
-    arriving, and the answers, the beacons and the gateway's data leaving.
-    A beacon lost is still recorded in the telemetry log, which is what the
-    vehicle produced, not what the ground heard.
+    Each simulation feature of the ground's asks
+    ``tcsmoc::simulation::allow`` before it does anything, and is refused
+    under ``simulate: none``, the flight setting, saying what was asked, the
+    file and what to state. The lander's delay (``--delay`` of
+    ``lander_yamcs.py``, lander-station and ``tcs-relay``) and the bit errors
+    are such features; a new one asks the same.
+
+Requirement
+    The simulator file's ``gateway`` section states ``bit_error_rate``,
+    ``p`` in flips per bit, and the ground, under ``simulate: some`` or
+    ``all``, loses each packet crossing its link to the vehicle as ``p``
+    flips per bit would: a packet of ``n`` bits is lost with probability
+    ``1 - (1 - p)^n``, and a packet with a flipped bit is dropped whole, as a
+    link whose check fails drops it. ``p`` is from 0 to 1. ``n`` is the
+    packet as the ground reads or writes it, eight bits a byte, without what
+    the transport adds. Up and down alike: the commands and what is sent up
+    through the gateway, and the answers, the beacons and the gateway's
+    data.
+
+Requirement
+    tcs-moc and lander-station lose packets in ``tcsmoc``'s own links, armed
+    once a program by ``tcsmoc::loss::arm_for``. A ground that does not hold
+    its link itself -- Yamcs, which the Yamcs examples' grounds start -- has
+    ``tcs-relay`` stand between it and the vehicle: its links are moved off
+    the vehicle's ports, and the relay listens there, holding each datagram
+    for the delay and losing those the rate loses. The relay is in Rust; the
+    Python grounds only start it.
 
 Requirement
     The section's ``seed`` is where the random numbers start: left out or
     blank, the default, 1 (``DEFAULT_BIT_ERROR_SEED``); a whole number, that
-    number; ``random``, one drawn from the system's source of randomness
-    (``getrandom``, a dependency of the ``bit-errors`` feature alone). The
-    default makes every run that states no seed lose the same packets, so
-    that a test is repeatable without saying how; ``random`` is asked for,
-    never fallen into. Anything else is refused as the file is read. The
-    rate, the seed, which of the three it was and the file are said in the
-    startup summary, so a random seed can be stated to have its run again.
-
-Requirement
-    The rate is in the simulator file, not on tcspecial's command line or in
-    its configuration: it is a test setting, as the payloads' faults are, and
-    the configuration flown is the one tested, byte for byte. tcspecial
-    reads the file tcs-sim and tcs-moc read for its configuration, the one
-    ``PAYLOAD_SIM_YAML`` names or the one beside it. A build that may fly,
-    run under ``--simulate=none``, does not read it at all.
-
-Requirement
-    A tcspecial without the ``bit-errors`` feature, under ``some`` or
-    ``all``, refuses a simulator file that states a rate, saying how to
-    build one that has it: a test that asked for a lossy link and was given
-    a perfect one would pass for the wrong reason. A file that states one
-    under ``--simulate=none`` is refused by every build that reads it.
+    number; ``random``, one drawn from the clock. The default makes every
+    run that states no seed lose the same packets, so that a test is
+    repeatable without saying how; ``random`` is asked for, never fallen
+    into. Anything else is refused as the file is read. The rate, the seed,
+    which of the three it was and the file are said as the ground starts, so
+    a random seed can be stated to have its run again.
 
 Waiting for the Simulator
 -------------------------
@@ -11238,8 +11277,8 @@ Requirement
 
 Requirement
     The answer also says what the simulator is set up for: the digest of the
-    tcspecial configuration it read, the digest of its simulator file, and its
-    ``--simulate`` mode. The simulator file's digest is taken as the
+    tcspecial configuration it read, the digest of its simulator file, and the
+    simulation mode the file states. The simulator file's digest is taken as the
     configuration's is, of what it says and not of its bytes: its
     ``tcs-sim`` section, its groups and its simulated payloads by name, each
     with its type and settings, and its world, its ambient temperature,
@@ -11277,15 +11316,14 @@ Requirement
     simulator.
 
 Requirement
-    ``tcs-sim --wait`` takes the same files and the same mode as the simulator
-    it waits for, and exits successfully once that simulator answers
+    ``tcs-sim --wait`` takes the same files as the simulator it waits for,
+    and so the same mode, and exits successfully once that simulator answers
     ``ready`` with the same digests and mode. It exits with a failure,
     saying why, on ``failed``, on a difference, or when its time runs out.
     This is the harness for a run started by hand::
 
-       tcs-sim --simulate=all x.ytcs x-sim.yaml &
-       tcs-sim --wait --simulate=all x.ytcs x-sim.yaml &&
-           tcspecial --simulate=all x.ytcs
+       tcs-sim x.ytcs &
+       tcs-sim --wait x.ytcs && tcspecial x.ytcs
 
 Requirement
     Under ``none`` there is nothing to wait for: tcs-sim refuses to start, and

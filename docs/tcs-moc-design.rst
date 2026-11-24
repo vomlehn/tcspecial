@@ -268,7 +268,7 @@ Requirement
     error rather than one with no effect, because it is more likely a mistake
     about which file is being read than something meant to be ignored. A flag
     is not a path: tcspecial's ``--quiet`` and ``--types`` (see `Which Node
-    Types Are Built <tcspecial-design.html#which-node-types-are-built>`__), and the ``--simulate`` all three programs take (see
+    Types Are Built <tcspecial-design.html#which-node-types-are-built>`__), and the ``--no-memlock`` tcspecial and tcs-moc take (see
     `Simulation Modes <tcspecial-design.html#simulation-modes>`__), say how a program runs and not what it reads.
 
 Where the Addresses Are

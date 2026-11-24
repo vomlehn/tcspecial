@@ -375,7 +375,7 @@ here for the first time.</p>
 <div class="contents local topic" id="the-checklist">
 <p class="topic-title"><a class="reference internal" href="#top">The checklist</a></p>
 <ul class="simple">
-<li><a class="reference internal" href="#fly-with-the-flight-setting-simulate-none" id="toc-entry-1">1. Fly with the flight setting, <tt class="docutils literal"><span class="pre">--simulate=none</span></tt></a></li>
+<li><a class="reference internal" href="#fly-with-the-flight-setting-simulate-none" id="toc-entry-1">1. Fly with the flight setting, <tt class="docutils literal">simulate: none</tt></a></li>
 <li><a class="reference internal" href="#leave-sim-address-where-it-is" id="toc-entry-2">2. Leave <tt class="docutils literal">sim_address</tt> where it is</a></li>
 <li><a class="reference internal" href="#name-the-real-addresses" id="toc-entry-3">3. Name the real addresses</a></li>
 <li><a class="reference internal" href="#keep-the-state-and-the-log-where-a-power-cycle-leaves-them" id="toc-entry-4">4. Keep the state and the log where a power cycle leaves them</a></li>
@@ -388,13 +388,16 @@ here for the first time.</p>
 </ul>
 </div>
 <div class="section" id="fly-with-the-flight-setting-simulate-none">
-<h1><a class="toc-backref" href="#toc-entry-1">1. Fly with the flight setting, <tt class="docutils literal"><span class="pre">--simulate=none</span></tt></a></h1>
-<p><em>Do:</em> start tcspecial with no <tt class="docutils literal"><span class="pre">--simulate</span></tt> flag, or with
-<tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, which is the same.</p>
+<h1><a class="toc-backref" href="#toc-entry-1">1. Fly with the flight setting, <tt class="docutils literal">simulate: none</tt></a></h1>
+<p><em>Do:</em> keep no simulator file beside the flight configuration
+(<tt class="docutils literal"><span class="pre">NAME-sim.yaml</span></tt>) and leave <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> unset, or have the one
+there state <tt class="docutils literal">simulate: none</tt> in its <tt class="docutils literal">tcspecial</tt> section, which is the
+same. The simulator file a desk ran with states <tt class="docutils literal">all</tt>; it does not go to
+the vehicle.</p>
 <p><em>Why:</em> under <tt class="docutils literal">none</tt> every payload must be a real device, and tcspecial
 refuses to start at the first one that is a simulated or a dummy device,
 naming it. A configuration whose bus number is wrong then fails on the
-ground instead of driving the wrong hardware. The flag is not part of the
+ground instead of driving the wrong hardware. The mode is not part of the
 configuration, so the checksum is the same under every mode.</p>
 <p><em>Check:</em> the startup summary says the mode and how each payload was judged.</p>
 <p><em>See:</em> &quot;Simulation Modes&quot; in the <a class="reference external" href="tcspecial-design.html#simulation-modes">tcspecial design</a>.</p>

@@ -395,9 +395,13 @@ It is how a configuration is tried on a desk, against tcspecial running the
 vehicle and tcs-sim simulating its payloads. How to start the three together
 is in Running the Programs, in <a class="reference external" href="tcspecial.html#running-the-programs">the tcspecial manual</a>.</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcs-moc<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>examples/thermostat/thermostat.ytcs
+<span class="generic prompt">$ </span>tcs-moc<span class="whitespace"> </span>examples/thermostat/thermostat.ytcs
 </pre>
-<p><tt class="docutils literal"><span class="pre">--simulate</span></tt> is given to the tcspecial and the tcs-sim it starts.
+<p>The simulation mode is the simulator file's -- the one <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>
+names, or the one beside the configuration -- which the tcspecial and the
+tcs-sim it starts read too; the example's states <tt class="docutils literal">all</tt>. Bit errors the
+file's <tt class="docutils literal">gateway</tt> section asks for are lost in tcs-moc's own links, and
+refused under <tt class="docutils literal">simulate: none</tt>.
 <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> is given to the tcspecial alone, which then runs without
 locking its memory into RAM: for a desk whose limit on locked memory is too
 small for the lock, as &quot;Locking memory&quot; in the tcspecial manual says.
@@ -454,7 +458,7 @@ configuration whose checksum the beacons carry, which clears it. A
 <tt class="docutils literal">Connect</tt> carrying another checksum leaves it set. The message line says
 <tt class="docutils literal">, FLIGHT</tt> or <tt class="docutils literal">, TEST</tt> after the digest, which is the beacon's flight
 check: whether tcspecial found test code in its run or its build. Under
-<tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, a beacon saying <tt class="docutils literal">test</tt> puts <tt class="docutils literal">TEST CODE</tt> first on
+<tt class="docutils literal">simulate: none</tt>, a beacon saying <tt class="docutils literal">test</tt> puts <tt class="docutils literal">TEST CODE</tt> first on
 the line and asks whether to go on, as a configuration that differs does,
 without ending the match. While the flag is set
 the message line also ends <tt class="docutils literal">, RESTARTED, NOT YET MATCHED</tt>, which is how
@@ -872,7 +876,7 @@ file, drawn as a dashed rule and labelled at its right end, as <tt class="docuti
 288.15 K (simulated world)</tt> in the thermostat example: what the zone drifts
 towards when nothing heats it. It is read from the file, not sent by the
 vehicle, and so is not drawn in tcs-cfge's diagram. A flight run, with
-<tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, has no simulated world and draws none.</p>
+<tt class="docutils literal">simulate: none</tt>, has no simulated world and draws none.</p>
 <p>The buttons at the top choose the span: the last <tt class="docutils literal">10 s</tt>, <tt class="docutils literal">1 min</tt> or
 <tt class="docutils literal">10 min</tt>, which fill from the left and then scroll, the newest at the right
 edge; or the <tt class="docutils literal">Whole run</tt>, from the first reading at the left edge to now

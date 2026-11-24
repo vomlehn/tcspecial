@@ -143,10 +143,11 @@ impl Vehicle {
     ///
     /// Told `--quiet` unless `verbose`, so that the console is this
     /// program's: tcspecial's startup summary is for somebody watching the
-    /// vehicle start, and what stops it starting it says either way. Run with
-    /// `--simulate=all`, as every example's run is: the example's payload is
-    /// a network node, a real device the mode does not count, so nothing the
-    /// mode counts is real and `all` refuses nothing.
+    /// vehicle start, and what stops it starting it says either way. Its
+    /// mode is the one the example's simulator file, beside the
+    /// configuration, states: `all`, as every example's is. The example's
+    /// payload is a network node, a real device the mode does not count, so
+    /// nothing the mode counts is real and `all` refuses nothing.
     ///
     /// # Arguments
     ///
@@ -180,14 +181,10 @@ impl Vehicle {
                 program.display()
             ));
         }
-        // As every example is run, though `all` and the flight setting a
-        // run without the flag gets would each take this one: its payload is
-        // a network node, which the mode does not count.
         let mut args = Vec::new();
         if !verbose {
             args.push("--quiet");
         }
-        args.push("--simulate=all");
         if !memlock {
             args.push("--no-memlock");
         }

@@ -219,7 +219,13 @@ fn an_armed_restart_runs_tcspecial_again_keeping_what_it_was_given() {
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&configuration)
             .arg("--quiet")
-            .arg("--simulate=all")
+            .env(
+                "PAYLOAD_SIM_YAML",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/simulate/all-sim.yaml"
+                ),
+            )
             .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
@@ -496,7 +502,13 @@ fn a_restart_runs_the_configuration_it_names() {
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&first)
             .arg("--quiet")
-            .arg("--simulate=all")
+            .env(
+                "PAYLOAD_SIM_YAML",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/simulate/all-sim.yaml"
+                ),
+            )
             .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())
@@ -623,7 +635,10 @@ fn a_stop_during_a_restart_stops_the_vehicle() {
     let mut vehicle = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
         .arg(&configuration)
         .arg("--quiet")
-        .arg("--simulate=all")
+        .env(
+            "PAYLOAD_SIM_YAML",
+            concat!(env!("CARGO_MANIFEST_DIR"), "/tests/simulate/all-sim.yaml"),
+        )
         .arg("--no-memlock")
         .env_remove("RUST_LOG")
         .stdout(Stdio::null())
@@ -733,7 +748,13 @@ fn a_child_that_dies_is_given_up_for_what_is_beneath() {
         Command::new(env!("CARGO_BIN_EXE_tcspecial"))
             .arg(&first)
             .arg("--quiet")
-            .arg("--simulate=all")
+            .env(
+                "PAYLOAD_SIM_YAML",
+                concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/tests/simulate/all-sim.yaml"
+                ),
+            )
             .arg("--no-memlock")
             .env_remove("RUST_LOG")
             .stdout(Stdio::null())

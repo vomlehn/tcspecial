@@ -795,7 +795,7 @@ impl Station {
     ///
     /// * `name` - The example, under `examples/`. Its simulator file,
     ///            where it has one, is where the plot's ambient comes
-    ///            from, as in a run with `--simulate=all`.
+    ///            from, as in a run that states `simulate: all`.
     ///
     /// # Returns
     ///

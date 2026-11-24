@@ -11,28 +11,30 @@
 //! `--visual` opens a window showing the graph as tcs-cfge draws it, each link
 //! lit as data crosses it, in a tcspecial built with the `visual` feature;
 //! one built without it says so and exits. Never in flight: see
-//! `tcspecial::visual`. It is refused under `--simulate=none`, the flight
-//! setting and the one a run without `--simulate` gets.
+//! `tcspecial::visual`. It is refused under `simulate: none`, the flight
+//! setting and the one a run without a simulator file gets.
 //!
-//! `--simulate=<mode>` is the simulation mode, `none`, `some` or `all`: see
-//! `tcsprotocol::simulate`. Each payload is judged a real, a dummy or a
-//! simulated device before anything is opened, and a run whose payloads the
-//! mode does not allow is refused: see `tcspecial::runtime::start`.
+//! The simulation mode, `none`, `some` or `all`, is not given on the
+//! command line but stated in the run's simulator file, as `simulate` in
+//! its `tcspecial` section: the file `PAYLOAD_SIM_YAML` names, or else the
+//! one beside the configuration. With neither, or none stated, the run is
+//! `none`, the flight setting. `--simulate`, which once gave it, is refused,
+//! saying so. See `tcsprotocol::simulate`. Each payload is judged a real, a
+//! dummy or a simulated device before anything is opened, and a run whose
+//! payloads the mode does not allow is refused: see
+//! `tcspecial::runtime::start`.
 //!
-//! Bit errors on the link to the ground are asked for in the simulator
-//! file's `gateway` section, not on the command line, and applied by a
-//! tcspecial built with the `bit-errors` feature. Never in flight: see
-//! `tcspecial::runtime::bit_errors`. Refused under `--simulate=none`, as
-//! `--visual` is.
+//! Bit errors and a delay on the link to the ground are the ground's to
+//! simulate, never tcspecial's: see `tcsmoc::loss` and `tcs-relay`.
 //!
 //! Every check that no test code is flying is made in
 //! `tcspecial::flight_checks`, before anything is read, and what it found
 //! goes in every beacon.
 //!
 //! `--no-memlock` runs the vehicle without locking its memory into RAM,
-//! under any `--simulate`. Without it the vehicle's memory is always locked,
-//! and a lock that fails is said and run without in flight, and stops
-//! tcspecial under `--simulate=some` or `all`: see
+//! in any mode. Without it the vehicle's memory is always locked, and a
+//! lock that fails is said and run without in flight, and stops tcspecial
+//! under `simulate: some` or `all`: see
 //! `tcspecial::runtime::memory`.
 //!
 //! `--types` prints the payload types this build contains, separated by
@@ -57,11 +59,15 @@ usage: tcspecial [options] [configuration]
   configuration      the .ytcs or .xtcs file to fly (default: the
                      PAYLOAD_CONFIG_PATH environment variable, or the
                      build's default)
-  --simulate=MODE    none (the default, the flight setting), some or all
   --no-memlock       run without locking memory into RAM
   -q, --quiet        no startup summary; warnings and worse only
   --visual           show the graph in a window (a build with the visual
-                     feature, under --simulate=some or all)
+                     feature, in a simulated run)
+
+The simulation mode is stated in the run's simulator file -- the one
+PAYLOAD_SIM_YAML names, or else NAME-sim.yaml beside the configuration --
+as simulate: none, some or all in its tcspecial section. With no file, or
+none stated, the run is none, the flight setting.
   --types            print the payload types this build contains, and exit
   -h, --help         print this, and exit
 ";
@@ -129,13 +135,10 @@ pub fn main() {
     let (no_memlock, args): (Vec<String>, Vec<String>) =
         args.into_iter().partition(|arg| arg == "--no-memlock");
     let memlock = no_memlock.is_empty();
-    let (simulate, args) = match tcsprotocol::simulate::take_mode(args) {
-        Ok(taken) => taken,
-        Err(e) => {
-            eprintln!("tcspecial: {e}");
-            process::exit(1);
-        }
-    };
+    if let Err(e) = tcsprotocol::simulate::refuse_flag(&args) {
+        eprintln!("tcspecial: {e}");
+        process::exit(1);
+    }
     let quiet = !quiet.is_empty();
     if quiet {
         runtime::start::be_quiet();
@@ -198,19 +201,23 @@ pub fn main() {
         }
     };
 
+    // The simulation mode, from the run's simulator file: the flight
+    // setting where there is none. A file that cannot be read stops the
+    // run, since what mode it meant cannot be known.
+    let run =
+        tcsprotocol::simulate::run_for(&payload_path).unwrap_or_else(|why| {
+            eprintln!("tcspecial: {why}");
+            process::exit(1);
+        });
+    let simulate = run.mode;
+
     // Every check that no test code is flying, before the configuration is
     // read or anything opened, and so before the first beacon, which says
     // what they found: test code asked of a run in the flight setting, or
     // of a build without it, is refused. The flight setting is what a run
-    // that leaves --simulate out gets, so test code there would be test
-    // code in flight. See crate::flight_checks.
-    let bit_errors =
-        crate::flight_checks::bit_errors_for(&payload_path, simulate)
-            .unwrap_or_else(|why| {
-                eprintln!("tcspecial: {why}");
-                process::exit(1);
-            });
-    let asked = crate::flight_checks::Asked { visual, bit_errors };
+    // without a simulator file gets, so test code there would be test code
+    // in flight. See crate::flight_checks.
+    let asked = crate::flight_checks::Asked { visual };
     let checked = match crate::flight_checks::check(simulate, &asked) {
         Ok(checked) => checked,
         Err(refused) => {
@@ -231,6 +238,10 @@ pub fn main() {
         runtime::start::summary(format!(
             "payload configuration: {payload_path}"
         ));
+        runtime::start::summary(match &run.sim {
+            Some(sim) => format!("simulator file: {sim}: simulate: {simulate}"),
+            None => "simulator file: none, so simulate: none".to_string(),
+        });
 
         // Before the configuration is checked, so that a node refused because
         // this build lacks its type is read beside the list of what it has.
@@ -248,13 +259,6 @@ pub fn main() {
         process::exit(runtime::supervisor::run(&payload_path, simulate));
     }
 
-    // The test code armed, said by the child alone: the supervisor made the
-    // same checks, but sends nothing, and under `seed: random` drew a seed
-    // of its own that no packet is lost by.
-    if let Some(armed) = crate::flight_checks::armed() {
-        runtime::start::summary(armed);
-    }
-
     // Locked before the configuration is read, so that everything a load
     // makes is locked as it is made: see `runtime::memory`.
     match runtime::memory::lock(memlock, simulate) {
@@ -270,7 +274,7 @@ pub fn main() {
         }
         Err(why) => {
             eprintln!(
-                "tcspecial: {why}. Under --simulate={simulate} a lock that \
+                "tcspecial: {why}. Under simulate: {simulate} a lock that \
                  fails stops tcspecial, since aboard it would mean a \
                  vehicle whose memory is not held"
             );

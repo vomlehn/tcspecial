@@ -66,7 +66,7 @@ pub(crate) fn group_kind_of(
     Ok(GroupKind::Iio(IioParams))
 }
 
-/// What `--simulate` asks to change on an IIO node that is a real device.
+/// What a simulated run asks to change on an IIO node that is a real device.
 const TO_SIMULATE: &str =
     "point path at the iio_dummy sensor, which bin/mkiio makes, or at a \
      pseudo-terminal tcs-sim makes";

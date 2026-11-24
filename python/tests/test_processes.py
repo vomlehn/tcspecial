@@ -89,21 +89,20 @@ class VehicleTest(unittest.TestCase):
         self.assertIn("cargo build --bin tcspecial", str(said.exception))
         self.assertIn("--no-vehicle", str(said.exception))
 
-    def test_it_is_told_its_mode_and_to_be_quiet(self):
+    def test_it_is_told_its_simulator_file_and_to_be_quiet(self):
         vehicle = processes.Vehicle.for_configuration("a.xtcs", "tcspecial",
-                                                      simulate="all")
-        self.assertEqual(vehicle.args,
-                         ["--quiet", "--simulate=all", "a.xtcs"])
+                                                      sim="a-sim.yaml")
+        self.assertEqual(vehicle.args, ["--quiet", "a.xtcs"])
+        self.assertEqual(vehicle.env["PAYLOAD_SIM_YAML"], "a-sim.yaml")
         loud = processes.Vehicle.for_configuration("a.xtcs", "tcspecial",
                                                    verbose=True)
         self.assertEqual(loud.args, ["a.xtcs"])
+        self.assertIsNone(loud.env)
 
     def test_it_is_told_not_to_lock_its_memory_where_asked(self):
         unlocked = processes.Vehicle.for_configuration(
-            "a.xtcs", "tcspecial", simulate="all", memlock=False)
-        self.assertEqual(unlocked.args,
-                         ["--quiet", "--simulate=all", "--no-memlock",
-                          "a.xtcs"])
+            "a.xtcs", "tcspecial", memlock=False)
+        self.assertEqual(unlocked.args, ["--quiet", "--no-memlock", "a.xtcs"])
 
 
 class ChildTest(unittest.TestCase):

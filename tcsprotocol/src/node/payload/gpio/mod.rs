@@ -472,7 +472,7 @@ pub(crate) fn group_kind_of(
     }))
 }
 
-/// What `--simulate` asks to change on a GPIO node that is a real device.
+/// What a simulated run asks to change on a GPIO node that is a real device.
 const TO_SIMULATE: &str =
     "point path at the gpio-sim chip, which bin/mkgpio makes";
 

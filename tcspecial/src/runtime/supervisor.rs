@@ -23,7 +23,7 @@
 //! * [`BAD`], any other status, or any other signal: it pops the top,
 //!   unless it is the bottom, and starts a child on what is then the top.
 //!   The bottom, which nothing pops, is started again after a delay that
-//!   doubles at each failure; on a desk, under `--simulate`, a bottom that
+//!   doubles at each failure; on a desk, in a simulated run, a bottom that
 //!   fails stops the supervisor instead, since nothing on a desk is helped
 //!   by trying for ever.
 //!
@@ -56,7 +56,7 @@ pub const GOOD: i32 = 0;
 /// is taken as this.
 pub const BAD: i32 = 1;
 /// The child cannot run, and no other configuration would help: a memory
-/// lock that failed under `--simulate`, a command line that is not one.
+/// lock that failed in a simulated run, a command line that is not one.
 pub const FATAL: i32 = 2;
 /// The child took a RESTART, and the state file's top is what it named.
 pub const RESTART: i32 = 3;

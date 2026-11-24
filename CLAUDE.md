@@ -147,10 +147,15 @@ make html-check                 # every committed page made again, and current
 `make help` lists the Makefile's targets. `make` in `docs/`, `examples/`,
 `tcsmoc/`, `tcsmoc-c/` and `tcsprotocol/` builds their HTML pages.
 
-tcspecial, tcs-sim and tcs-moc take `--simulate=none|some|all`. Left out it is
+The run's simulator file states `simulate: none|some|all` in its `tcspecial`
+section, which tcspecial, tcs-sim, tcs-moc and the ground stations all read
+(the file `PAYLOAD_SIM_YAML` names, or `NAME-sim.yaml` beside the
+configuration); `--simulate` is refused. With no file, or none stated, it is
 `none`, the flight setting, under which tcspecial refuses every simulated
 and dummy device and tcs-sim will not start, so a run on a desk gives
-`--simulate=all`, as the Makefiles' run targets do. tcspecial judges each
+`simulate: all`, as every shipped example's simulator file does. The link's
+simulation -- a delay, bit errors -- is the ground's (`tcsmoc::loss`,
+`tcs-relay`), never tcspecial's, and refused under `none`. tcspecial judges each
 payload a simulated device (tcs-sim's: a pseudo-terminal, a socket), a dummy
 device (the kernel's: i2c-stub, gpio-sim, vcan, iio_dummy) or a real device
 from what is at its endpoint (`tcsprotocol::simulate`), never from a file.

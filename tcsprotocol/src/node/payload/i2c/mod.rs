@@ -229,7 +229,7 @@ pub(crate) fn group_kind_named(
 /// `bin/mki2c` finds it and how a dummy bus is told from a real one.
 pub const STUB_ADAPTER: &str = "SMBus stub driver";
 
-/// What `--simulate` asks to change on an I2C node that is a real device.
+/// What a simulated run asks to change on an I2C node that is a real device.
 const TO_SIMULATE: &str =
     "point path at the i2c-stub bus, which bin/mki2c makes";
 

@@ -10,12 +10,14 @@
 //! divided into segments. The two are joined by the data handler's name; see
 //! [`tcsprotocol::sim_config`].
 //!
-//! `--simulate=<mode>` is the run's simulation mode, as tcspecial and tcs-moc
-//! take it: see `tcsprotocol::simulate`. Under `none`, the flight setting
-//! and the mode a run without the flag gets, tcs-sim refuses to start, there
-//! being nothing for it to do in a run that may simulate nothing. Under `some`
-//! and `all` it checks that what it will simulate, with what is a simulated or
-//! dummy device already, is what the mode allows.
+//! The run's simulation mode is the simulator file's, `simulate` in its
+//! `tcspecial` section, as tcspecial and tcs-moc read it: see
+//! `tcsprotocol::simulate`. Under `none`, the flight setting and the mode a
+//! file that states none has, tcs-sim refuses to start, there being nothing
+//! for it to do in a run that may simulate nothing. Under `some` and `all`
+//! it checks that what it will simulate, with what is a simulated or dummy
+//! device already, is what the mode allows. `--simulate`, which once gave
+//! the mode, is refused, saying so.
 //!
 //! Every simulated payload is made as tcs-sim starts and kept until it stops,
 //! so that tcspecial finds them whatever the panels say; a panel's button
@@ -671,7 +673,7 @@ type Loaded = (
 ///                     simulated together in one world, which the simulator
 ///                     file is then shared by.
 /// * `sim_path`      - The simulator file.
-/// * `mode`          - The `--simulate` setting.
+/// * `mode`          - The run's simulation mode.
 /// * `startup`       - Where each problem found is said.
 ///
 /// # Returns
@@ -937,7 +939,7 @@ fn shared_out(
 /// * `graph`    - The tcspecial configuration's graph.
 /// * `sim_file` - The simulator file.
 /// * `sim_path` - Its path, for the messages.
-/// * `mode`     - The `--simulate` setting.
+/// * `mode`     - The run's simulation mode.
 ///
 /// # Returns
 ///
@@ -1008,7 +1010,7 @@ fn simulation_refused(
 /// * `payload_paths` - The tcspecial configuration files.
 /// * `sim_path`      - The simulator file.
 /// * `sim_file`      - The simulator file as read, which gives the address.
-/// * `mode`          - The `--simulate` setting.
+/// * `mode`          - The run's simulation mode.
 ///
 /// # Returns
 ///
@@ -1038,7 +1040,7 @@ fn ready_socket(
 ///
 /// * `payload_paths` - The tcspecial configuration files.
 /// * `sim_path`      - The simulator file.
-/// * `mode`          - The `--simulate` setting.
+/// * `mode`          - The run's simulation mode.
 ///
 /// # Returns
 ///
@@ -1231,7 +1233,7 @@ fn payload_paths_from(args: Vec<String>) -> Result<Vec<String>, String> {
     if let Some(unknown) = args.iter().skip(1).find(|a| a.starts_with("--")) {
         return Err(format!(
             "tcs-sim: {unknown} is not an option tcs-sim takes\nusage: \
-             tcs-sim [--simulate=MODE] [--sending] [--wait[=SECONDS]] \
+             tcs-sim [--sending] [--wait[=SECONDS]] \
              [{SIMULATOR_FLAG}=FILE] [CONFIGURATION...]"
         ));
     }
@@ -1253,7 +1255,7 @@ fn payload_paths_from(args: Vec<String>) -> Result<Vec<String>, String> {
 /// * `payload_paths` - The tcspecial configuration files, in the order the
 ///                     simulator was given them.
 /// * `sim_path`      - The simulator file, which says where to ask.
-/// * `mode`          - The `--simulate` setting the simulator must have.
+/// * `mode`          - The simulation mode the simulator must have.
 /// * `patience`      - How long to wait.
 ///
 /// # Returns
@@ -1364,16 +1366,13 @@ fn present(startup: &Startup) {
 pub fn main() {
     //    env_logger::init();
 
-    // The mode first, and before anything is read: under the flight setting
-    // there is nothing to read anything for.
-    let (mode, args) =
-        match tcsprotocol::simulate::take_mode(env::args().collect()) {
-            Ok(taken) => taken,
-            Err(e) => {
-                eprintln!("tcs-sim: {e}");
-                process::exit(1);
-            }
-        };
+    // The old flag first, before anything is read: a run started the old
+    // way would otherwise go ahead in whatever mode its file states.
+    let args: Vec<String> = env::args().collect();
+    if let Err(e) = tcsprotocol::simulate::refuse_flag(&args) {
+        eprintln!("tcs-sim: {e}");
+        process::exit(1);
+    }
     let (waiting, args) = match take_wait(args) {
         Ok(taken) => taken,
         Err(e) => {
@@ -1395,16 +1394,6 @@ pub fn main() {
             process::exit(1);
         }
     };
-    if mode.is_flight() {
-        eprintln!(
-            "tcs-sim: --simulate={mode} is the flight setting, which allows \
-             only real devices, so there is nothing for a simulator to do or \
-             to wait for: give --simulate=some or --simulate=all for a run \
-             that simulates"
-        );
-        process::exit(1);
-    }
-
     // Read both configuration files before the window exists, so a file that
     // cannot be read is reported plainly rather than as an empty window.
     let payload_paths = match payload_paths_from(args) {
@@ -1439,6 +1428,26 @@ pub fn main() {
                 }
             },
         };
+
+    // The mode the file states, which under the flight setting leaves a
+    // simulator nothing to do.
+    let mode = match tcsprotocol::simulate::mode_of(&sim_path) {
+        Ok(mode) => mode,
+        Err(e) => {
+            eprintln!("tcs-sim: {e}");
+            process::exit(1);
+        }
+    };
+    if mode.is_flight() {
+        eprintln!(
+            "tcs-sim: {sim_path} states simulate: {mode}, or no mode, which \
+             is the flight setting and allows only real devices, so there \
+             is nothing for a simulator to do or to wait for: state \
+             simulate: some or simulate: all in its tcspecial section for a \
+             run that simulates"
+        );
+        process::exit(1);
+    }
 
     if let Some(patience) = waiting {
         process::exit(wait_for_another(

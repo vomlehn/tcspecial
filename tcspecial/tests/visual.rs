@@ -7,10 +7,28 @@
 
 use tcsos::process::Command;
 
+/// The fixture simulator file that states only a mode.
+///
+/// # Arguments
+///
+/// * `mode` - The mode: `none`, `some` or `all`.
+///
+/// # Returns
+///
+/// Its path.
+fn sim(mode: &str) -> String {
+    format!(
+        "{}/tests/simulate/{mode}-sim.yaml",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
 /// Runs tcspecial.
 ///
 /// # Arguments
 ///
+/// * `mode` - The simulation mode its simulator file states; `None` for no
+///            simulator file.
 /// * `args` - Its command-line arguments.
 ///
 /// # Returns
@@ -20,8 +38,13 @@ use tcsos::process::Command;
 /// # Panics
 ///
 /// If tcspecial cannot be run.
-fn tcspecial(args: &[&str]) -> (bool, String) {
-    let ran = Command::new(env!("CARGO_BIN_EXE_tcspecial"))
+fn tcspecial(mode: Option<&str>, args: &[&str]) -> (bool, String) {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_tcspecial"));
+    command.env_remove("PAYLOAD_SIM_YAML");
+    if let Some(mode) = mode {
+        command.env("PAYLOAD_SIM_YAML", sim(mode));
+    }
+    let ran = command
         .args(args)
         .arg("--no-memlock")
         .env_remove("RUST_LOG")
@@ -36,44 +59,46 @@ fn tcspecial(args: &[&str]) -> (bool, String) {
 #[cfg(not(feature = "visual"))]
 #[test]
 fn a_window_asked_of_a_build_without_one_is_refused_saying_why() {
-    let (ran, said) = tcspecial(&[
-        "--visual",
-        "--simulate=all",
-        "/nonexistent/tcspecial-visual-test.ytcs",
-    ]);
+    let (ran, said) = tcspecial(
+        Some("all"),
+        &["--visual", "/nonexistent/tcspecial-visual-test.ytcs"],
+    );
     assert!(!ran, "refused");
     assert!(said.contains("--features visual"), "{said}");
     // Before the file is looked at: nothing about it is said.
     assert!(!said.contains("payload configuration:"), "{said}");
 }
 
-/// In the flight setting, whether it is asked for or is what a run without
-/// `--simulate` gets. Said whether or not the window is built in, so that the
+/// In the flight setting, whether a simulator file states it or it is what
+/// a run without one gets. Said whether or not the window is built in, so that the
 /// refusal a flight launch would meet does not depend on the build.
 #[test]
 fn a_window_asked_of_the_flight_setting_is_refused_saying_why() {
-    for simulate in [&["--simulate=none"][..], &[]] {
-        let mut args = vec!["--visual"];
-        args.extend_from_slice(simulate);
-        args.push("/nonexistent/tcspecial-visual-test.ytcs");
-        let (ran, said) = tcspecial(&args);
+    for mode in [Some("none"), None] {
+        let (ran, said) = tcspecial(
+            mode,
+            &["--visual", "/nonexistent/tcspecial-visual-test.ytcs"],
+        );
         assert!(!ran, "refused");
         assert!(
-            said.contains("--simulate=none, the flight setting"),
+            said.contains("simulate: none, the flight setting"),
             "{said}"
         );
-        assert!(said.contains("--simulate=some or --simulate=all"), "{said}");
+        assert!(said.contains("simulate: some or simulate: all"), "{said}");
         assert!(!said.contains("payload configuration:"), "{said}");
     }
 }
 
+/// The flag the mode was once given by is refused, saying where the mode is
+/// stated now, before the file is looked at.
 #[test]
-fn a_mistaken_mode_is_refused_naming_the_three() {
-    let (ran, said) = tcspecial(&[
-        "--simulate=most",
-        "/nonexistent/tcspecial-visual-test.ytcs",
-    ]);
+fn the_old_flag_is_refused_saying_where_the_mode_is() {
+    let (ran, said) = tcspecial(
+        None,
+        &["--simulate=all", "/nonexistent/tcspecial-visual-test.ytcs"],
+    );
     assert!(!ran, "refused");
+    assert!(said.contains("tcspecial section"), "{said}");
     assert!(said.contains("none, some, all"), "{said}");
     assert!(!said.contains("payload configuration:"), "{said}");
 }

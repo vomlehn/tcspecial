@@ -20,8 +20,10 @@ pub mod client;
 pub mod connection;
 pub mod gateway;
 pub mod listening;
+pub mod loss;
 pub mod matched;
 pub mod ping;
+pub mod simulation;
 pub mod simulator;
 
 pub use client::*;

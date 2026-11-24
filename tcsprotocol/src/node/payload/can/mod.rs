@@ -163,7 +163,7 @@ pub(crate) fn group_kind_of(
     Ok(GroupKind::Can(CanParams { fd, loopback }))
 }
 
-/// What `--simulate` asks to change on a CAN node that is a real device.
+/// What a simulated run asks to change on a CAN node that is a real device.
 const TO_SIMULATE: &str =
     "point interface at a vcan interface, which bin/mkvcan makes";
 

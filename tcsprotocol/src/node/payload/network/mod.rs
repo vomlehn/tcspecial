@@ -11,7 +11,7 @@ use tcsos::net::IpAddr;
 
 use crate::types::{NetworkConfig, NetworkProtocol};
 
-/// What `--simulate` asks to change where the far end may be off this host.
+/// What a simulated run asks to change where the far end may be off this host.
 /// [`crate::simulate::judge`] says what to change of `sim_address` instead,
 /// which is the one network endpoint it asks about.
 const TO_SIMULATE: &str =

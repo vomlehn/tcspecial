@@ -560,10 +560,8 @@ ul.auto-toc {
 <li><a class="reference internal" href="#what-each-program-does-with-the-mode" id="toc-entry-145">What Each Program Does With the Mode</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#test-code-never-flies" id="toc-entry-146">Test Code Never Flies</a><ul>
-<li><a class="reference internal" href="#bit-errors-on-the-link" id="toc-entry-147">Bit errors on the link</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#test-code-never-flies" id="toc-entry-146">Test Code Never Flies</a></li>
+<li><a class="reference internal" href="#simulation-done-by-the-ground" id="toc-entry-147">Simulation Done by the Ground</a></li>
 <li><a class="reference internal" href="#waiting-for-the-simulator" id="toc-entry-148">Waiting for the Simulator</a></li>
 <li><a class="reference internal" href="#gui-framework" id="toc-entry-149">GUI Framework</a></li>
 </ul>
@@ -854,7 +852,8 @@ always a real device -- a socket or a file -- whatever answers at its far
 end.</dd>
 <dt>simulation mode</dt>
 <dd>How many of a run's payloads may be simulated or dummy devices: <tt class="docutils literal">none</tt>,
-<tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt>, given to each program as <tt class="docutils literal"><span class="pre">--simulate</span></tt>. See
+<tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt>, stated in the run's simulator file, which each
+program reads. See
 <a class="reference internal" href="#simulation-modes">Simulation Modes</a>.</dd>
 </dl>
 </div>
@@ -1638,7 +1637,7 @@ loads a configuration, so that every buffer is real once it is made: a
 shortage is then a failure to load, not a process killed mid-pass when
 a buffer is first written. On another kernel, its own call for this
 does the same. The supervisor locks nothing. <tt class="docutils literal"><span class="pre">--no-memlock</span></tt> asks for
-no lock, under any <tt class="docutils literal"><span class="pre">--simulate</span></tt>, and the startup summary says so;
+no lock, in any simulation mode, and the startup summary says so;
 without it the memory is always locked.</p>
 <p class="last"><strong>Built</strong> (2026-11-15): <tt class="docutils literal"><span class="pre">runtime::memory::lock</span></tt>, called by the child
 before it reads the configuration, and said in the summary as
@@ -1684,7 +1683,7 @@ RESTART. Untested here, since a lock that succeeds takes a larger limit
 than the desks the tests run on have.</p>
 </dd>
 <dt>Requirement</dt>
-<dd><p class="first">Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt> -- a desk, a test bench -- a lock
+<dd><p class="first">Under <tt class="docutils literal">simulate: some</tt> or <tt class="docutils literal">all</tt> -- a desk, a test bench -- a lock
 that fails, at either moment, stops tcspecial at once, saying why on
 its error output: the child exits with the fatal status, the
 supervisor stops, nothing falls back and nothing runs unlocked. A desk
@@ -5067,7 +5066,7 @@ takes them itself.</dd>
 <dt>Requirement</dt>
 <dd>Where the supervisor cannot start a child, it says why in its log, and
 tries again after a delay in flight, as it does for a bottom that
-fails, and stops under <tt class="docutils literal"><span class="pre">--simulate</span></tt>. A process that carried on after
+fails, and stops in a simulated run. A process that carried on after
 being told to restart would be flying something the ground believes
 has gone, so the old child never carries on: it has exited before the
 new one is started.</dd>
@@ -7552,8 +7551,8 @@ beneath, which the ground had heard, runs again.</dd>
 <td>starts a child on the new top, the
 configuration the RESTART pushed</td>
 </tr>
-<tr><td>fatal: a lock that failed under
-<tt class="docutils literal"><span class="pre">--simulate</span></tt>, the command
+<tr><td>fatal: a lock that failed in a
+simulated run, the command
 line's configuration refused
 before anything was opened</td>
 <td>stops, the stack unchanged, saying
@@ -7589,8 +7588,8 @@ see stopped, not one to spin.</dd>
 <dd>When the bottom fails otherwise -- as it opens, or as it runs -- there
 is nothing to pop: the supervisor starts it again after a delay that
 doubles at each failure, from one second to at most a minute, and goes
-back to one second once the bottom has stayed up for a minute. Under
-<tt class="docutils literal"><span class="pre">--simulate</span></tt> it stops instead: a desk is not helped by trying for
+back to one second once the bottom has stayed up for a minute. In a
+simulated run it stops instead: a desk is not helped by trying for
 ever, and a test that starts a failing tcspecial is owed an answer. A configuration that fails at once is then
 not started thousands of times an hour, and one that recovers is not
 kept waiting.</dd>
@@ -8295,9 +8294,9 @@ describes the nodes, the links between them and the payloads among them --
 see <a class="reference internal" href="#payloads">Payloads</a> -- and it states what tcspecial itself is configured with in
 its <tt class="docutils literal">tcspecial</tt> section: where commands are taken, where beacons go, the
 beacon interval, and where the telemetry log is written.</p>
-<p>How many of the payloads it reaches may be simulated or dummy devices is said on
-the command line too, by <tt class="docutils literal"><span class="pre">--simulate</span></tt>, and is not part of the configuration;
-see <a class="reference internal" href="#simulation-modes">Simulation Modes</a>.</p>
+<p>How many of the payloads it reaches may be simulated or dummy devices is said
+in the run's simulator file, as <tt class="docutils literal">simulate</tt> in its <tt class="docutils literal">tcspecial</tt> section, and
+is not part of the configuration; see <a class="reference internal" href="#simulation-modes">Simulation Modes</a>.</p>
 <p>Which payload types it can reach at all is decided when it is built; see
 <a class="reference internal" href="#which-node-types-are-built">Which Node Types Are Built</a>.</p>
 <p>It read two. The second was its own, <tt class="docutils literal">tcspecial/src/tcspecial.ytcs</tt>, named
@@ -9107,10 +9106,10 @@ flight software, whose licence, Slint's royalty-free one, does not
 cover embedded systems; and a build that has it says so as a warning
 every time it starts, window or not.</dd>
 <dt>Requirement</dt>
-<dd><tt class="docutils literal"><span class="pre">--visual</span></tt> is refused under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, in every build and before
-anything is read or opened, saying to give <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or
-<tt class="docutils literal"><span class="pre">--simulate=all</span></tt> with it. <tt class="docutils literal">none</tt> is the flight setting and what a run
-that leaves <tt class="docutils literal"><span class="pre">--simulate</span></tt> out gets (see <a class="reference internal" href="#simulation-modes">Simulation Modes</a>), so a window
+<dd><tt class="docutils literal"><span class="pre">--visual</span></tt> is refused under <tt class="docutils literal">simulate: none</tt>, in every build and before
+anything is opened, saying to state <tt class="docutils literal">simulate: some</tt> or <tt class="docutils literal">simulate:
+all</tt> in the simulator file. <tt class="docutils literal">none</tt> is the flight setting and what a run
+without a simulator file gets (see <a class="reference internal" href="#simulation-modes">Simulation Modes</a>), so a window
 there would be a window opened in flight; a run with no simulated or dummy
 devices that is not flight is a mistake about which run it is. The refusal
 comes before the build's own, so that what a flight launch meets does not
@@ -10198,7 +10197,7 @@ and no RTS to drive, so it would refuse the mode; on a line judged a
 simulated device the RS-485 terms are left unapplied, which is said as
 tcspecial starts, and the simulator at the far end receives and sends the
 bus's bytes. Only the turnaround and its delays go unexercised. Under
-<tt class="docutils literal"><span class="pre">--simulate=none</span></tt> no simulated device starts, so a flight line always has
+<tt class="docutils literal">simulate: none</tt> no simulated device starts, so a flight line always has
 the mode applied and read back.</dd>
 </dl>
 <p><strong>A line's terms</strong></p>
@@ -11023,8 +11022,10 @@ what is wrong with them.</p>
 <div class="section" id="simulation-modes">
 <h2><a class="toc-backref" href="#toc-entry-142">Simulation Modes</a></h2>
 <p>Implemented, except that the mode and the judgements are not yet written
-to the telemetry log: they are said in the startup summary only. The mode is
-read by <tt class="docutils literal"><span class="pre">tcsprotocol::simulate::take_mode</span></tt>, a payload is judged by
+to the telemetry log: they are said in the startup summary only. The run's
+simulator file is found and its mode read by
+<tt class="docutils literal"><span class="pre">tcsprotocol::simulate::run_for</span></tt>, the old flag is refused by
+<tt class="docutils literal"><span class="pre">tcsprotocol::simulate::refuse_flag</span></tt>, a payload is judged by
 <tt class="docutils literal"><span class="pre">tcsprotocol::simulate::judge</span></tt> and its type's <tt class="docutils literal">judged</tt> in
 <tt class="docutils literal"><span class="pre">tcsprotocol::node::payload</span></tt>, and the mode is checked by
 <tt class="docutils literal"><span class="pre">tcsprotocol::simulate::refusals</span></tt>, which tcspecial and tcs-sim both call.</p>
@@ -11039,8 +11040,10 @@ the simulator file says which payloads are meant to be simulated, with
 says which kind of run a run is meant to be.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd><p class="first">Tcspecial, tcs-sim and tcs-moc each take <tt class="docutils literal"><span class="pre">--simulate=&lt;mode&gt;</span></tt>, and the mode
-is one of three:</p>
+<dd><p class="first">The mode is stated in the run's simulator file, as <tt class="docutils literal">simulate</tt> in its
+<tt class="docutils literal">tcspecial</tt> section, and every program of the run -- tcspecial,
+tcs-sim, tcs-moc, and the ground's own programs -- reads it there. It is
+one of three:</p>
 <ul class="last simple">
 <li><tt class="docutils literal">none</tt>: every payload must be a real device. This is the flight
 setting.</li>
@@ -11054,20 +11057,43 @@ undoes.</li>
 </ul>
 </dd>
 <dt>Requirement</dt>
-<dd>The mode is <tt class="docutils literal">none</tt> when the flag is not given, in all three programs. A
-flight launch that leaves the flag out then gets the flight setting, and a
-test run that leaves it out is refused at its first simulated or dummy
-device, saying which flag it wants. Of the two mistakes, that is the cheap
-one.</dd>
+<dd>The run's simulator file is the one <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> names, and
+otherwise the one beside the configuration and named for it,
+<tt class="docutils literal"><span class="pre">NAME-sim.yaml</span></tt>. Every program finds it the same way, through
+<tt class="docutils literal"><span class="pre">tcsprotocol::simulate::run_for</span></tt> -- in Python,
+<tt class="docutils literal">tcsprotocol.simulate.run_for</tt> -- so that no two programs of a run can
+read different files.</dd>
 <dt>Requirement</dt>
-<dd>The mode is a flag and not part of the configuration. The configuration
-flown is then the configuration tested, byte for byte, and its digest is
-the same under every mode, so a <tt class="docutils literal">CONNECT</tt> agrees about it whichever mode
-the ground station was started in.</dd>
+<dd><p class="first">The mode is <tt class="docutils literal">none</tt> where there is no simulator file, or the file states
+no mode, in every program. A flight vehicle, which has no simulator file,
+then gets the flight setting, and a test run whose file states no mode is
+refused at its first simulated or dummy device, saying which mode to
+state. Of the two mistakes, that is the cheap one.</p>
+<p class="last">A stray simulator file beside a flight configuration would put the
+vehicle in the mode it states, without anybody asking for it on a
+command line. Two things stand against that: under <tt class="docutils literal">all</tt> every real
+device is refused, so a vehicle with its hardware attached does not
+start; and every beacon says <tt class="docutils literal">test</tt> under <tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt> (see
+<a class="reference internal" href="#test-code-never-flies">Test Code Never Flies</a>), which the MOC is told of on every beacon. A
+flight configuration has no simulator file beside it, and the packages'
+service says so.</p>
+</dd>
 <dt>Requirement</dt>
-<dd>A mode that is not one of the three, or the flag given twice, is refused,
-naming the three modes. A second <tt class="docutils literal"><span class="pre">--simulate</span></tt> is more likely a mistake
-about which run this is than something meant to override the first.</dd>
+<dd>The mode is in the simulator file and not in the configuration. The
+configuration flown is then the configuration tested, byte for byte, and
+its digest is the same under every mode, so a <tt class="docutils literal">CONNECT</tt> agrees about
+it whichever mode the run was started in. Nor is the mode on any
+program's command line: the simulator file is where everything simulated
+about a run is said, and the ground's own simulation -- see <a class="reference internal" href="#simulation-done-by-the-ground">Simulation
+Done by the Ground</a> -- is held to the same mode read from the same
+place.</dd>
+<dt>Requirement</dt>
+<dd>A mode that is not one of the three is refused as the file is read,
+naming the three modes; a file that cannot be read is refused too, since
+what mode it meant cannot be known. <tt class="docutils literal"><span class="pre">--simulate</span></tt>, which once gave the
+mode, is refused by every program, saying where the mode is stated now:
+a run started the old way would otherwise go ahead in whatever mode its
+file states.</dd>
 <dt>Requirement</dt>
 <dd>A payload, for the mode, is a node of an interface type other than the
 gateway, <tt class="docutils literal">network</tt> and <tt class="docutils literal"><span class="pre">device-file</span></tt>: what the configuration reaches
@@ -11163,7 +11189,7 @@ disagree about what one is.</dd>
 <dd><p class="first">A refusal names the node, what it reaches, what was found there and the
 mode that forbids it, and says what would satisfy the mode. For example:</p>
 <pre class="last literal-block">
-temp_1: /dev/i2c-1 is a real adapter (i915 gmbus), and --simulate=all
+temp_1: /dev/i2c-1 is a real adapter (i915 gmbus), and simulate: all
 allows only simulated and dummy devices: point path at the i2c-stub
 bus, which bin/mki2c makes.
 </pre>
@@ -11235,7 +11261,7 @@ all; <tt class="docutils literal">spi</tt>, <tt class="docutils literal">rpmsg</
 carry the bytes but not the clock, the channel or the sysfs around them; and
 the temperature sensors <tt class="docutils literal">i2c_tmass</tt> and <tt class="docutils literal">spi_tmass</tt>, whose simulated
 device is the thermal mass they are fixed to, which tcs-sim answers with the
-temperature of. Under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, tcspecial reaches such
+temperature of. Under <tt class="docutils literal">simulate: some</tt> or <tt class="docutils literal">all</tt>, tcspecial reaches such
 a node over UDP at its <tt class="docutils literal">sim_address</tt> instead of opening the device, by the
 rule of which end speaks first that a UDP payload has, and tcs-sim answers
 there as a UDP payload.</p>
@@ -11299,8 +11325,8 @@ One joined to a heater switches it as well.</dd>
 <dd>The comparison is tcs-sim's, and tcspecial does not read the simulator
 file. The flight software's inputs are its configuration and its flags,
 and a simulator's file among them would be a file a flight could be
-wrong about. Tcspecial's own check, of each endpoint against
-<tt class="docutils literal"><span class="pre">--simulate</span></tt>, is unchanged and stays the last one: only tcspecial opens
+wrong about. Tcspecial's own check, of each endpoint against the
+simulation mode, is unchanged and stays the last one: only tcspecial opens
 the hardware.</dd>
 </dl>
 </div>
@@ -11329,15 +11355,17 @@ its endpoint to.</p>
 that forgot a payload before anything runs. Only tcspecial's check protects
 the hardware, because only tcspecial opens it.</dd>
 <dt>Requirement</dt>
-<dd>Tcs-moc takes the mode and gives the same one to both programs it starts,
-so that the two cannot disagree in a run tcs-moc started. Each program run
-by hand is given the flag by whoever runs it, as each is given its files.</dd>
+<dd>Tcs-moc reads the mode from the run's simulator file, and both programs
+it starts read it from the same file, found the same way, so that the
+three cannot disagree in a run tcs-moc started. Each program run by hand
+finds the file as tcs-moc does: the one <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> names, or
+the one beside its configuration.</dd>
 <dt>Requirement</dt>
 <dd>Under <tt class="docutils literal">none</tt>, tcs-moc starts tcspecial and not tcs-sim. A run that is like
 a flight then looks like one, with no simulator present to answer for a
 device that is missing.</dd>
 <dt>Requirement</dt>
-<dd>Tcspecial does not start tcs-sim, and so does not pass the mode on to it.
+<dd>Tcspecial does not start tcs-sim.
 Flight software that cannot start a simulator cannot start one by mistake,
 and the code for finding and launching one would be flown although it
 served only testing.</dd>
@@ -11346,32 +11374,29 @@ served only testing.</dd>
 </div>
 <div class="section" id="test-code-never-flies">
 <h2><a class="toc-backref" href="#toc-entry-146">Test Code Never Flies</a></h2>
-<p>Implemented: the checks are <tt class="docutils literal"><span class="pre">tcspecial::flight_checks</span></tt>, the bit errors
-<tt class="docutils literal"><span class="pre">tcspecial::runtime::bit_errors</span></tt>, the beacon's field
+<p>Implemented: the checks are <tt class="docutils literal"><span class="pre">tcspecial::flight_checks</span></tt>, the beacon's field
 <tt class="docutils literal"><span class="pre">tcsprotocol::beacon::FlightCheck</span></tt>, and the ground's alarm
 <tt class="docutils literal"><span class="pre">tcsmoc::beacon::Beacons::flying</span></tt>.</p>
 <p><em>Test code</em> is code in tcspecial that exists for testing and must never run
-aboard: the visual window (<tt class="docutils literal"><span class="pre">--visual</span></tt>, see <a class="reference internal" href="#the-visual-window">The Visual Window</a>) and bit
-errors on the link to the ground (the simulator file's <tt class="docutils literal">gateway</tt>
-section). The simulation mode
-is what says a run is flight, so each piece of test code is held to it; and
-the ground, which cannot see the build, is told in every beacon what the
-vehicle found.</p>
+aboard: the visual window (<tt class="docutils literal"><span class="pre">--visual</span></tt>, see <a class="reference internal" href="#the-visual-window">The Visual Window</a>). The
+simulation mode is what says a run is flight, so test code is held to it;
+and the ground, which cannot see the build, is told in every beacon what the
+vehicle found. What simulates the link to the ground -- a delay, bit errors
+-- is not test code in tcspecial, because it is not in tcspecial at all:
+see <a class="reference internal" href="#simulation-done-by-the-ground">Simulation Done by the Ground</a>.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
 <dd>Each piece of test code is in tcspecial only with a Cargo feature that
-is not a default and is never in a build that flies: <tt class="docutils literal">visual</tt> and
-<tt class="docutils literal"><span class="pre">bit-errors</span></tt>. A build without it has none of the test code's workings
--- the bit errors, in a build without their feature, are a function
-that answers that no packet is lost, which the compiler takes out --
-so a flight build has nothing to switch on by mistake.
-<tt class="docutils literal"><span class="pre">tcspecial::flight_checks::NEVER_FLIES</span></tt> names every such feature, and
-a build that has any of them says so as a warning every time it starts.</dd>
+is not a default and is never in a build that flies: <tt class="docutils literal">visual</tt>. A build
+without it has none of the test code's workings, so a flight build has
+nothing to switch on by mistake. <tt class="docutils literal"><span class="pre">tcspecial::flight_checks::NEVER_FLIES</span></tt>
+names every such feature, and a build that has any of them says so as a
+warning every time it starts.</dd>
 <dt>Requirement</dt>
-<dd>Each piece of test code is refused under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, the flight
-setting and what a run that leaves the flag out gets, even in a build
-that has it, before anything is read or opened, saying to give
-<tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal"><span class="pre">--simulate=all</span></tt> with it. Asked of a build
+<dd>Each piece of test code is refused under <tt class="docutils literal">simulate: none</tt>, the flight
+setting and what a run without a simulator file gets, even in a build
+that has it, before anything is opened, saying to state <tt class="docutils literal">simulate:
+some</tt> or <tt class="docutils literal">simulate: all</tt> in the simulator file. Asked of a build
 without its feature, it is refused, saying how to build one that has it.
 A build that has the feature and is not asked for it runs.</dd>
 <dt>Requirement</dt>
@@ -11382,7 +11407,7 @@ made without one, so no beacon can go before the checks are finished.
 A new piece of test code adds its check there, and nowhere after it.</dd>
 <dt>Requirement</dt>
 <dd>Every beacon carries the <em>flight check</em>: <tt class="docutils literal">flight</tt> where the run is
-under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt> and the build has no feature that never flies,
+under <tt class="docutils literal">simulate: none</tt> and the build has no feature that never flies,
 and <tt class="docutils literal">test</tt> otherwise -- a run under <tt class="docutils literal">some</tt> or <tt class="docutils literal">all</tt>, or a build
 with test code in it, whether or not that is asked for: such a build is
 not the one that was meant to fly. In every beacon, not in a message
@@ -11390,7 +11415,7 @@ sent once, because any one packet can be lost: a ground station that
 missed the first beacons hears it in the next. See <a class="reference internal" href="#asynchronous-telemetry">Asynchronous
 Telemetry</a>.</dd>
 <dt>Requirement</dt>
-<dd>A ground station run as flight -- tcs-moc under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt> --
+<dd>A ground station run as flight -- tcs-moc under <tt class="docutils literal">simulate: none</tt> --
 holds every beacon to flight code. A beacon saying <tt class="docutils literal">test</tt> is said as a
 mismatch is, <tt class="docutils literal">TEST CODE</tt> first on the beacon line and on the console,
 and the operator is asked whether to go on. It does not end the match
@@ -11404,48 +11429,58 @@ flight, <tt class="docutils literal">test</tt> for a test. A station that hears 
 the check, and a vehicle it cannot hear is not one it may take for
 flight code.</dd>
 </dl>
-<div class="section" id="bit-errors-on-the-link">
-<h3><a class="toc-backref" href="#toc-entry-147">Bit errors on the link</a></h3>
+</div>
+<div class="section" id="simulation-done-by-the-ground">
+<h2><a class="toc-backref" href="#toc-entry-147">Simulation Done by the Ground</a></h2>
+<p>Implemented: the check is <tt class="docutils literal"><span class="pre">tcsmoc::simulation::allow</span></tt> (in Python,
+<tt class="docutils literal">tcsmoc.simulation.allow</tt>), the bit errors <tt class="docutils literal"><span class="pre">tcsmoc::loss</span></tt>, and the
+relays <tt class="docutils literal"><span class="pre">tcs_moc::relay</span></tt>, the <tt class="docutils literal"><span class="pre">tcs-relay</span></tt> program, which
+<tt class="docutils literal">python/tcsmoc/relay.py</tt> starts.</p>
+<p>What stands for something that is not there on the link between the ground
+and the vehicle -- the light time to the Moon, a link that loses packets --
+is simulated by the ground's software, never by tcspecial. None of it can
+then reach the flight software: tcspecial holds no delay, no injector, no
+random numbers and no rate. But a ground that delayed or lost what crosses
+its link in a flight would be as wrong as a vehicle that did, so the
+ground's simulation is held to the run's simulation mode, read from the same
+simulator file every program reads (see <a class="reference internal" href="#simulation-modes">Simulation Modes</a>).</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>A simulator file's <tt class="docutils literal">gateway</tt> section states <tt class="docutils literal">bit_error_rate</tt>, <tt class="docutils literal">p</tt>
-in flips per bit, and tcspecial, in a build with the <tt class="docutils literal"><span class="pre">bit-errors</span></tt>
-feature and under <tt class="docutils literal"><span class="pre">--simulate=some</span></tt> or <tt class="docutils literal">all</tt>, loses each packet
-crossing the link to the ground as <tt class="docutils literal">p</tt> flips per bit would: a packet
-of <tt class="docutils literal">n</tt> bits is lost with probability <tt class="docutils literal">1 - (1 - <span class="pre">p)^n</span></tt>, and a packet
-with a flipped bit is dropped whole, as a link whose check fails drops
-it. <tt class="docutils literal">p</tt> is from 0 to 1. <tt class="docutils literal">n</tt> is the packet as tcspecial reads or
-writes it, eight bits a byte, without what the transport adds.</dd>
+<dd>Each simulation feature of the ground's asks
+<tt class="docutils literal"><span class="pre">tcsmoc::simulation::allow</span></tt> before it does anything, and is refused
+under <tt class="docutils literal">simulate: none</tt>, the flight setting, saying what was asked, the
+file and what to state. The lander's delay (<tt class="docutils literal"><span class="pre">--delay</span></tt> of
+<tt class="docutils literal">lander_yamcs.py</tt>, lander-station and <tt class="docutils literal"><span class="pre">tcs-relay</span></tt>) and the bit errors
+are such features; a new one asks the same.</dd>
 <dt>Requirement</dt>
-<dd>Up and down alike: the commands arriving and the gateway's data
-arriving, and the answers, the beacons and the gateway's data leaving.
-A beacon lost is still recorded in the telemetry log, which is what the
-vehicle produced, not what the ground heard.</dd>
+<dd>The simulator file's <tt class="docutils literal">gateway</tt> section states <tt class="docutils literal">bit_error_rate</tt>,
+<tt class="docutils literal">p</tt> in flips per bit, and the ground, under <tt class="docutils literal">simulate: some</tt> or
+<tt class="docutils literal">all</tt>, loses each packet crossing its link to the vehicle as <tt class="docutils literal">p</tt>
+flips per bit would: a packet of <tt class="docutils literal">n</tt> bits is lost with probability
+<tt class="docutils literal">1 - (1 - <span class="pre">p)^n</span></tt>, and a packet with a flipped bit is dropped whole, as a
+link whose check fails drops it. <tt class="docutils literal">p</tt> is from 0 to 1. <tt class="docutils literal">n</tt> is the
+packet as the ground reads or writes it, eight bits a byte, without what
+the transport adds. Up and down alike: the commands and what is sent up
+through the gateway, and the answers, the beacons and the gateway's
+data.</dd>
+<dt>Requirement</dt>
+<dd>tcs-moc and lander-station lose packets in <tt class="docutils literal">tcsmoc</tt>'s own links, armed
+once a program by <tt class="docutils literal"><span class="pre">tcsmoc::loss::arm_for</span></tt>. A ground that does not hold
+its link itself -- Yamcs, which the Yamcs examples' grounds start -- has
+<tt class="docutils literal"><span class="pre">tcs-relay</span></tt> stand between it and the vehicle: its links are moved off
+the vehicle's ports, and the relay listens there, holding each datagram
+for the delay and losing those the rate loses. The relay is in Rust; the
+Python grounds only start it.</dd>
 <dt>Requirement</dt>
 <dd>The section's <tt class="docutils literal">seed</tt> is where the random numbers start: left out or
 blank, the default, 1 (<tt class="docutils literal">DEFAULT_BIT_ERROR_SEED</tt>); a whole number, that
-number; <tt class="docutils literal">random</tt>, one drawn from the system's source of randomness
-(<tt class="docutils literal">getrandom</tt>, a dependency of the <tt class="docutils literal"><span class="pre">bit-errors</span></tt> feature alone). The
-default makes every run that states no seed lose the same packets, so
-that a test is repeatable without saying how; <tt class="docutils literal">random</tt> is asked for,
-never fallen into. Anything else is refused as the file is read. The
-rate, the seed, which of the three it was and the file are said in the
-startup summary, so a random seed can be stated to have its run again.</dd>
-<dt>Requirement</dt>
-<dd>The rate is in the simulator file, not on tcspecial's command line or in
-its configuration: it is a test setting, as the payloads' faults are, and
-the configuration flown is the one tested, byte for byte. tcspecial
-reads the file tcs-sim and tcs-moc read for its configuration, the one
-<tt class="docutils literal">PAYLOAD_SIM_YAML</tt> names or the one beside it. A build that may fly,
-run under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, does not read it at all.</dd>
-<dt>Requirement</dt>
-<dd>A tcspecial without the <tt class="docutils literal"><span class="pre">bit-errors</span></tt> feature, under <tt class="docutils literal">some</tt> or
-<tt class="docutils literal">all</tt>, refuses a simulator file that states a rate, saying how to
-build one that has it: a test that asked for a lossy link and was given
-a perfect one would pass for the wrong reason. A file that states one
-under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt> is refused by every build that reads it.</dd>
+number; <tt class="docutils literal">random</tt>, one drawn from the clock. The default makes every
+run that states no seed lose the same packets, so that a test is
+repeatable without saying how; <tt class="docutils literal">random</tt> is asked for, never fallen
+into. Anything else is refused as the file is read. The rate, the seed,
+which of the three it was and the file are said as the ground starts, so
+a random seed can be stated to have its run again.</dd>
 </dl>
-</div>
 </div>
 <div class="section" id="waiting-for-the-simulator">
 <h2><a class="toc-backref" href="#toc-entry-148">Waiting for the Simulator</a></h2>
@@ -11524,8 +11559,8 @@ asks an hour later is told the truth.</p>
 </dd>
 <dt>Requirement</dt>
 <dd>The answer also says what the simulator is set up for: the digest of the
-tcspecial configuration it read, the digest of its simulator file, and its
-<tt class="docutils literal"><span class="pre">--simulate</span></tt> mode. The simulator file's digest is taken as the
+tcspecial configuration it read, the digest of its simulator file, and the
+simulation mode the file states. The simulator file's digest is taken as the
 configuration's is, of what it says and not of its bytes: its
 <tt class="docutils literal"><span class="pre">tcs-sim</span></tt> section, its groups and its simulated payloads by name, each
 with its type and settings, and its world, its ambient temperature,
@@ -11559,15 +11594,14 @@ started on its own can then outlive any number of ground station runs,
 and a ground station started twice by mistake does not start a second
 simulator.</dd>
 <dt>Requirement</dt>
-<dd><p class="first"><tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--wait</span></tt> takes the same files and the same mode as the simulator
-it waits for, and exits successfully once that simulator answers
+<dd><p class="first"><tt class="docutils literal"><span class="pre">tcs-sim</span> <span class="pre">--wait</span></tt> takes the same files as the simulator it waits for,
+and so the same mode, and exits successfully once that simulator answers
 <tt class="docutils literal">ready</tt> with the same digests and mode. It exits with a failure,
 saying why, on <tt class="docutils literal">failed</tt>, on a difference, or when its time runs out.
 This is the harness for a run started by hand:</p>
 <pre class="last literal-block">
-tcs-sim --simulate=all x.ytcs x-sim.yaml &amp;
-tcs-sim --wait --simulate=all x.ytcs x-sim.yaml &amp;&amp;
-    tcspecial --simulate=all x.ytcs
+tcs-sim x.ytcs &amp;
+tcs-sim --wait x.ytcs &amp;&amp; tcspecial x.ytcs
 </pre>
 </dd>
 <dt>Requirement</dt>

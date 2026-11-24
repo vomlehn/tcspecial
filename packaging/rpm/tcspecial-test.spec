@@ -23,7 +23,9 @@ Conflicts:      tcspecial < 0.1.1
 %description
 tcs-moc, a test mission operations center with a window per payload, and
 tcs-sim, which simulates the payloads a configuration describes. tcs-moc
-starts the tcspecial installed beside it and tcs-sim. Also the test segsend,
+starts the tcspecial installed beside it and tcs-sim. tcs-relay holds and
+loses datagrams between a Yamcs ground and a vehicle, as the Yamcs examples'
+simulated link. Also the test segsend,
 which deletes each filled telemetry log segment it is given, and the five
 test app programs, under /opt/tcs/libexec, that the app node types are tested
 with. Verification tools, never flown.
@@ -49,6 +51,7 @@ fi
 %dir /opt/tcs/share
 %dir /opt/tcs/share/doc
 /opt/tcs/bin/tcs-moc
+/opt/tcs/bin/tcs-relay
 /opt/tcs/bin/tcs-sim
 /opt/tcs/bin/segsend
 /opt/tcs/libexec/app_pl

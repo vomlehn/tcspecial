@@ -839,7 +839,7 @@ class YamcsBeacons:
         links:    The configuration's link digest, as hex, which each
                   beacon's is compared with; ``None`` to compare none.
         flying:   Whether this station is run as flight, under
-                  ``--simulate=none``, so that a beacon saying ``test`` is a
+                  ``simulate: none``, so that a beacon saying ``test`` is a
                   mismatch: see :meth:`tcsmoc.beacon.Beacons.flying`.
     """
 

@@ -443,7 +443,7 @@ def main(argv):
         if not options.no_vehicle:
             for one in watched:
                 vehicle = Vehicle.for_configuration(
-                    one.path, options.tcspecial, options.verbose, "all",
+                    one.path, options.tcspecial, options.verbose,
                     memlock=not options.no_memlock)
                 vehicle.start()
                 started.append(vehicle)

@@ -4,8 +4,7 @@
 # lander-a, which flies the X axis, and lander-b, which flies the Y axis:
 # one tcs-sim simulates the payloads of both, in one world, with
 #
-#   tcs-sim --simulate=all \
-#       --simulator=examples/lander-common/lander-sim.yaml \
+#   tcs-sim --simulator=examples/lander-common/lander-sim.yaml \
 #       examples/lander-a/lander-a.ytcs examples/lander-b/lander-b.ytcs
 #
 # Each payload says whose it is, by its configuration, so that a tool
@@ -17,6 +16,12 @@
 # into that run's copy of this file. See docs/lander-design.rst.
 
 description: Simulator settings for the lander example's two configurations
+
+# The run's simulation mode, which tcspecial, tcs-sim and tcs-moc all read
+# here: all, every payload a simulated or dummy device, as on a desk with no
+# hardware. See "Simulation Modes" in docs/tcspecial-design.rst.
+tcspecial:
+  simulate: all
 
 tcs-sim:
   ready: "127.0.0.24:7914"

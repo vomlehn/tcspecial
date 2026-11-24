@@ -26,7 +26,7 @@ def playing(mode, state):
     """A simulator answering with ``state[0]``, until the test ends.
 
     Args:
-        mode:  The mode, as ``--simulate`` names it, it says it is set up for.
+        mode:  The mode, as the simulator file names it, it says it is set up for.
         state: A one-element list holding the state it answers with, which the
                test may change while it runs.
 

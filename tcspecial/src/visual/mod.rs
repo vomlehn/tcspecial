@@ -185,7 +185,7 @@ fn lines_of(graph: &Graph) -> Vec<Line> {
 /// # Arguments
 ///
 /// * `path`    - The vehicle's configuration file.
-/// * `mode`    - The `--simulate` mode to run it under.
+/// * `mode`    - The simulation mode to run it under.
 /// * `checked` - That every check for test code has been made.
 ///
 /// # Returns

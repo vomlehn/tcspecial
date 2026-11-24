@@ -70,11 +70,11 @@ pub const TEST_CHECK: &str = "test";
 /// Flies" in `docs/tcspecial-design.rst`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlightCheck {
-    /// Flight code and nothing else: a run under `--simulate=none`, from a
+    /// Flight code and nothing else: a run under `simulate: none`, from a
     /// build with no feature that never flies.
     Flight,
     /// Test code is in this run or in this build, or the sender has not
-    /// said: a run under `--simulate=some` or `all`, or a build with a
+    /// said: a run under `simulate: some` or `all`, or a build with a
     /// feature that never flies, whether or not it is in use.
     Test,
 }

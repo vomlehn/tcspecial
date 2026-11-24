@@ -70,10 +70,12 @@ sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 
 from tcsmoc.beacon import Schedule, links_of  # noqa: E402
 from tcsmoc.processes import Child, Vehicle, built  # noqa: E402
+from tcsmoc.relay import Relays, loss_asked, relay_instances  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
     Yamcs, YamcsBeacons, command_settings, connect, print_beacon_pass,
     write_yamcs, yamcs_home)
 from tcsprotocol import configuration  # noqa: E402
+from tcsprotocol import simulate  # noqa: E402
 from tcsprotocol import yamcs as generated  # noqa: E402
 from tcsprotocol.form import UNITS, Form  # noqa: E402
 
@@ -87,9 +89,8 @@ HTTP_PORT = 17090
 #: The Yamcs instance this example runs.
 INSTANCE = "thermostat"
 
-#: The run's simulation mode, given to tcs-sim and tcspecial: every payload
-#: simulated, as the examples' run targets have it.
-SIMULATE = "all"
+#: The program that writes Yamcs's configuration, as each file says.
+WRITER = "thermostat_yamcs.py"
 
 #: How long tcs-sim is given to say it is ready, in seconds.
 SIMULATOR_PATIENCE = 60
@@ -207,6 +208,12 @@ class Setup:
     def __init__(self, options):
         self.path = Path(options.configuration).resolve()
         self.config = configuration.load(self.path)
+        # The run's simulation mode, from its simulator file, which tcs-sim
+        # and tcspecial read too: see tcsprotocol.simulate.
+        self.mode, self.sim = simulate.run_for(self.path)
+        #: Whether the simulator file asks for bit errors on the link,
+        #: which relays between Yamcs and the vehicle lose packets for.
+        self.lossy = loss_asked(self.sim, self.mode)
         said = self.config.tcspecial
         if said.get("gateway") != "yamcs":
             raise ValueError(f"{self.path}: its gateway is "
@@ -573,8 +580,8 @@ def run_the_window(readings, beacons):
 
 def simulator_ready(config_path, program, patience):
     """Wait for tcs-sim to say it is ready for this run, as ``tcs-sim --wait``
-    asks it: set up for this configuration, its simulator file and
-    :data:`SIMULATE`.
+    asks it: set up for this configuration, its simulator file and the
+    mode the file states.
 
     Args:
         config_path: The configuration.
@@ -585,8 +592,8 @@ def simulator_ready(config_path, program, patience):
         RuntimeError: It is not ready in time, or is set up for another run.
     """
     asked = subprocess.run(
-        [str(program), f"--simulate={SIMULATE}", f"--wait={patience}",
-         str(config_path)], capture_output=True, text=True)
+        [str(program), f"--wait={patience}", str(config_path)],
+        capture_output=True, text=True)
     if asked.returncode != 0:
         raise RuntimeError("tcs-sim is not ready for this run: "
                            f"{asked.stderr.strip() or asked.stdout.strip()}")
@@ -623,8 +630,21 @@ def main(argv):
         if not options.no_yamcs:
             home = yamcs_home(options.yamcs)
             write_yamcs(setup.config, run_dir, options.http_port, home,
-                        INSTANCE, "thermostat_yamcs.py",
-                        world=setup.world is not None)
+                        INSTANCE, WRITER, world=setup.world is not None)
+            # Bit errors on the link, where the simulator file asks for
+            # them: relays between Yamcs and the vehicle that lose what a
+            # lossy link would. The ground's simulation, refused in a flight
+            # run. See tcsmoc.relay.
+            if setup.lossy:
+                line = Relays(0.0, setup.sim, verbose=options.verbose)
+                for listen, forward, both in relay_instances(
+                        run_dir, [INSTANCE], WRITER):
+                    (line.both_ways if both else line.one_way)(listen,
+                                                               forward)
+                line.start()
+                started.append(line)
+                status("bit errors on the link, from "
+                       f"{setup.sim}: tcs-relay loses what they lose")
             status(f"starting Yamcs on {run_dir}")
             yamcs.start()
             status(f"Yamcs is at http://localhost:{options.http_port}")
@@ -634,16 +654,15 @@ def main(argv):
             # panel's buttons had been pressed: the sensors report the zone
             # and the heaters take what they are driven to without anybody
             # at tcs-sim's window. Each can still be stopped there.
-            simulator = Child(tcs_sim, [f"--simulate={SIMULATE}", "--sending",
-                                       str(setup.path)], "tcs-sim",
-                              options.verbose)
+            simulator = Child(tcs_sim, ["--sending", str(setup.path)],
+                              "tcs-sim", options.verbose)
             simulator.start()
             started.append(simulator)
             status("waiting for tcs-sim to make its simulated devices")
             simulator_ready(setup.path, tcs_sim, SIMULATOR_PATIENCE)
         if not options.no_vehicle:
             vehicle = Vehicle.for_configuration(
-                setup.path, options.tcspecial, options.verbose, SIMULATE,
+                setup.path, options.tcspecial, options.verbose, setup.sim,
                 memlock=not options.no_memlock)
             vehicle.start()
             started.append(vehicle)
@@ -657,7 +676,7 @@ def main(argv):
                                Schedule.for_interval(setup.beacon_interval),
                                setup.digest, setup.beacon_interval,
                                links=links_of(setup.config),
-                               flying=SIMULATE == "none")
+                               flying=setup.mode == simulate.FLIGHT)
         sources = setup.sources + [setup.world] * (setup.world is not None)
         if setup.world is None:
             status("no simulated world's temperature: "

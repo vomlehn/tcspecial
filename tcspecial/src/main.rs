@@ -11,18 +11,30 @@
 //! `--visual` opens a window showing the graph as tcs-cfge draws it, each link
 //! lit as data crosses it, in a tcspecial built with the `visual` feature;
 //! one built without it says so and exits. Never in flight: see
-//! `tcspecial::visual`. It is refused under `--simulate=none`, the flight
-//! setting and the one a run without `--simulate` gets.
+//! `tcspecial::visual`. It is refused under `simulate: none`, the flight
+//! setting and the one a run without a simulator file gets.
 //!
-//! `--simulate=<mode>` is the simulation mode, `none`, `some` or `all`: see
-//! `tcsprotocol::simulate`. Each payload is judged a real, a dummy or a
-//! simulated device before anything is opened, and a run whose payloads the
-//! mode does not allow is refused: see `tcspecial::runtime::start`.
+//! The simulation mode, `none`, `some` or `all`, is not given on the
+//! command line but stated in the run's simulator file, as `simulate` in
+//! its `tcspecial` section: the file `PAYLOAD_SIM_YAML` names, or else the
+//! one beside the configuration. With neither, or none stated, the run is
+//! `none`, the flight setting. `--simulate`, which once gave it, is refused,
+//! saying so. See `tcsprotocol::simulate`. Each payload is judged a real, a
+//! dummy or a simulated device before anything is opened, and a run whose
+//! payloads the mode does not allow is refused: see
+//! `tcspecial::runtime::start`.
+//!
+//! Bit errors and a delay on the link to the ground are the ground's to
+//! simulate, never tcspecial's: see `tcsmoc::loss` and `tcs-relay`.
+//!
+//! Every check that no test code is flying is made in
+//! `tcspecial::flight_checks`, before anything is read, and what it found
+//! goes in every beacon.
 //!
 //! `--no-memlock` runs the vehicle without locking its memory into RAM,
-//! under any `--simulate`. Without it the vehicle's memory is always locked,
-//! and a lock that fails is said and run without in flight, and stops
-//! tcspecial under `--simulate=some` or `all`: see
+//! in any mode. Without it the vehicle's memory is always locked, and a
+//! lock that fails is said and run without in flight, and stops tcspecial
+//! under `simulate: some` or `all`: see
 //! `tcspecial::runtime::memory`.
 //!
 //! `--types` prints the payload types this build contains, separated by

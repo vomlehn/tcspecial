@@ -48,6 +48,9 @@ configuration=$run/cfs.ytcs
 sed -e "s|/tmp/telemetry|$run/telemetry|" \
 	-e "s|/tmp/tcspecial-cfs.state|$run/tcspecial.state|" \
 	"$example" >"$configuration"
+# The copy has no simulator file beside it, so the example's is named: it
+# states the run's simulation mode, which tcspecial reads there.
+export PAYLOAD_SIM_YAML="${example%.ytcs}-sim.yaml"
 
 started=()
 
@@ -110,7 +113,7 @@ echo "tcspecial, on $configuration..."
 # Unlocked, since a desk may not let it lock its memory: see the manual's
 # "Locking memory".
 start "$run" "$run/tcspecial.log" "$top/target/debug/tcspecial" \
-	--simulate=all --no-memlock "$configuration"
+	--no-memlock "$configuration"
 
 echo "The test, as the cFS's ground..."
 (cd "$top" && TCS_CFS_CONFIGURATION=$configuration \

@@ -384,7 +384,8 @@ answers as the device would -- over UDP, or on a kernel dummy device -- with
 the packets, timings and errors its simulator configuration asks for. It is
 started with tcspecial and tcs-moc, as Running the Programs, in <a class="reference external" href="tcspecial.html#running-the-programs">the tcspecial
 manual</a>, describes, and tcspecial's
-<tt class="docutils literal"><span class="pre">--simulate</span></tt> says which payloads it stands in for.</p>
+simulation mode, stated in the simulator file, says which payloads it
+stands in for.</p>
 <div class="figure">
 <object data="tcs-sim-between.svg" type="image/svg+xml">tcs-sim, tcspecial and tcs-moc side by side, from left to right,
 on the thermostat example. tcs-moc starts the other two and asks tcs-sim, at its
@@ -481,7 +482,7 @@ real too.</p>
 </pre>
 <p>Before it simulates anything, tcs-sim compares each payload's <tt class="docutils literal">simulate</tt>
 with what is at the payload's endpoint, by the same rules tcspecial judges a
-payload by (see <a class="reference external" href="tcspecial.html#simulated-dummy-or-real-devices-simulate">Simulated, Dummy or Real Devices: --simulate</a>), and will
+payload by (see <a class="reference external" href="tcspecial.html#simulated-dummy-or-real-devices-simulate">Simulated, Dummy or Real Devices: simulate</a>), and will
 not start on a disagreement: <tt class="docutils literal">simulate: true</tt> where the configuration
 points at real hardware, or <tt class="docutils literal">simulate: false</tt> where it points at a
 simulated or dummy device. A simulated device tcs-sim makes itself, a
@@ -1146,24 +1147,19 @@ gateway                         optional
   seed                 where the random numbers start: left out, or
                        blank, for the default, 1; a whole number for that
                        number, to lose again the packets a run lost; or
-                       random, for one drawn from the system's source of
-                       randomness, never the clock
+                       random, for one drawn from the clock
 </pre>
 <pre class="code yaml literal-block">
 <span class="name tag">gateway</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">bit_error_rate</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">1e-5</span><span class="whitespace">    </span><span class="comment single"># a 100-byte packet lost about one time in 125</span><span class="whitespace">
   </span><span class="name tag">seed</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">random</span>
 </pre>
-<p>tcs-sim reads the section and does nothing with it. A tcspecial built with
-the <tt class="docutils literal"><span class="pre">bit-errors</span></tt> feature, which never flies, reads the file tcs-sim reads
--- the one <tt class="docutils literal">PAYLOAD_SIM_YAML</tt> names, and otherwise the one beside the
-configuration -- and loses the packets itself; its startup summary says the
-rate and the seed, so a run with a random one can be had again. Like every
-piece of test code it is refused under <tt class="docutils literal"><span class="pre">--simulate=none</span></tt>, and a tcspecial
-built without the feature refuses a file that states a rate rather than
-passing a test of a lossy link over a perfect one. See <a class="reference external" href="tcspecial.html#a-lossy-link-to-the-ground">A lossy link to the
-ground</a> in the tcspecial
-manual.</p>
+<p>tcs-sim reads the section and does nothing with it, and neither does
+tcspecial: the ground loses the packets -- tcs-moc and lander-station in
+their own links, and <tt class="docutils literal"><span class="pre">tcs-relay</span></tt> between Yamcs and the vehicle for the
+Yamcs examples -- and says the rate and the seed as it starts, so a run
+with a random one can be had again. It is the ground's simulation, refused
+under <tt class="docutils literal">simulate: none</tt>. See <a class="reference external" href="tcspecial.html#a-lossy-link-to-the-ground">A lossy link to the ground</a> in the tcspecial manual.</p>
 <p>The two files are joined by name. Every data handler needs a simulated payload
 naming it, and a name here that no handler has is an error rather than a line
 with no effect, because a typo is otherwise indistinguishable from a payload
@@ -1174,7 +1170,7 @@ reading one physical model. tcs-sim is then given every configuration and
 the file, which is beside none of them, so it is named, with
 <tt class="docutils literal"><span class="pre">--simulator=FILE</span></tt> or <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>:</p>
 <pre class="code console literal-block">
-<span class="generic prompt">$ </span>tcs-sim<span class="whitespace"> </span>--simulate<span class="operator">=</span>all<span class="whitespace"> </span>--simulator<span class="operator">=</span>lander-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
+<span class="generic prompt">$ </span>tcs-sim<span class="whitespace"> </span>--simulator<span class="operator">=</span>lander-sim.yaml<span class="whitespace"> </span><span class="literal string escape">\
 </span><span class="whitespace">    </span>lander-a.ytcs<span class="whitespace"> </span>lander-b.ytcs
 </pre>
 <p>Each payload the file names is a payload of exactly one of the

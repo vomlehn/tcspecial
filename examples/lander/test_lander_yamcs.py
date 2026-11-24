@@ -5,7 +5,6 @@ made are held to the lander's physical model by tcs-verify, where it is built.
 """
 
 import math
-import socket
 import subprocess
 import sys
 import tempfile
@@ -141,69 +140,17 @@ class Relays(unittest.TestCase):
             listening += [listen for listen, _, _ in relays]
         self.assertEqual(len(listening), len(set(listening)))
 
-    def _free(self):
-        """A UDP socket on a port nobody has, closed after the test.
-
-        Returns:
-            The socket, bound on the loopback.
-        """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.addCleanup(sock.close)
-        sock.bind(("127.0.0.1", 0))
-        sock.settimeout(3)
-        return sock
-
-    @staticmethod
-    def _port():
-        """A port nobody has, for a relay to listen on.
-
-        Returns:
-            The port.
-        """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(("127.0.0.1", 0))
-        port = sock.getsockname()[1]
-        sock.close()
-        return port
-
-    def test_one_way_holds_each_datagram(self):
-        """A datagram is passed on, no sooner than the delay."""
-        yamcs = self._free()
-        listen = ("127.0.0.1", self._port())
-        line = lander_yamcs.DelayLine(0.3)
-        line.one_way(listen, yamcs.getsockname())
-        line.start()
-        try:
-            vehicle = self._free()
-            sent = time.monotonic()
-            vehicle.sendto(b"down", listen)
-            data, _ = yamcs.recvfrom(100)
-            self.assertEqual(data, b"down")
-            self.assertGreaterEqual(time.monotonic() - sent, 0.3)
-        finally:
-            line.stop()
-
-    def test_both_ways_answers_whoever_asked(self):
-        """A command is passed on, and the answer comes back to the socket
-        that sent it, each held for the delay."""
-        vehicle = self._free()
-        listen = ("127.0.0.1", self._port())
-        line = lander_yamcs.DelayLine(0.2)
-        line.both_ways(listen, vehicle.getsockname())
-        line.start()
-        try:
-            yamcs = self._free()
-            sent = time.monotonic()
-            yamcs.sendto(b"CONNECT", listen)
-            data, relay = vehicle.recvfrom(100)
-            self.assertEqual(data, b"CONNECT")
-            vehicle.sendto(b"answer", relay)
-            data, sender = yamcs.recvfrom(100)
-            self.assertEqual(data, b"answer")
-            self.assertEqual(sender, listen)
-            self.assertGreaterEqual(time.monotonic() - sent, 0.4)
-        finally:
-            line.stop()
+    def test_tcs_relay_is_told_each_relay_the_delay_and_the_file(self):
+        """The relays go to tcs-relay, in Rust, which holds and loses: each
+        one way or both, the delay, and the run's simulator file."""
+        line = lander_yamcs.Relays(1.3, "run/lander-sim.yaml")
+        line.one_way(("127.0.0.1", 9000), ("127.0.0.1", 19000))
+        line.both_ways(("127.0.0.1", 19001), ("127.0.0.1", 9001))
+        self.assertEqual(line.args(), [
+            "--delay=1.3", "--simulator=run/lander-sim.yaml",
+            "127.0.0.1:9000>127.0.0.1:19000",
+            "127.0.0.1:19001<>127.0.0.1:9001"])
+        self.assertEqual(lander_yamcs.Relays(0).args(), ["--delay=0"])
 
 
 class Shown(unittest.TestCase):

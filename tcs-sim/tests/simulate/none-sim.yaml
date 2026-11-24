@@ -1,0 +1,4 @@
+# A simulator file stating only the flight setting, for a test that tcs-sim
+# refuses it: named by PAYLOAD_SIM_YAML.
+tcspecial:
+  simulate: none

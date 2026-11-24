@@ -266,6 +266,11 @@ impl Uplink {
                 self.to
             ));
         }
+        // Lost to a bit error, where a test asks the link to lose packets:
+        // gone as a datagram on a lossy link goes, with nothing said.
+        if crate::loss::lost(data.len()) {
+            return Ok(());
+        }
         self.socket
             .send_to(data, self.to)
             .map(|_| ())

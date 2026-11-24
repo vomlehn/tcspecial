@@ -209,9 +209,6 @@ pub struct EndpointPort {
     ///
     /// See [`EndpointPort::laid_out_as`].
     laid_out: Option<Format>,
-    /// Whether this is the gateway, the link to the ground, whose packets a
-    /// test of a lossy link loses: see `crate::runtime::bit_errors`.
-    gateway: bool,
 }
 
 impl EndpointPort {
@@ -342,7 +339,6 @@ impl EndpointPort {
             abandon: Abandon::nothing(),
             holds: false,
             laid_out: None,
-            gateway: false,
         }
     }
 
@@ -471,7 +467,6 @@ impl EndpointPort {
             )
         };
         let mut port = opened.map_err(|e| format!("{e}"))?;
-        port.gateway = tcsprotocol::gateway::is_gateway(&node.node_type);
 
         // A payload is a thing in the world that stays as it was put: a
         // decision written to it holds until another one is. A gateway link is
@@ -945,21 +940,6 @@ impl EndpointPort {
         }
     }
 
-    /// Whether what was just read from the ground is lost to a bit error,
-    /// in a test of a lossy link: never, but at the gateway in a build with
-    /// the `bit-errors` feature. See `crate::runtime::bit_errors`.
-    ///
-    /// # Arguments
-    ///
-    /// * `bytes` - How much was read.
-    ///
-    /// # Returns
-    ///
-    /// Whether to drop it whole.
-    fn lost_on_the_way_up(&self, bytes: usize) -> bool {
-        self.gateway && bytes > 0 && crate::runtime::bit_errors::lost(bytes)
-    }
-
     /// What has arrived at this device without asking it, before the stream
     /// it is on is said: see [`Port::take_unasked`].
     ///
@@ -1001,9 +981,6 @@ impl Port for EndpointPort {
     /// [`crate::endpoint::EndpointReadable::stream`].
     fn take(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         let taken = self.take_unstreamed(buffer)?;
-        if self.lost_on_the_way_up(taken.bytes) {
-            return Ok(Taken::NOTHING);
-        }
         let taken = self.standard(buffer, taken)?;
         Ok(Taken {
             stream: self.reader.stream(),
@@ -1013,9 +990,6 @@ impl Port for EndpointPort {
 
     fn take_unasked(&mut self, buffer: &mut [u8]) -> Result<Taken, String> {
         let taken = self.take_unasked_unstreamed(buffer)?;
-        if self.lost_on_the_way_up(taken.bytes) {
-            return Ok(Taken::NOTHING);
-        }
         let taken = self.standard(buffer, taken)?;
         Ok(Taken {
             stream: self.reader.stream(),
@@ -1070,11 +1044,6 @@ impl Port for EndpointPort {
             ));
         }
 
-        // Lost on the way down, in a test of a lossy link: never in a build
-        // that flies, where `lost` is `false`.
-        if self.gateway && crate::runtime::bit_errors::lost(data.len()) {
-            return Ok(());
-        }
         self.write_all(data, "write")
     }
 

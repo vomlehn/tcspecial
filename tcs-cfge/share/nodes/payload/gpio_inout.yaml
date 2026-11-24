@@ -42,7 +42,7 @@ attributes:
     required: false
     about: >
       Where tcs-sim answers for the lines over UDP when they are simulated, as
-      a loopback address and port: 127.0.0.1:5204. Under --simulate=some or
+      a loopback address and port: 127.0.0.1:5204. Under simulate: some or
       all tcspecial drives and watches the lines there instead of on the
-      chip, so no dummy chip is needed; under --simulate=none, the flight
+      chip, so no dummy chip is needed; under simulate: none, the flight
       setting, it is not used and the chip is opened.

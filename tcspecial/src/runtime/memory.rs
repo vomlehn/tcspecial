@@ -4,15 +4,15 @@
 //! will have with `mlockall`, before it loads a configuration, so that every
 //! buffer is real once it is made: a shortage is then a failure to load,
 //! not a process killed mid-pass when a buffer is first written. The
-//! supervisor locks nothing. `--no-memlock` asks for no lock, under any
-//! `--simulate`.
+//! supervisor locks nothing. `--no-memlock` asks for no lock, in any
+//! simulation mode.
 //!
 //! A lock can fail at two moments. The call itself fails, or not, the same
 //! for every configuration: it locks what the process has mapped before any
 //! is loaded. In flight that is said in the log and the startup summary,
 //! and the configuration runs unlocked, since a vehicle that would not start
 //! for want of a setting would be lost for want of it. Under
-//! `--simulate=some` or `all` it is fatal, since a desk is set up to lock as
+//! `simulate: some` or `all` it is fatal, since a desk is set up to lock as
 //! a vehicle is, and a lock that fails there may be the first sign of one
 //! that would fail aboard.
 //!
@@ -23,7 +23,7 @@
 //! with [`supervisor::SHORT`] in flight -- so that the supervisor gives the
 //! configuration up and starts a fresh child on the one beneath, or, for the
 //! command line's, which has none, starts it again unlocked -- and the
-//! fatal status under `--simulate`. A fresh process, because what a failed
+//! fatal status in a simulated run. A fresh process, because what a failed
 //! load took is not reliably handed back and stays locked.
 
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -36,7 +36,7 @@ use crate::runtime::supervisor;
 
 /// The status the child ends with when memory runs out:
 /// [`supervisor::SHORT`] in flight, and [`supervisor::FATAL`] once [`lock`]
-/// has been told the mode is `--simulate=some` or `all`.
+/// has been told the mode is `simulate: some` or `all`.
 static SHORT_STATUS: tcsos::local::Local<AtomicI32> =
     tcsos::local::Local::new(AtomicI32::new(supervisor::SHORT), || {
         AtomicI32::new(supervisor::SHORT)
@@ -66,7 +66,7 @@ pub enum Locked {
 ///
 /// # Errors
 ///
-/// Why the lock failed, under `--simulate=some` or `all`, where that is
+/// Why the lock failed, under `simulate: some` or `all`, where that is
 /// fatal: the child is to end with [`supervisor::FATAL`].
 pub fn lock(asked: bool, mode: Mode) -> Result<Locked, String> {
     if !mode.is_flight() {

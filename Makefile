@@ -124,13 +124,10 @@ TCSPECIAL_SIM_FILE ?= $(TCSPECIAL_CONFIG_FILE)-sim.yaml
 #   make run TCSPECIAL_CONFIG_FILE=examples/minimal/minimal RUST_LOG=debug
 RUST_LOG = info
 
-# The run's simulation mode, given to every program a run target starts:
-# none, some or all. All by default, because these targets run on a desk with
-# simulated and dummy devices, and a program that leaves the flag out gets
-# none -- the flight setting -- and refuses every one. See "Simulation Modes"
-# in docs/design.rst.
-#   make runmocy SIMULATE=some
-SIMULATE = all
+# The run's simulation mode is not given here: it is the simulator file's,
+# simulate: none, some or all in its tcspecial section, which every program a
+# run target starts reads there. See "Simulation Modes" in
+# docs/tcspecial-design.rst.
 
 # Whether the tcspecial a run target starts locks its memory into RAM, which
 # it does unless given --no-memlock. NO_MEMLOCK=1 gives it, for a desk whose
@@ -363,7 +360,8 @@ run:
 		cd $(RUST); \
 		cargo build -q --bin segsend; \
 		RUST_LOG=$(RUST_LOG) \
-			cargo run -q --bin tcspecial -- --simulate=$(SIMULATE) \
+			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
+			cargo run -q --bin tcspecial -- \
 			$(MEMLOCK_FLAG) $(TCSPECIAL_CONFIG_FILE).ytcs \
 	)
 
@@ -390,8 +388,7 @@ define runmoc_on
 		cargo build -q --bin tcspecial --bin tcs-sim --bin segsend; \
 		RUST_LOG=$(RUST_LOG) \
 			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
-			cargo run -q --bin tcs-moc -- --simulate=$(SIMULATE) \
-			$(MEMLOCK_FLAG) \
+			cargo run -q --bin tcs-moc -- $(MEMLOCK_FLAG) \
 			$(basename $(TCSPECIAL_CONFIG_FILE).$(1)).$(1) \
 	)
 endef
@@ -599,7 +596,7 @@ runsim:
 		echo "Running $(SIM_NAME)..."; \
 		cd $(RUST) && RUST_LOG=$(RUST_LOG) \
 			PAYLOAD_SIM_YAML=$(TCSPECIAL_SIM_FILE) \
-			cargo run -q --bin tcs-sim -- --simulate=$(SIMULATE) \
+			cargo run -q --bin tcs-sim -- \
 			$(TCSPECIAL_CONFIG_FILE).ytcs \
 	)
 
@@ -876,7 +873,7 @@ distclean: clean
 # bin, beside tcspecial, which is where tcspecial looks for it.
 FLIGHT_BIN := tcspecial
 TOOLS_BIN := tcs-cfge tcs-verify tcs-conflict
-TEST_BIN := tcs-moc tcs-sim segsend
+TEST_BIN := tcs-moc tcs-relay tcs-sim segsend
 TEST_LIBEXEC := app_pl app_all_pl app_gateway_veh app_payload_veh app_all_veh
 EXAMPLES_BIN := beacon lorem_gateway
 PACKAGES := tcspecial tcsmoc tcs-tools tcspecial-test tcspecial-doc \
@@ -1453,8 +1450,8 @@ endif
 # workspace built with every type never makes. The types are what a build
 # with the defaults says it contains, which is every type, so that the list
 # is not written down a second time here; see "Which Node Types Are Built" in
-# docs/design.rst. And with the visual window and with the bit errors,
-# test code that no default build has and so nothing else would ever build.
+# docs/design.rst. And with the visual window, test code that no default
+# build has and so nothing else would ever build.
 #
 # And every configuration compared in its two spellings, which must say the
 # same thing: a change made to one and not the other leaves both files valid,
@@ -1482,10 +1479,6 @@ check:
 		--lib visual
 	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features visual \
 		--test visual
-	cd $(RUST) && cargo clippy -p $(PROJECT_NAME) --features bit-errors \
-		--all-targets -- -D warnings
-	cd $(RUST) && cargo test -q -p $(PROJECT_NAME) --features bit-errors \
-		--lib -- bit_errors flight_checks
 	cd $(RUST) && cargo fmt -- --check
 	$(MAKE) --no-print-directory comparespellings
 	$(MAKE) --no-print-directory xtce-check

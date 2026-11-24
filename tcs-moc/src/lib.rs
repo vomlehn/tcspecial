@@ -13,7 +13,6 @@ use tcsos::time::Duration;
 
 use tcs_verify::startup::Startup;
 use tcsprotocol::config::payload_path_from_args;
-use tcsprotocol::simulate::Mode;
 use tcsprotocol::{Edge, NO_TRANSFER_TIME};
 
 use crate::oc_link::Arrivals;
@@ -25,6 +24,9 @@ mod ci_link;
 mod config;
 mod oc_link;
 mod plot;
+// Relays for a ground with no link of its own to simulate a delay or bit
+// errors in: the tcs-relay program. See relay.
+pub mod relay;
 mod vehicle;
 
 /// What the window's status line says about the link to the command
@@ -46,26 +48,12 @@ pub(crate) const ERROR_STATUS: &str = "Error";
 /// name that reaches further than intended, and all three programs now read
 /// their file the same way.
 ///
-/// Tcs-sim's simulator configuration is not passed on: tcs-sim takes it from
+/// The simulator file is not passed on: each finds it as the MOC does, from
 /// `PAYLOAD_SIM_YAML`, inherited from the MOC's environment like any other
-/// variable, and so is already looking at the file the MOC was pointed at.
-/// The MOC reads that file itself, but only to show it -- see
-/// `simulator_settings` -- and acts on none of it, so it has nothing to say
-/// about which one is right.
+/// variable, or beside the configuration, and so is looking at the file the
+/// MOC was pointed at -- and reads the run's simulation mode there, as the
+/// MOC does. See `tcsprotocol::simulate::run_for`.
 const CHILDREN: [&str; 2] = ["tcspecial", "tcs-sim"];
-
-/// Which environment variable names the simulator configuration.
-///
-/// The same variable tcs-sim reads, which is the point: the MOC shows what the
-/// tcs-sim it starts is simulating, so the two have to be looking at one file.
-///
-/// There was a default beside this, read when the variable was unset and no
-/// file was beside the tcspecial configuration -- and it named another
-/// payload set's simulator file, so a set with no simulator of its own was
-/// read against one describing payloads it had never heard of. A set with no
-/// simulator file simulates nothing: see [`sim_path_for`].
-const SIM_CONFIG_PATH_VAR: &str = "PAYLOAD_SIM_YAML";
-
 /// What one column of the grid takes, and the height of everything above and
 /// below the grid.
 ///
@@ -353,34 +341,6 @@ fn grid_shape(sizes: &Sizes, panels: usize) -> GridShape {
     }
 }
 
-/// Which simulator file goes with this payload set, if it has one.
-///
-/// The one `PAYLOAD_SIM_YAML` names, and otherwise the one beside the tcspecial
-/// configuration and named for it -- see
-/// `tcsprotocol::config::sim_path_beside`, which tcs-sim asks as well --
-/// which is the convention the whole payload set mechanism rests on.
-///
-/// `None` for a set with no simulator file beside it, which is a set with
-/// nothing simulated. It used to fall back to one named here, which was
-/// another payload set's: a configuration of its own was then read against
-/// payloads it had never heard of, and the window opened complaining about
-/// four handlers nobody had mentioned. A set that simulates nothing says so
-/// and starts no simulator.
-///
-/// # Arguments
-///
-/// * `payload_path` - The tcspecial configuration's path.
-///
-/// # Returns
-///
-/// The simulator file's path, or `None` where the set has none.
-fn sim_path_for(payload_path: &str) -> Option<String> {
-    match env::var(SIM_CONFIG_PATH_VAR) {
-        Ok(named) => Some(named),
-        Err(_) => tcsprotocol::config::sim_path_beside(payload_path),
-    }
-}
-
 /// Says what was found as tcs-moc started, in a window of its own, and waits
 /// for it to be closed.
 ///
@@ -568,7 +528,6 @@ fn update_row(
 ///
 /// * `name`         - The binary to run, `tcspecial` or `tcs-sim`.
 /// * `payload_path` - The tcspecial configuration the child is to read.
-/// * `mode`         - The run's simulation mode, passed on as the flag.
 /// * `installed`    - The directory an installed MOC is in, or `None` for
 ///                    one run out of a source tree.
 ///
@@ -584,13 +543,11 @@ fn update_row(
 fn child_command(
     name: &str,
     payload_path: &str,
-    mode: Mode,
     installed: Option<&Path>,
 ) -> Result<Command, String> {
     let args = child_args(
         name,
         payload_path,
-        mode,
         NO_MEMLOCK.get().copied().unwrap_or(false),
     );
     if let Some(program) = child_program(name, installed)? {
@@ -609,26 +566,21 @@ fn child_command(
 /// tcspecial it starts: set once, as the MOC reads its command line.
 static NO_MEMLOCK: tcsos::sync::OnceLock<bool> = tcsos::sync::OnceLock::new();
 
-/// The arguments a child is started with.
+/// The arguments a child is started with. Not the simulation mode, which
+/// the child reads from the simulator file it finds as the MOC found it.
 ///
 /// # Arguments
 ///
 /// * `name`         - The binary, `tcspecial` or `tcs-sim`.
 /// * `payload_path` - The tcspecial configuration it is to read.
-/// * `mode`         - The run's simulation mode, passed on as the flag.
 /// * `no_memlock`   - Whether tcspecial is to run without locking its
 ///                    memory; tcs-sim locks nothing, and is not told.
 ///
 /// # Returns
 ///
 /// The arguments, the configuration last.
-fn child_args(
-    name: &str,
-    payload_path: &str,
-    mode: Mode,
-    no_memlock: bool,
-) -> Vec<String> {
-    let mut args = vec![format!("{}={mode}", tcsprotocol::simulate::FLAG)];
+fn child_args(name: &str, payload_path: &str, no_memlock: bool) -> Vec<String> {
+    let mut args = Vec::new();
     if no_memlock && name == "tcspecial" {
         args.push("--no-memlock".to_string());
     }
@@ -774,18 +726,16 @@ impl ProcessManager {
     ///
     /// * `name`         - The binary to start, `tcspecial` or `tcs-sim`.
     /// * `payload_path` - The tcspecial configuration the child is to read.
-    /// * `mode`         - The run's simulation mode, passed on to it.
     ///
     /// # Panics
     ///
     /// If the child cannot be started, or a lock on it is poisoned.
-    fn start_child(&self, name: &str, payload_path: &str, mode: Mode) {
+    fn start_child(&self, name: &str, payload_path: &str) {
         let installed = installed_directory();
-        let child =
-            child_command(name, payload_path, mode, installed.as_deref())
-                .unwrap_or_else(|e| panic!("{e}"))
-                .spawn()
-                .unwrap_or_else(|e| panic!("Failed to start {name}: {e}"));
+        let child = child_command(name, payload_path, installed.as_deref())
+            .unwrap_or_else(|e| panic!("{e}"))
+            .spawn()
+            .unwrap_or_else(|e| panic!("Failed to start {name}: {e}"));
 
         *self.child.lock().unwrap() = Some(child);
         *self.name.lock().unwrap() = name.to_string();
@@ -868,17 +818,20 @@ const USAGE: &str = "\
 usage: tcs-moc [options] configuration
 
   configuration      the .ytcs or .xtcs file of the vehicle to command; the
-                     simulator file beside it, NAME-sim.yaml, is read too
-  --simulate=MODE    none (the default, the flight setting), some or all,
-                     given to the tcspecial and tcs-sim it starts
+                     simulator file PAYLOAD_SIM_YAML names, or else the one
+                     beside it, NAME-sim.yaml, is read too
   --no-memlock       have the tcspecial it starts run without locking its
                      memory into RAM
   -h, --help         print this, and exit
+
+The simulation mode is the simulator file's, simulate: none, some or all in
+its tcspecial section, which the tcspecial and tcs-sim it starts read too.
+With no file, or none stated, the run is none, the flight setting.
 ";
 
-/// Reads the simulation mode and the tcspecial configuration from the
-/// command line, says what is wrong with the configuration, and runs the
-/// window.
+/// Reads the tcspecial configuration from the command line and the
+/// simulation mode from its simulator file, says what is wrong with the
+/// configuration, and runs the window.
 ///
 /// Exits with status 1 on a bad command line or a configuration that stops
 /// the MOC.
@@ -900,19 +853,13 @@ pub fn main() {
     // panels, the grid they sit in, and the size the window opens at all follow
     // from how many data handlers it describes. No variable of its own: the MOC
     // starts the other two and they inherit its environment, so a variable here
-    // would name their file as well. The run's simulation mode, given to both
-    // programs this starts: see `tcsprotocol::simulate`. Under the flight
-    // setting, which is what a run without the flag gets, tcs-sim is not
-    // started at all.
-    let (mode, args) =
-        match tcsprotocol::simulate::take_mode(env::args().collect()) {
-            Ok(taken) => taken,
-            Err(e) => {
-                eprintln!("tcs-moc: {e}");
-                exit(1);
-            }
-        };
-    eprintln!("simulation mode: {mode}");
+    // would name their file as well. The flag the mode was once given by
+    // is refused: the mode is the simulator file's.
+    let args: Vec<String> = env::args().collect();
+    if let Err(e) = tcsprotocol::simulate::refuse_flag(&args) {
+        eprintln!("tcs-moc: {e}");
+        exit(1);
+    }
     // Passed on to the tcspecial this starts, under any mode: a desk that
     // will not let tcspecial lock its memory runs it without the lock.
     let (no_memlock, args): (Vec<String>, Vec<String>) =
@@ -927,6 +874,31 @@ pub fn main() {
     };
     eprintln!("payload configuration: {}", payload_path);
 
+    // The run's simulator file and the mode it states, which the tcspecial
+    // and tcs-sim this starts find and read the same way: see
+    // `tcsprotocol::simulate`. Under the flight setting, which is what a run
+    // without a simulator file gets, tcs-sim is not started at all.
+    let run = match tcsprotocol::simulate::run_for(&payload_path) {
+        Ok(run) => run,
+        Err(e) => {
+            eprintln!("tcs-moc: {e}");
+            exit(1);
+        }
+    };
+    let mode = run.mode;
+    eprintln!("simulation mode: {mode}");
+    // Bit errors on the link, where the simulator file asks for them:
+    // simulation done here, on the ground, and refused in a flight run.
+    // See tcsmoc::loss.
+    match tcsmoc::loss::arm_for(run.sim.as_deref(), mode) {
+        Ok(Some(armed)) => eprintln!("{armed}"),
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("tcs-moc: {e}");
+            exit(1);
+        }
+    }
+
     // Everything wrong with the payload set, in tcs-verify's words: every
     // problem at once, each with its file and line, which is what tcs-verify,
     // tcspecial, tcs-sim and tcs-cfge say about the same files. The simulator
@@ -936,7 +908,7 @@ pub fn main() {
     // All of what this finds, and what the MOC finds for itself below, is
     // shown before the main window is -- and the window is not shown at all
     // where any of it stops the MOC.
-    let sim_path = sim_path_for(&payload_path);
+    let sim_path = run.sim;
     let mut startup = Startup::default();
     startup.report_loosely(
         &tcsverify::verify(
@@ -2366,23 +2338,14 @@ mod tests {
     #[test]
     fn each_child_is_started_on_the_mocs_payload_file() {
         for name in CHILDREN {
-            let command =
-                child_command(name, "tcspecial2.ytcs", Mode::All, None)
-                    .unwrap();
+            let command = child_command(name, "tcspecial2.ytcs", None).unwrap();
 
             assert_eq!(command.get_program(), "cargo", "{name}");
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args,
-                [
-                    "run",
-                    "--bin",
-                    name,
-                    "--",
-                    "--simulate=all",
-                    "tcspecial2.ytcs"
-                ],
-                "{name}: with the MOC's own mode"
+                ["run", "--bin", name, "--", "tcspecial2.ytcs"],
+                "{name}: no mode, which the child reads for itself"
             );
 
             // Nothing is put in the child's environment: the argument says it
@@ -2397,7 +2360,8 @@ mod tests {
     /// What `--help` prints names every option the MOC takes.
     #[test]
     fn the_usage_names_every_option() {
-        for option in ["--simulate=", "--no-memlock", "--help"] {
+        for option in ["simulate: none, some or all", "--no-memlock", "--help"]
+        {
             assert!(USAGE.contains(option), "{option}");
         }
     }
@@ -2407,17 +2371,11 @@ mod tests {
     #[test]
     fn no_memlock_is_passed_on_to_tcspecial_alone() {
         assert_eq!(
-            child_args("tcspecial", "v.ytcs", Mode::All, true),
-            ["--simulate=all", "--no-memlock", "v.ytcs"]
+            child_args("tcspecial", "v.ytcs", true),
+            ["--no-memlock", "v.ytcs"]
         );
-        assert_eq!(
-            child_args("tcs-sim", "v.ytcs", Mode::All, true),
-            ["--simulate=all", "v.ytcs"]
-        );
-        assert_eq!(
-            child_args("tcspecial", "v.ytcs", Mode::None, false),
-            ["--simulate=none", "v.ytcs"]
-        );
+        assert_eq!(child_args("tcs-sim", "v.ytcs", true), ["v.ytcs"]);
+        assert_eq!(child_args("tcspecial", "v.ytcs", false), ["v.ytcs"]);
     }
 
     /// The file a child is started on is the one named on the MOC's own
@@ -2428,8 +2386,7 @@ mod tests {
             payload_path_from_args(args(&["tcspecial2.ytcs"]), None).unwrap();
 
         for name in CHILDREN {
-            let command =
-                child_command(name, &payload_path, Mode::All, None).unwrap();
+            let command = child_command(name, &payload_path, None).unwrap();
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2447,8 +2404,7 @@ mod tests {
         assert_eq!(payload_path, DEFAULT_PAYLOAD_CONFIG_PATH);
 
         for name in CHILDREN {
-            let command =
-                child_command(name, &payload_path, Mode::All, None).unwrap();
+            let command = child_command(name, &payload_path, None).unwrap();
             let args: Vec<&OsStr> = command.get_args().collect();
             assert_eq!(
                 args.last(),
@@ -2465,13 +2421,9 @@ mod tests {
         let installed = tempfile::tempdir().expect("a directory");
         for name in CHILDREN {
             tcsos::fs::write(installed.path().join(name), "").expect("written");
-            let command = child_command(
-                name,
-                "tcspecial2.ytcs",
-                Mode::None,
-                Some(installed.path()),
-            )
-            .expect("the child is beside the MOC");
+            let command =
+                child_command(name, "tcspecial2.ytcs", Some(installed.path()))
+                    .expect("the child is beside the MOC");
 
             assert_eq!(
                 command.get_program(),
@@ -2479,7 +2431,7 @@ mod tests {
                 "{name}"
             );
             let args: Vec<&OsStr> = command.get_args().collect();
-            assert_eq!(args, ["--simulate=none", "tcspecial2.ytcs"], "{name}");
+            assert_eq!(args, ["tcspecial2.ytcs"], "{name}");
         }
     }
 
@@ -2493,13 +2445,9 @@ mod tests {
             ("tcspecial", "tcspecial package"),
             ("tcs-sim", "tcspecial-test"),
         ] {
-            let refused = child_command(
-                name,
-                "tcspecial2.ytcs",
-                Mode::All,
-                Some(installed.path()),
-            )
-            .expect_err("a missing child is refused");
+            let refused =
+                child_command(name, "tcspecial2.ytcs", Some(installed.path()))
+                    .expect_err("a missing child is refused");
             let looked = installed.path().join(name);
             assert!(
                 refused.contains(&format!("no {name} beside it")),

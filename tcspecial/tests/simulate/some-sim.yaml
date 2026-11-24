@@ -1,0 +1,4 @@
+# A simulator file stating only the simulation mode, some, for a test that
+# runs tcspecial so: named by PAYLOAD_SIM_YAML.
+tcspecial:
+  simulate: some

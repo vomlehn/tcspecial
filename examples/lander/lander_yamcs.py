@@ -52,14 +52,10 @@ window, where the lander is flown, so it wants a display.
 """
 
 import argparse
-import heapq
-import itertools
 import math
 import os
 import random
 import re
-import select
-import socket
 import struct
 import subprocess
 import sys
@@ -74,9 +70,13 @@ sys.path.insert(0, str(ROOT / "python"))
 sys.path.insert(0, str(ROOT / "tcs-ui" / "python"))
 
 from tcsmoc.processes import Child, Vehicle, built  # noqa: E402
+from tcsmoc.relay import (  # noqa: E402
+    Relays, loss_asked, relay_instances, relayed)
+from tcsmoc.simulation import allow  # noqa: E402
 from tcsmoc.yamcs_ground import (  # noqa: E402
     Yamcs, connect, write_yamcs_instances, yamcs_home)
 from tcsprotocol import configuration  # noqa: E402
+from tcsprotocol.simulate import mode_of  # noqa: E402
 from tcsprotocol import yamcs as generated  # noqa: E402
 
 #: The two vehicles, each by the name of its Yamcs instance, which is its
@@ -93,13 +93,6 @@ HTTP_PORT = 19090
 #: How long a datagram takes between the Moon and the Earth, in seconds,
 #: unless --delay says: light takes about 1.28.
 DELAY = 1.3
-
-#: How far above its own port each link Yamcs is given is moved, so that the
-#: relay can have the port the vehicle sends to or is sent from.
-SHIFT = 10000
-
-#: The run's simulation mode, given to tcs-sim and both tcspecials.
-SIMULATE = "all"
 
 #: How long tcs-sim is given to say it is ready, in seconds.
 SIMULATOR_PATIENCE = 60
@@ -517,164 +510,6 @@ def run_sim_text(shipped, seed, ground, pad):
             f"landscape made\n# from seed {seed}.\n\n" + text)
 
 
-def relayed(links, shift=SHIFT):
-    """A Yamcs instance's links moved for relays to stand between it and the
-    vehicle, and the relays.
-
-    A link Yamcs only listens on -- telemetry, the beacon -- is moved
-    ``shift`` above its port, and its relay listens on the port the vehicle
-    sends to and passes each datagram on to Yamcs. A link Yamcs sends on --
-    commands, whose answers come back to the socket that sent them -- is
-    pointed at a port ``shift`` above the vehicle's, where its relay
-    listens, passing each command on to the vehicle and each answer back.
-
-    Args:
-        links: The links, as :func:`tcsprotocol.yamcs.data_links` gives
-               them. Left as they are.
-        shift: How far each port is moved.
-
-    Returns:
-        The moved links, and each relay as ``(listen, forward, both_ways)``,
-        each address a ``(host, port)``.
-    """
-    moved, relays = [], []
-    for link in links:
-        link = dict(link)
-        port = link["port"]
-        if "host" in link:
-            vehicle = (link["host"], port)
-            link["host"] = "127.0.0.1"
-            link["port"] = port + shift
-            relays.append((("127.0.0.1", port + shift), vehicle, True))
-        else:
-            link["port"] = port + shift
-            relays.append((("127.0.0.1", port), ("127.0.0.1", port + shift),
-                           False))
-        moved.append(link)
-    return moved, relays
-
-
-class DelayLine:
-    """Relays that hold each datagram a while before passing it on, all
-    served by one thread.
-
-    Args:
-        delay: How long each datagram is held, in seconds.
-    """
-
-    def __init__(self, delay):
-        self.delay = delay
-        # Each socket, and what it does with what arrives at it: a function
-        # of the datagram's sender giving the socket to send it on and where
-        # to, or None where it has nowhere to go yet.
-        self._routes = {}
-        self._due = []
-        self._order = itertools.count()
-        self._stopping = threading.Event()
-        self._thread = None
-
-    @staticmethod
-    def _bound(address):
-        """A UDP socket bound to an address.
-
-        Args:
-            address: ``(host, port)``.
-
-        Returns:
-            The socket.
-
-        Raises:
-            OSError: The address cannot be had, saying which it is.
-        """
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        try:
-            sock.bind(address)
-        except OSError as why:
-            sock.close()
-            raise OSError(f"a relay cannot listen at "
-                          f"{address[0]}:{address[1]}: {why}")
-        return sock
-
-    def one_way(self, listen, forward):
-        """Adds a relay passing what arrives at one address on to another.
-
-        Args:
-            listen:  Where it listens, ``(host, port)``.
-            forward: Where it passes each datagram on to.
-        """
-        near = self._bound(listen)
-        self._routes[near] = lambda _sender: (near, forward)
-
-    def both_ways(self, listen, forward):
-        """Adds a relay passing what arrives at one address on to another,
-        from a socket of its own, and the answers back to whoever last sent.
-
-        Args:
-            listen:  Where it listens, ``(host, port)``.
-            forward: Where it passes each datagram on to.
-        """
-        near = self._bound(listen)
-        far = self._bound(("127.0.0.1", 0))
-        asker = []
-
-        def from_near(sender):
-            """Where a datagram from the near side goes.
-
-            Args:
-                sender: Who sent it, who is answered.
-
-            Returns:
-                The far socket and ``forward``.
-            """
-            asker[:] = [sender]
-            return far, forward
-
-        self._routes[near] = from_near
-        self._routes[far] = lambda _sender: (near, asker[0]) if asker \
-            else None
-
-    def start(self):
-        """Starts passing datagrams on."""
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
-
-    def stop(self):
-        """Stops, and closes every socket."""
-        self._stopping.set()
-        if self._thread is not None:
-            self._thread.join(timeout=2)
-        for sock in self._routes:
-            sock.close()
-
-    def _run(self):
-        """Receives, holds and sends, until stopped."""
-        sockets = list(self._routes)
-        while not self._stopping.is_set():
-            now = time.monotonic()
-            while self._due and self._due[0][0] <= now:
-                _, _, sock, to, data = heapq.heappop(self._due)
-                try:
-                    sock.sendto(data, to)
-                except OSError as why:
-                    status(f"relay: cannot send to {to}: {why}")
-            wait = 0.05
-            if self._due:
-                wait = min(wait, max(0.0, self._due[0][0] - now))
-            readable, _, _ = select.select(sockets, [], [], wait)
-            for sock in readable:
-                try:
-                    data, sender = sock.recvfrom(65536)
-                except OSError:
-                    continue
-                route = self._routes[sock](sender)
-                if route is None:
-                    continue
-                out, to = route
-                heapq.heappush(self._due, (time.monotonic() + self.delay,
-                                           next(self._order), out, to,
-                                           data))
-
-
 class Craft:
     """One of the vehicles, as the program reads it.
 
@@ -768,22 +603,11 @@ def write_yamcs(crafts, yamcs_dir, http_port, home):
     Raises:
         As :func:`tcsmoc.yamcs_ground.write_yamcs_instances`.
     """
-    import yaml
     write_yamcs_instances([(craft.config, craft.instance)
                            for craft in crafts], yamcs_dir, http_port, home,
                           "lander_yamcs.py")
-    relays = []
-    for craft in crafts:
-        path = yamcs_dir / "etc" / f"yamcs.{craft.instance}.yaml"
-        text = path.read_text()
-        header = "".join(line + "\n" for line in text.splitlines()
-                         if line.startswith("#"))
-        said = yaml.safe_load(text)
-        said["dataLinks"], theirs = relayed(said["dataLinks"])
-        relays += theirs
-        path.write_text(header + "# Its links moved for lander_yamcs.py's "
-                        "relays.\n" + yaml.safe_dump(said, sort_keys=False))
-    return relays
+    return relay_instances(yamcs_dir, [craft.instance for craft in crafts],
+                           "lander_yamcs.py")
 
 
 def simulator_args(sim_path, crafts):
@@ -794,10 +618,10 @@ def simulator_args(sim_path, crafts):
         crafts:   The :class:`Craft` of each vehicle.
 
     Returns:
-        The arguments: the mode, the simulator file, and each
-        configuration, in order.
+        The arguments: the simulator file, which states the run's mode, and
+        each configuration, in order.
     """
-    return ([f"--simulate={SIMULATE}", f"--simulator={sim_path}"]
+    return ([f"--simulator={sim_path}"]
             + [str(craft.path) for craft in crafts])
 
 
@@ -1853,6 +1677,13 @@ def main(argv):
     try:
         crafts = [Craft(instance) for instance in VEHICLES]
         sim_path, lander = write_run(run_dir, seed)
+        # The delay on the link, and any bit errors the run's simulator
+        # file asks for, are the ground's simulation, which the run's mode,
+        # as the file states it, must allow.
+        mode = mode_of(sim_path)
+        if options.delay > 0:
+            allow(f"--delay={options.delay:g}", mode, str(sim_path))
+        loss_asked(sim_path, mode)
     except (ValueError, OSError) as why:
         print(f"lander_yamcs: {why}", file=sys.stderr)
         return 2
@@ -1871,7 +1702,7 @@ def main(argv):
     first = Yamcs(options.yamcs, yamcs_dir, options.http_port, VEHICLES[0])
     yamcses = [first] + [first.instance_of(instance)
                          for instance in VEHICLES[1:]]
-    line = DelayLine(options.delay)
+    line = Relays(options.delay, sim_path, verbose=options.verbose)
     started = []
     simulator = None
 
@@ -1918,7 +1749,7 @@ def main(argv):
                 if logs is not None:
                     logs.mkdir(parents=True, exist_ok=True)
                 vehicle = Vehicle.for_configuration(
-                    craft.path, options.tcspecial, options.verbose, SIMULATE,
+                    craft.path, options.tcspecial, options.verbose, sim_path,
                     memlock=not options.no_memlock)
                 vehicle.start()
                 started.append(vehicle)

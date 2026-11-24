@@ -1,5 +1,5 @@
 //! tcspecial judges each payload a real, a dummy or a simulated device before
-//! it opens anything, and refuses a run whose payloads its `--simulate` mode
+//! it opens anything, and refuses a run whose payloads its simulation mode
 //! does not allow.
 //!
 //! A simulated device here is a pseudo-terminal, as tcs-sim makes for a serial
@@ -172,11 +172,28 @@ const ON_THE_NETWORK: &str = "  - type network:
         protocol: \"udp\"
 ";
 
+/// The fixture simulator file that states only a mode.
+///
+/// # Arguments
+///
+/// * `mode` - The mode: `none`, `some` or `all`.
+///
+/// # Returns
+///
+/// Its path.
+fn sim(mode: &str) -> String {
+    format!(
+        "{}/tests/simulate/{mode}-sim.yaml",
+        env!("CARGO_MANIFEST_DIR")
+    )
+}
+
 /// Runs tcspecial, which must fail, on a fresh configuration.
 ///
 /// # Arguments
 ///
-/// * `args`     - The arguments to give before the configuration's path.
+/// * `mode`     - The simulation mode its simulator file states; `None`
+///                for no simulator file.
 /// * `payloads` - The configuration's `payloads` section.
 ///
 /// # Returns
@@ -186,12 +203,16 @@ const ON_THE_NETWORK: &str = "  - type network:
 /// # Panics
 ///
 /// If tcspecial cannot be run, or as [`stderr_of`] panics.
-fn run(args: &[&str], payloads: &str) -> String {
+fn run(mode: Option<&str>, payloads: &str) -> String {
     let dir = tempfile::tempdir().expect("a directory");
     let path = configuration(dir.path(), payloads);
+    let mut command = Command::new(env!("CARGO_BIN_EXE_tcspecial"));
+    match mode {
+        Some(mode) => command.env("PAYLOAD_SIM_YAML", sim(mode)),
+        None => command.env_remove("PAYLOAD_SIM_YAML"),
+    };
     stderr_of(
-        Command::new(env!("CARGO_BIN_EXE_tcspecial"))
-            .args(args)
+        command
             // This desk cannot lock tcspecial's memory: see the manual's
             // "Locking memory".
             .arg("--no-memlock")
@@ -199,13 +220,14 @@ fn run(args: &[&str], payloads: &str) -> String {
     )
 }
 
-/// Left out, the mode is the flight setting, and a simulated device is refused
-/// saying which flag a test run wants -- before the log is looked at.
+/// Unstated, the mode is the flight setting, and a simulated device is
+/// refused saying which mode a test run wants -- before the log is looked
+/// at.
 #[test]
 fn a_simulated_device_is_refused_in_the_flight_setting() {
     let (_master, slave) = pseudo_terminal();
-    for args in [&[][..], &["--simulate=none"]] {
-        let said = run(args, &on_a_terminal(&slave));
+    for mode in [None, Some("none")] {
+        let said = run(mode, &on_a_terminal(&slave));
         assert!(said.contains("simulation mode: none"), "{said}");
         assert!(
             said.contains(&format!(
@@ -216,7 +238,7 @@ fn a_simulated_device_is_refused_in_the_flight_setting() {
         );
         assert!(
             said.contains(
-                "a simulated device, and --simulate=none, the flight \
+                "a simulated device, and simulate: none, the flight \
                  setting, allows only real devices"
             ),
             "{said}"
@@ -229,14 +251,14 @@ fn a_simulated_device_is_refused_in_the_flight_setting() {
 #[test]
 fn a_simulated_device_is_allowed_where_the_mode_allows_it() {
     let (_master, slave) = pseudo_terminal();
-    let said = run(&["--simulate=all"], &on_a_terminal(&slave));
+    let said = run(Some("all"), &on_a_terminal(&slave));
     assert!(said.contains("simulation mode: all"), "{said}");
     assert!(!said.contains("allows"), "{said}");
     assert!(said.contains("tcspecial v"), "{said}");
 
     // One simulated device and nothing else is not `some`.
-    let said = run(&["--simulate=some"], &on_a_terminal(&slave));
-    assert!(said.contains("give --simulate=all"), "{said}");
+    let said = run(Some("some"), &on_a_terminal(&slave));
+    assert!(said.contains("state simulate: all"), "{said}");
 }
 
 /// A network payload is a real device, whatever answers at its far end, so the
@@ -244,8 +266,8 @@ fn a_simulated_device_is_allowed_where_the_mode_allows_it() {
 /// devices refuses it.
 #[test]
 fn a_network_payload_is_a_real_device_under_every_mode() {
-    for mode in ["--simulate=none", "--simulate=all"] {
-        let said = run(&[mode], ON_THE_NETWORK);
+    for mode in ["none", "all"] {
+        let said = run(Some(mode), ON_THE_NETWORK);
         assert!(!said.contains("allows"), "{said}");
         assert!(!said.contains("simulated device"), "{said}");
         assert!(said.contains("tcspecial v"), "{said}");
@@ -253,7 +275,7 @@ fn a_network_payload_is_a_real_device_under_every_mode() {
 
     // With nothing counted there is no payload to simulate, which `some` wants
     // one of.
-    let said = run(&["--simulate=some"], ON_THE_NETWORK);
+    let said = run(Some("some"), ON_THE_NETWORK);
     assert!(said.contains("has no payloads"), "{said}");
 }
 
@@ -293,20 +315,20 @@ payloads:
     let said = |mode: &str| {
         stderr_of(
             Command::new(env!("CARGO_BIN_EXE_tcspecial"))
-                .arg(mode)
+                .env("PAYLOAD_SIM_YAML", sim(mode))
                 .arg("--no-memlock")
                 .arg(&path),
         )
     };
 
-    let all = said("--simulate=all");
+    let all = said("all");
     assert!(
         all.contains(
             "channel: a simulated device: 127.0.0.1 is a loopback address"
         ),
         "{all}"
     );
-    let none = said("--simulate=none");
+    let none = said("none");
     assert!(
         none.contains(
             "channel: taken for hardware, as what could not be told: \

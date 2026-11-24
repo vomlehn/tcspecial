@@ -364,14 +364,16 @@ together.</p>
 simulator file also has a <code>tcs-sim</code> section giving the
 address at which tcs-sim says it has made its simulated devices, a port
 no other example uses, so that tcs-moc starts tcspecial only once they
-are there. The <code>make run-*</code> targets give every program
-<code>--simulate=all</code>, the run being one with simulated and dummy
-devices only: a program started without <code>--simulate</code> gets the
-flight setting, <code>none</code>, and refuses every simulated and dummy
-device. A <code>network</code> or <code>device-file</code> payload is a
-real device under any mode, whether or not tcs-sim answers at its far
-end. See “Simulated, Dummy or Real Devices: –simulate” in the
-manual.</p>
+are there. Every simulator file states the run’s simulation mode in a
+<code>tcspecial</code> section, which every program reads there:
+<code>simulate: all</code>, the run being one with simulated and dummy
+devices only, but for <code>ping</code> and <code>ping-yamcs</code>,
+which run as a flight does, <code>simulate: none</code>. A run with no
+simulator file gets the flight setting, <code>none</code>, and refuses
+every simulated and dummy device. A <code>network</code> or
+<code>device-file</code> payload is a real device under any mode,
+whether or not tcs-sim answers at its far end. See “Simulated, Dummy or
+Real Devices: simulate” in the manual.</p>
 <p>The examples’ programs – <code>beacon</code>,
 <code>lorem_gateway</code> and <code>ping_gateway.py</code> – are quiet
 unless given <code>-v</code> or <code>--verbose</code>: they print what
@@ -418,12 +420,13 @@ with the programs each runs, the Rust ground stations
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="ex">tcsx</span> thermostat             <span class="co"># run one, by tcs-moc</span></span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="ex">tcsx</span> <span class="at">--no-memlock</span> ping <span class="at">-v</span>   <span class="co"># one whose ground station is its own</span></span></code></pre></div>
 <p><code>--no-memlock</code> is for a desk whose limit on locked memory
-is too small for tcspecial to lock its memory into RAM, and
-<code>--simulate=MODE</code> gives another simulation mode than
-<code>all</code>. Arguments after the name go to the example’s own
-ground station. The examples through Yamcs use the Yamcs release
-<code>YAMCS_HOME</code> names, or, where it names none, the one their
-ground station fetches the first time and keeps in
+is too small for tcspecial to lock its memory into RAM. The simulation
+mode is each example’s simulator file’s; a run in another mode is one
+with a simulator file that states it, named by
+<code>PAYLOAD_SIM_YAML</code>. Arguments after the name go to the
+example’s own ground station. The examples through Yamcs use the Yamcs
+release <code>YAMCS_HOME</code> names, or, where it names none, the one
+their ground station fetches the first time and keeps in
 <code>~/.cache/tcspecial</code>; Yamcs needs Java.
 <code>TCSX_EXAMPLES</code> and <code>TCSX_BIN</code> point
 <code>tcsx</code> at other examples and programs, such as these and a
@@ -699,13 +702,13 @@ run the vehicle yourself, in another terminal, say
 <code>--no-vehicle</code>:</p>
 <pre><code>cargo run --bin tcspecial -- examples/ping/ping.xtcs   # in one terminal
 python3 examples/ping/ping_gateway.py --no-vehicle    # in another</code></pre>
-<p>It gives tcspecial no <code>--simulate</code>, the flight setting,
-and so it is run as flight itself: a beacon saying <code>test</code> –
-from a tcspecial built with <code>visual</code> or
-<code>bit-errors</code>, say – puts <code>TEST CODE</code> first on the
-window’s line, and the pings go on. <code>ping_yamcs.py</code> does the
-same; <code>thermostat_yamcs.py</code> runs tcspecial with
-<code>--simulate=all</code> and expects test code.</p>
+<p>Its simulator file states <code>simulate: none</code>, the flight
+setting, and so it is run as flight itself: a beacon saying
+<code>test</code> – from a tcspecial built with <code>visual</code>, say
+– puts <code>TEST CODE</code> first on the window’s line, and the pings
+go on. <code>ping_yamcs.py</code> does the same;
+<code>thermostat_yamcs.py</code> runs tcspecial under
+<code>simulate: all</code> and expects test code.</p>
 <p>Its ports are all in the seven thousands, which no other example
 uses.</p>
 <p>tcs-moc pings it too:
@@ -1206,19 +1209,20 @@ file’s <code>ambient_temp</code>, read by
 CONNECT.</p>
 <p>It starts Yamcs, then tcs-sim – every payload sending from the start,
 as though its panel’s button had been pressed – and, once tcs-sim says
-it is ready, tcspecial, each with <code>--simulate=all</code>; has Yamcs
-send CONNECT until the vehicle answers with the configuration’s
-checksum; and reads the parameters back over Yamcs’s REST API. Its
-window shows the beacon panel above the thermostat’s: the zone’s
-temperature, each reading, and each line sensing a heater, on or off.
-With <code>--seconds</code> there is no window: it prints every value
-each <code>--every</code> seconds, and a line each time a heater’s line
-changes, and stops. tcs-sim draws a window of its own, so either wants a
-display. Every payload sending from the start includes the heaters’
-switches, so both start enabled; press Disable on one in tcs-sim’s
-window to take its heater away, and its line goes low and stays low
-while the zone falls behind in the cold part of the orbit. Its GPIO
-lines are the thermostat example’s, so the two are not run at once.</p>
+it is ready, tcspecial, each reading <code>simulate: all</code> from the
+run’s simulator file; has Yamcs send CONNECT until the vehicle answers
+with the configuration’s checksum; and reads the parameters back over
+Yamcs’s REST API. Its window shows the beacon panel above the
+thermostat’s: the zone’s temperature, each reading, and each line
+sensing a heater, on or off. With <code>--seconds</code> there is no
+window: it prints every value each <code>--every</code> seconds, and a
+line each time a heater’s line changes, and stops. tcs-sim draws a
+window of its own, so either wants a display. Every payload sending from
+the start includes the heaters’ switches, so both start enabled; press
+Disable on one in tcs-sim’s window to take its heater away, and its line
+goes low and stays low while the zone falls behind in the cold part of
+the orbit. Its GPIO lines are the thermostat example’s, so the two are
+not run at once.</p>
 <pre><code>make run-thermostat-yamcs   # the window
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --seconds 120
 python3 examples/thermostat-yamcs/thermostat_yamcs.py --describe</code></pre>

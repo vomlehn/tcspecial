@@ -715,10 +715,10 @@ pub struct Watch {
     /// The lander drawn once, at the middle of the display, for its
     /// figures, which a window's do not change.
     drawn: Option<Drawn>,
-    /// When it last landed, in the time `frame` is given as `simulated`,
-    /// while it stands on the pad: what the countdown to its start again
-    /// counts from.
-    landed_since: Option<f64>,
+    /// When it last landed or crashed, in the time `frame` is given as
+    /// `simulated`, and whether it crashed, while it stands on the pad or
+    /// lies crashed: what the countdown to its start again counts from.
+    stopped_since: Option<(f64, bool)>,
 }
 
 /// The lander's picture, drawn once at the middle of the display: the pane
@@ -2000,7 +2000,7 @@ fn fly(ui: &MainWindow, scene: &Scene, pilot: &RefCell<Option<Autopilot>>) {
 ///
 /// * `pane`   - The lander's pane, in tcs-sim's window.
 /// * `f`      - The lander's figures.
-fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
+pub(crate) fn draw_landscape(pane: &LanderScene<'_>, f: &Resolved) {
     pane.set_world_width(f.width as f32);
     pane.set_world_height(f.height as f32);
     pane.set_ground(slint::Image::from_rgba8(ground_picture(f)));
@@ -2107,8 +2107,9 @@ pub struct Frame {
     pub touchdown_x: Touchdown,
     /// How its speed down stands against the limit down, `landing_speed`.
     pub touchdown_y: Touchdown,
-    /// While it stands on the pad, the whole seconds left before it starts
-    /// again by itself, its pad wait run; `None` otherwise.
+    /// While it stands on the pad or lies crashed, the whole seconds left
+    /// before it starts again by itself, its pad wait or its pause run;
+    /// `None` while it flies.
     pub countdown: Option<u32>,
     /// The lander's single lines, as picture commands; empty while it has
     /// crashed.
@@ -2242,12 +2243,25 @@ impl Watch {
             frame.lander_green.clear();
             frame.lander_strobes.clear();
         }
-        if out[LANDED] > 0.5 {
-            let since = *self.landed_since.get_or_insert(simulated);
-            let left = f.pad_wait.as_secs_f64() - (simulated - since);
-            frame.countdown = Some(left.ceil().max(0.0) as u32);
+        // Its pad wait on the pad, its pause after a crash.
+        let wait = if out[LANDED] > 0.5 {
+            Some((f.pad_wait, false))
+        } else if crashed {
+            Some((f.pause, true))
         } else {
-            self.landed_since = None;
+            None
+        };
+        match wait {
+            Some((wait, crash)) => {
+                let since = match self.stopped_since {
+                    Some((since, was)) if was == crash => since,
+                    _ => simulated,
+                };
+                self.stopped_since = Some((since, crash));
+                let left = wait.as_secs_f64() - (simulated - since);
+                frame.countdown = Some(left.ceil().max(0.0) as u32);
+            }
+            None => self.stopped_since = None,
         }
         self.hold_readouts(&mut frame, seconds);
         frame
@@ -2303,7 +2317,7 @@ impl Watch {
 ///
 /// * `pane`  - The lander's pane, in tcs-sim's window.
 /// * `frame` - What it is to show.
-fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
+pub(crate) fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
     pane.set_lander_lines(frame.lander_lines.as_str().into());
     pane.set_lander_shapes(frame.lander_shapes.as_str().into());
     pane.set_lander_green(frame.lander_green.as_str().into());
@@ -3299,6 +3313,30 @@ pub(crate) mod tests {
         assert_eq!(watch.frame(&f, &out, 121.0, 0.0).countdown, None);
         out[LANDED] = 1.0;
         assert_eq!(watch.frame(&f, &out, 130.0, 0.0).countdown, Some(10));
+    }
+
+    /// After a crash, the window counts down to the lander's start again,
+    /// its pause, from the crash; and stops counting once it flies again.
+    #[test]
+    fn a_crash_counts_down_to_the_start_again() {
+        let f = Resolved {
+            pause: Duration::from_secs(5),
+            pad_wait: Duration::from_secs(10),
+            ..figures()
+        };
+        let mut watch = Watch::default();
+        let mut out = vec![0.0; RATED + 1];
+        out[FUEL] = 1.0;
+        out[Y] = 300.0;
+        assert_eq!(watch.frame(&f, &out, 50.0, 0.0).countdown, None);
+        out[CRASHED] = 1.0;
+        assert_eq!(watch.frame(&f, &out, 60.0, 0.0).countdown, Some(5));
+        assert_eq!(watch.frame(&f, &out, 61.5, 0.0).countdown, Some(4));
+        assert_eq!(watch.frame(&f, &out, 64.5, 0.0).countdown, Some(1));
+        out[CRASHED] = 0.0;
+        assert_eq!(watch.frame(&f, &out, 65.0, 0.0).countdown, None);
+        out[LANDED] = 1.0;
+        assert_eq!(watch.frame(&f, &out, 90.0, 0.0).countdown, Some(10));
     }
 
     /// A frame's plumes, drawn with the lander at the middle of the display

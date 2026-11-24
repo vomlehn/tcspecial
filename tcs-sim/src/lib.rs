@@ -63,6 +63,9 @@ mod grid;
 // Public for a ground station that draws the lander as tcs-sim does: see
 // examples/lander.
 pub mod lander_view;
+// Public for the ground station's pictures of the lander, made as tcs-sim's
+// own are: see make screenshots-lander.
+pub mod lander_flight;
 mod landing_rating;
 mod node;
 mod payload;

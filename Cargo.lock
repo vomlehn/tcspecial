@@ -2650,6 +2650,7 @@ dependencies = [
 name = "lander-example"
 version = "0.1.0"
 dependencies = [
+ "png",
  "rand",
  "slint",
  "slint-build",

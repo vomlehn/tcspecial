@@ -365,6 +365,9 @@ class Lander:
             #: starts again by itself, in seconds.
             self.pad_wait = float(settings.get("pad_wait", "10 s")
                                   .split()[0])
+            #: How long it lies crashed before it starts again by itself,
+            #: in seconds.
+            self.pause = float(settings.get("pause", "5 s").split()[0])
         except (KeyError, IndexError, AttributeError) as why:
             raise ValueError(f"the lander's settings: {why}")
 
@@ -1137,28 +1140,33 @@ class Readings:
         return "ok"
 
     def countdown(self, lander, now=None):
-        """The whole seconds left before the lander, standing on the pad,
-        starts again by itself: its pad wait, counted from when the landed
-        signal came down.
+        """The whole seconds left before the lander, standing on the pad or
+        lying crashed, starts again by itself: its pad wait or its pause,
+        counted from when the landed or crashed signal came down.
 
         Args:
-            lander: The :class:`Lander`, whose pad wait it is.
+            lander: The :class:`Lander`, whose pad wait and pause they are.
             now:    The moment, on this program's monotonic clock; now if
                     ``None``.
 
         Returns:
-            The seconds, or ``None`` while it does not stand on the pad.
+            The seconds, or ``None`` while it flies.
         """
-        if not self.said("landed"):
+        if self.said("landed"):
+            signal, wait = "landed", lander.pad_wait
+        elif self.said("crashed"):
+            signal, wait = "crashed", lander.pause
+        else:
             return None
         now = time.monotonic() if now is None else now
         with self._lock:
-            since = self.changed.get("landed", now)
-        return max(0, math.ceil(lander.pad_wait - (now - since)))
+            since = self.changed.get(signal, now)
+        return max(0, math.ceil(wait - (now - since)))
 
     def state_text(self, lander):
         """What the lander is doing, as the window says it: with the
-        seconds before it starts again, while it stands on the pad.
+        seconds before it starts again, while it stands on the pad or lies
+        crashed.
 
         Args:
             lander: The :class:`Lander`.

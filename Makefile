@@ -1608,6 +1608,20 @@ screenshots-tcs-moc:
 	cd $(RUST) && cargo test -p tcs-moc --lib -- --ignored --exact \
 		vehicle::screenshots::screenshots
 
+# Make the lander design's screenshots, docs/shots/lander-*.png, again:
+# tcs-sim's lander pane and the lander example's Rust ground station's
+# window, each built by its own code and drawn in memory by Slint's software
+# renderer, the lander example's lander flown against its own physics (see
+# tcs-sim's lander_flight), so that no window opens and no world runs. Two
+# ignored tests, each run alone because Slint takes one platform per
+# process; never part of make test, make check or make html-check.
+.PHONY: screenshots-lander
+screenshots-lander:
+	cd $(RUST) && cargo test -p tcs-sim --lib -- --ignored --exact \
+		shots::lander_screenshots
+	cd $(RUST) && cargo test -p lander-example --lib -- --ignored \
+		--exact window::shots::screenshots
+
 # Print every example's configuration to a PDF beside it,
 # examples/NAME/NAME.pdf: every page, the top page and each subdiagram's, as
 # tcs-cfge's File > Print prints them, by tcs-cfge --print, which draws in
@@ -1636,7 +1650,8 @@ example-pdfs:
 # a process of its own; the pages that show them are made again by the
 # pre-commit hook when they are committed.
 .PHONY: screenshots
-screenshots: screenshots-tcs-cfge screenshots-tcs-moc screenshots-tcs-sim
+screenshots: screenshots-tcs-cfge screenshots-tcs-moc screenshots-tcs-sim \
+	screenshots-lander
 
 # Every directory whose HTML pages are made from its markdown or
 # reStructuredText and committed beside it, which make in each builds.

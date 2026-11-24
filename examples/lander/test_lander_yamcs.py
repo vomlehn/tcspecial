@@ -457,6 +457,22 @@ class Shown(unittest.TestCase):
         self.assertEqual(readings.countdown(lander, now=103.5), 7)
         self.assertEqual(readings.countdown(lander, now=120.0), 0)
 
+    def test_a_crash_counts_down_to_the_start_again(self):
+        """Lying crashed, the seconds left of the pause, from when the
+        crashed signal came down, said under the crash's words."""
+        import yaml
+        lander = lander_yamcs.Lander(lander_yamcs.lander_settings(
+            yaml.safe_load(lander_yamcs.SHIPPED_SIM.read_text())))
+        self.assertEqual(lander.pause, 5.0)
+        readings = lander_yamcs.Readings([])
+        readings.values["crashed"] = "1"
+        readings.changed["crashed"] = 100.0
+        self.assertEqual(readings.countdown(lander, now=100.0), 5)
+        self.assertEqual(readings.countdown(lander, now=101.5), 4)
+        # Long after, on the monotonic clock: run down to nought.
+        self.assertEqual(readings.state_text(lander),
+                         f"{readings.state()}\nStarting again in 0 s")
+
     def test_ratings_are_listed_the_latest_first(self):
         """The ratings' records are kept by when, each once however often
         it comes, the latest first, no more than RATINGS_LISTED, each said

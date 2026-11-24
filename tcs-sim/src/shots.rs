@@ -36,13 +36,16 @@ use slint::platform::software_renderer::{
 use slint::platform::{Platform, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, LogicalSize, Model, ModelRc, VecModel};
 use tcs_verify::startup::Startup;
+use tcsprotocol::node::physics::lander::Resolved;
 use tcsprotocol::simulate::Mode;
 use tcsprotocol::Timestamp;
 
+use crate::lander_flight;
+use crate::lander_view::{self, Frame};
 use crate::payload::{PayloadConfig, SimulatedPayload};
 use crate::{
     grid, handle_transfer_button, load, payload_info_from, show_progress,
-    update_row, MainWindow, PayloadInfo, RUNNING_STATUS,
+    update_row, LanderScene, MainWindow, PayloadInfo, RUNNING_STATUS,
 };
 
 /// Where the pictures go, from the crate's directory.
@@ -379,60 +382,76 @@ impl Scene {
     ///             all of it.
     /// * `scale` - How many pixels of the picture to a logical pixel.
     fn shoot(&self, file: &str, area: Option<Area>, scale: f32) {
-        let logical = self.size;
-        self.window.dispatch_event(WindowEvent::ScaleFactorChanged {
-            scale_factor: scale,
-        });
-        self.window
-            .set_size(slint::WindowSize::Logical(LogicalSize::new(
-                logical.width,
-                logical.height,
-            )));
-        slint::platform::update_timers_and_animations();
-        self.window.request_redraw();
-
-        let size = self.window.size();
-        let (width, height) = (size.width as usize, size.height as usize);
-        let mut pixels =
-            vec![PremultipliedRgbaColor::default(); width * height];
-        self.window.draw_if_needed(|renderer| {
-            renderer.render(&mut pixels, width);
-        });
-
-        let area = area.unwrap_or(Area {
-            x: 0.0,
-            y: 0.0,
-            width: logical.width,
-            height: logical.height,
-        });
-        let x0 = ((area.x * scale).round().max(0.0) as usize).min(width);
-        let y0 = ((area.y * scale).round().max(0.0) as usize).min(height);
-        let x1 = (((area.x + area.width) * scale).round() as usize).min(width);
-        let y1 =
-            (((area.y + area.height) * scale).round() as usize).min(height);
-        let mut rgb = Vec::with_capacity((x1 - x0) * (y1 - y0) * 3);
-        for row in pixels[y0 * width..y1 * width].chunks(width) {
-            for p in &row[x0..x1] {
-                // Over white, which is what the window's background is.
-                let over = 255 - p.alpha;
-                rgb.extend([p.red + over, p.green + over, p.blue + over]);
-            }
-        }
-
-        let path = shots_dir().join(file);
-        let out = tcsos::fs::File::create(&path)
-            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
-        let mut encoder = png::Encoder::new(
-            std::io::BufWriter::new(out),
-            (x1 - x0) as u32,
-            (y1 - y0) as u32,
-        );
-        encoder.set_color(png::ColorType::Rgb);
-        encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = encoder.write_header().unwrap();
-        writer.write_image_data(&rgb).unwrap();
-        eprintln!("wrote {}", path.display());
+        shoot(&self.window, self.size, file, area, scale);
     }
+}
+
+/// Draws a window and writes part of it as a PNG.
+///
+/// # Arguments
+///
+/// * `window`  - What the window is drawn into.
+/// * `logical` - The window's size, in logical pixels.
+/// * `file`    - The picture's name, in `SHOTS`.
+/// * `area`    - The part of the window, in logical pixels; `None` for all
+///               of it.
+/// * `scale`   - How many pixels of the picture to a logical pixel.
+fn shoot(
+    window: &MinimalSoftwareWindow,
+    logical: LogicalSize,
+    file: &str,
+    area: Option<Area>,
+    scale: f32,
+) {
+    window.dispatch_event(WindowEvent::ScaleFactorChanged {
+        scale_factor: scale,
+    });
+    window.set_size(slint::WindowSize::Logical(LogicalSize::new(
+        logical.width,
+        logical.height,
+    )));
+    slint::platform::update_timers_and_animations();
+    window.request_redraw();
+
+    let size = window.size();
+    let (width, height) = (size.width as usize, size.height as usize);
+    let mut pixels = vec![PremultipliedRgbaColor::default(); width * height];
+    window.draw_if_needed(|renderer| {
+        renderer.render(&mut pixels, width);
+    });
+
+    let area = area.unwrap_or(Area {
+        x: 0.0,
+        y: 0.0,
+        width: logical.width,
+        height: logical.height,
+    });
+    let x0 = ((area.x * scale).round().max(0.0) as usize).min(width);
+    let y0 = ((area.y * scale).round().max(0.0) as usize).min(height);
+    let x1 = (((area.x + area.width) * scale).round() as usize).min(width);
+    let y1 = (((area.y + area.height) * scale).round() as usize).min(height);
+    let mut rgb = Vec::with_capacity((x1 - x0) * (y1 - y0) * 3);
+    for row in pixels[y0 * width..y1 * width].chunks(width) {
+        for p in &row[x0..x1] {
+            // Over white, which is what the window's background is.
+            let over = 255 - p.alpha;
+            rgb.extend([p.red + over, p.green + over, p.blue + over]);
+        }
+    }
+
+    let path = shots_dir().join(file);
+    let out = tcsos::fs::File::create(&path)
+        .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let mut encoder = png::Encoder::new(
+        std::io::BufWriter::new(out),
+        (x1 - x0) as u32,
+        (y1 - y0) as u32,
+    );
+    encoder.set_color(png::ColorType::Rgb);
+    encoder.set_depth(png::BitDepth::Eight);
+    let mut writer = encoder.write_header().unwrap();
+    writer.write_image_data(&rgb).unwrap();
+    eprintln!("wrote {}", path.display());
 }
 
 /// The directory the pictures go in, made if it is not there.
@@ -526,4 +545,150 @@ fn screenshots() {
     scene.press("temp_3", "Configuration");
     scene.wheel("temp_3", "PayloadPanel::parameters-scroll", -2000.0);
     scene.shoot("tcs-sim-fault-3.png", Some(popup.grown(1.0)), 1.0);
+}
+
+/// tcs-sim's window with nothing but the lander's pane in it, as a lander
+/// example's run shows it, drawn into memory.
+struct Pane {
+    /// The window.
+    ui: MainWindow,
+    /// What the window is drawn into.
+    window: Rc<MinimalSoftwareWindow>,
+    /// The window's size, in logical pixels.
+    size: LogicalSize,
+    /// The pane's part of the window.
+    area: Area,
+}
+
+impl Pane {
+    /// Builds the window, with room for the pane as `main` makes it, and
+    /// the landscape drawn.
+    ///
+    /// # Arguments
+    ///
+    /// * `windows` - The windows the platform has made.
+    /// * `f`       - The lander's figures.
+    ///
+    /// # Returns
+    ///
+    /// The window.
+    fn new(windows: &Windows, f: &Resolved) -> Pane {
+        let made = windows.borrow().len();
+        let ui = MainWindow::new().unwrap();
+        let window = windows.borrow()[made].clone();
+        lander_view::make_room(&ui);
+        lander_view::draw_landscape(&ui.global::<LanderScene>(), f);
+        // As tall again as the landscape is at its least, which brings it to
+        // the width it prefers, 600 pixels.
+        let size = LogicalSize::new(
+            ui.get_lander_width() + 16.0,
+            ui.get_least_height() + 180.0,
+        );
+        ui.window().set_size(size);
+        ui.show().unwrap();
+        let area = Area {
+            x: 0.0,
+            y: 0.0,
+            width: size.width,
+            height: size.height,
+        };
+        Pane {
+            ui,
+            window,
+            size,
+            area,
+        }
+    }
+
+    /// Shows a frame, and whether Autoland flies.
+    ///
+    /// # Arguments
+    ///
+    /// * `frame`    - What the window shows.
+    /// * `autoland` - Whether Autoland flies the lander.
+    /// * `axes`     - Where the joystick is held, X and Y, from -1 to 1.
+    fn show(&self, frame: &Frame, autoland: bool, axes: (f64, f64)) {
+        let pane = self.ui.global::<LanderScene>();
+        pane.set_autoland(autoland);
+        pane.set_dot_x(lander_view::dot_of(axes.0));
+        pane.set_dot_y(lander_view::dot_of(-axes.1));
+        lander_view::set_frame(&pane, frame);
+    }
+
+    /// Takes hold of the joystick, as a hand pressing on its square does,
+    /// so that its lines show where it is held.
+    fn hold_stick(&self) {
+        let pane = self.ui.global::<LanderScene>();
+        // The square's middle, half the joystick's width in from its left
+        // and as far down from its top.
+        let reach = pane.get_stick_width() / 2.0;
+        let at = slint::LogicalPosition::new(
+            pane.get_stick_left() + reach,
+            pane.get_stick_top() + reach,
+        );
+        self.window.dispatch_event(WindowEvent::PointerPressed {
+            position: at,
+            button: slint::platform::PointerEventButton::Left,
+        });
+    }
+
+    /// Lets go of the joystick, as a hand does.
+    fn let_go(&self) {
+        self.window.dispatch_event(WindowEvent::PointerReleased {
+            position: slint::LogicalPosition::new(0.0, 0.0),
+            button: slint::platform::PointerEventButton::Left,
+        });
+    }
+
+    /// Shows a landing's rating, whole, as the window does on a landing.
+    ///
+    /// # Arguments
+    ///
+    /// * `rating` - What it says.
+    fn rating(&self, rating: &str) {
+        let pane = self.ui.global::<LanderScene>();
+        pane.set_rating(rating.into());
+        pane.set_rating_shown(1.0);
+    }
+
+    /// Draws the pane and writes it as a PNG.
+    ///
+    /// # Arguments
+    ///
+    /// * `file` - The picture's name, in `SHOTS`.
+    fn shoot(&self, file: &str) {
+        shoot(&self.window, self.size, file, Some(self.area), 1.0);
+    }
+}
+
+/// Makes every picture of the lander's pane the lander design shows, from
+/// the lander example as it is shipped, flown against its own physics.
+#[test]
+#[ignore = "makes the lander's screenshots: make screenshots-lander"]
+fn lander_screenshots() {
+    let windows = Windows::default();
+    slint::platform::set_platform(Box::new(Headless {
+        windows: windows.clone(),
+    }))
+    .expect("run this test alone: make screenshots-lander");
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let f = lander_flight::figures(
+        &root.join("examples/lander-common/lander-sim.yaml"),
+    );
+    let pane = Pane::new(&windows, &f);
+
+    let (frame, axes) = lander_flight::flying(&f);
+    pane.hold_stick();
+    pane.show(&frame, false, axes);
+    pane.shoot("lander-flying.png");
+    pane.let_go();
+
+    pane.show(&lander_flight::crashed(&f), false, (0.0, 0.0));
+    pane.shoot("lander-crashed.png");
+
+    let (frame, rating) = lander_flight::landed(&f);
+    pane.show(&frame, false, (0.0, 0.0));
+    pane.rating(&rating);
+    pane.shoot("lander-landed.png");
 }

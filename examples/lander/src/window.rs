@@ -265,3 +265,137 @@ fn set_frame(scene: &LanderScene<'_>, frame: &Frame) {
     scene.set_touchdown_y_colour(frame.touchdown_y.colour());
     scene.set_strobe_lit(frame.strobe_lit);
 }
+
+#[cfg(test)]
+mod shots {
+    //! The pictures of the station's window that the lander design,
+    //! `docs/lander-design.rst`, shows, made on demand and never by an
+    //! ordinary `cargo test`:
+    //!
+    //! ```text
+    //! cargo test -p lander-example --lib -- --ignored --exact \
+    //!     window::shots::screenshots
+    //! ```
+    //!
+    //! which `make screenshots-lander` runs. The window is the station's
+    //! own, drawn by Slint's software renderer into memory, with the lander
+    //! example's lander flown against its own physics as tcs-sim's pictures
+    //! fly it -- see `tcs_sim::lander_flight` -- every star come down, and
+    //! both vehicles connected. Ignored, and run alone: Slint takes one
+    //! platform per process.
+
+    use std::path::Path;
+    use std::rc::Rc;
+
+    use slint::platform::software_renderer::{
+        MinimalSoftwareWindow, RepaintBufferType,
+    };
+    use slint::platform::{Platform, WindowAdapter};
+    use slint::ComponentHandle;
+    use tcs_sim::lander_flight;
+    use tcs_sim::lander_view::{dot_of, ground_picture, pad, sky, Frame};
+
+    use super::set_frame;
+    use crate::{LanderScene, Said, StationWindow};
+
+    /// Where the pictures go, from the crate's directory.
+    const SHOTS: &str = "../../docs/shots";
+
+    /// The window's size, in logical pixels: the landscape at the width it
+    /// prefers, 600 pixels, with the window's padding.
+    const SIZE: (u32, u32) = (616, 650);
+
+    /// A Slint platform whose one window is drawn into memory and never
+    /// shown.
+    struct Headless(Rc<MinimalSoftwareWindow>);
+
+    impl Platform for Headless {
+        /// Gives the one window, drawn into memory.
+        ///
+        /// # Returns
+        ///
+        /// The window.
+        fn create_window_adapter(
+            &self,
+        ) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
+            Ok(self.0.clone())
+        }
+    }
+
+    /// Shows a frame in the window, and where the joystick sent down was
+    /// held, as the window's tick does.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui`    - The window.
+    /// * `frame` - What it shows.
+    /// * `axes`  - The joystick's values sent down, X and Y.
+    fn show(ui: &StationWindow, frame: &Frame, axes: (f64, f64)) {
+        let scene = ui.global::<LanderScene>();
+        set_frame(&scene, frame);
+        scene.set_dot_x(dot_of(axes.0));
+        scene.set_dot_y(-dot_of(axes.1));
+    }
+
+    /// Draws the window and writes it as a PNG.
+    ///
+    /// # Arguments
+    ///
+    /// * `ui`   - The window.
+    /// * `file` - The picture's name, in `SHOTS`.
+    fn shoot(ui: &StationWindow, file: &str) {
+        let picture = ui.window().take_snapshot().expect("drawn");
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join(SHOTS);
+        tcsos::fs::create_dir_all(&dir).expect("the directory");
+        let path = dir.join(file);
+        let out = tcsos::fs::File::create(&path)
+            .unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let mut png = png::Encoder::new(
+            std::io::BufWriter::new(out),
+            picture.width(),
+            picture.height(),
+        );
+        png.set_color(png::ColorType::Rgba);
+        png.set_depth(png::BitDepth::Eight);
+        png.write_header()
+            .and_then(|mut w| w.write_image_data(picture.as_bytes()))
+            .expect("written");
+        eprintln!("wrote {}", path.display());
+    }
+
+    /// Makes every picture of the station's window the lander design
+    /// shows.
+    #[test]
+    #[ignore = "makes the lander's screenshots: make screenshots-lander"]
+    fn screenshots() {
+        let adapter = MinimalSoftwareWindow::new(RepaintBufferType::NewBuffer);
+        slint::platform::set_platform(Box::new(Headless(adapter.clone())))
+            .expect("run this test alone: make screenshots-lander");
+        let f = lander_flight::figures(
+            &Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../lander-common/lander-sim.yaml"),
+        );
+
+        let ui = StationWindow::new().expect("a window");
+        let scene = ui.global::<LanderScene>();
+        scene.set_world_width(f.width as f32);
+        scene.set_world_height(f.height as f32);
+        scene.set_ground(slint::Image::from_rgba8(ground_picture(&f)));
+        scene.set_pad(pad(&f).into());
+        scene.set_sky(slint::Image::from_rgba8(sky(&f)));
+        let said = ui.global::<Said>();
+        said.set_note("Everything here is 1.3 s behind the lander".into());
+        said.set_links("lander-a connected, lander-b connected".into());
+        said.set_heard(true);
+        ui.show().expect("shown");
+        ui.window()
+            .set_size(slint::PhysicalSize::new(SIZE.0, SIZE.1));
+
+        let (frame, axes) = lander_flight::flying(&f);
+        show(&ui, &frame, axes);
+        shoot(&ui, "lander-station-flying.png");
+
+        show(&ui, &lander_flight::crashed(&f), (0.0, 0.0));
+        shoot(&ui, "lander-station-crashed.png");
+    }
+}

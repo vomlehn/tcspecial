@@ -217,7 +217,8 @@ pane at the left of its payload panels:
   words, and the fuel left, in words and as a
   bar; standing on the pad, under "Landed", "Starting again in N s", the
   whole seconds of the pad wait left, so that a visitor knows how long
-  there is to read the rating or to lift off again;
+  there is to read the rating or to lift off again; and after a crash,
+  under its words, the same, the seconds of the pause left;
 * below them, the X and Y position, velocity, "Landing speed",
   acceleration and thrust. "Landing speed" says how each axis's speed
   stands against its touchdown limit -- across either way against
@@ -236,6 +237,38 @@ pane at the left of its payload panels:
 * below them, Pause, which halts the simulated world and resumes it, and
   Autoland, which tries to land the lander by flying it through the
   joystick, a landing not being certain.
+
+Here is the pane flown by hand, low over the pad and coming down at
+"close" to the limit, the joystick's lines showing where it is held:
+
+.. figure:: shots/lander-flying.png
+   :alt: tcs-sim's lander pane, the lander just over the pad, its Landing
+         speed ok across and close down, and the joystick held part way up.
+
+   Flying by hand, coming down close to the limit.
+
+The same hand, cutting the engine once low, hits at 23 m/s, and the
+readouts stand at what it hit with while the pause counts down:
+
+.. figure:: shots/lander-crashed.png
+   :alt: The pane a second after a crash, a fireball on the pad, the
+         words "On the Moon, no one can hear you CRASH!" and "Starting
+         again in 4 s", and Landing speed too fast down.
+
+   Crashed, too fast, starting again in a few seconds.
+
+And Autoland's landing, three seconds into the pad wait, with its rating:
+
+.. figure:: shots/lander-landed.png
+   :alt: The pane with the lander on the pad wearing a smiling face, the
+         words "Landed" and "Starting again in 7 s", and "Efficiency 48%
+         w/ Autoland" at the top right.
+
+   Landed by Autoland, rated, starting again in 7 s.
+
+The pictures here and the ground station's below are made by ``make
+screenshots-lander`` from each window's own code, drawn in memory, with
+the lander example's lander flown against its own physics.
 
 The pad has a flashing light on top of each of its end marks in
 tcs-sim's window, the lander's own view. The ground's window draws the pad
@@ -265,12 +298,29 @@ second and shows:
   joystick sent down, or its plus when they are nought; the pointer does
   nothing there;
 * "Landed", or "On the Moon, no one can hear you CRASH!", when the values
-  sent down say so; and under "Landed" the seconds left before the lander
-  starts again, counted from when the landed signal came down;
+  sent down say so; and under either the seconds left before the lander
+  starts again, its pad wait or its pause, counted from when the landed or
+  crashed signal came down;
 * a Restart button, which sends a command up through lander-b's gateway to
   a simulated payload, ``restart``, joined to the lander's ``restart``
   input: each press a new count, the lander starting again at each, a light
   time after the press.
+
+The Rust ground station, lander-station, shows the same flights as tcs-sim
+does, a light time later, the joystick's lines at what was sent down:
+
+.. figure:: shots/lander-station-flying.png
+   :alt: lander-station's window, the lander just over the pad, Landing
+         speed close down, the note "Everything here is 1.3 s behind the
+         lander", both vehicles connected, and Restart.
+
+   lander-station, the lander coming down close to the limit.
+
+.. figure:: shots/lander-station-crashed.png
+   :alt: lander-station's window after the crash, a fireball on the pad
+         and "Starting again in 4 s".
+
+   lander-station after the crash, counting down to the start again.
 
 The lander always starts again by itself: after a crash once its pause
 has run, and after a landing once its pad wait has, unless it lifts off

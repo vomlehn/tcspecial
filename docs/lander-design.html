@@ -583,7 +583,8 @@ ground, with the smiling face after a landing;</li>
 words, and the fuel left, in words and as a
 bar; standing on the pad, under &quot;Landed&quot;, &quot;Starting again in N s&quot;, the
 whole seconds of the pad wait left, so that a visitor knows how long
-there is to read the rating or to lift off again;</li>
+there is to read the rating or to lift off again; and after a crash,
+under its words, the same, the seconds of the pause left;</li>
 <li>below them, the X and Y position, velocity, &quot;Landing speed&quot;,
 acceleration and thrust. &quot;Landing speed&quot; says how each axis's speed
 stands against its touchdown limit -- across either way against
@@ -603,6 +604,26 @@ shows the same, a light time later;</li>
 Autoland, which tries to land the lander by flying it through the
 joystick, a landing not being certain.</li>
 </ul>
+<p>Here is the pane flown by hand, low over the pad and coming down at
+&quot;close&quot; to the limit, the joystick's lines showing where it is held:</p>
+<div class="figure">
+<img alt="tcs-sim's lander pane, the lander just over the pad, its Landing speed ok across and close down, and the joystick held part way up." src="shots/lander-flying.png" />
+<p class="caption">Flying by hand, coming down close to the limit.</p>
+</div>
+<p>The same hand, cutting the engine once low, hits at 23 m/s, and the
+readouts stand at what it hit with while the pause counts down:</p>
+<div class="figure">
+<img alt="The pane a second after a crash, a fireball on the pad, the words &quot;On the Moon, no one can hear you CRASH!&quot; and &quot;Starting again in 4 s&quot;, and Landing speed too fast down." src="shots/lander-crashed.png" />
+<p class="caption">Crashed, too fast, starting again in a few seconds.</p>
+</div>
+<p>And Autoland's landing, three seconds into the pad wait, with its rating:</p>
+<div class="figure">
+<img alt="The pane with the lander on the pad wearing a smiling face, the words &quot;Landed&quot; and &quot;Starting again in 7 s&quot;, and &quot;Efficiency 48% w/ Autoland&quot; at the top right." src="shots/lander-landed.png" />
+<p class="caption">Landed by Autoland, rated, starting again in 7 s.</p>
+</div>
+<p>The pictures here and the ground station's below are made by <tt class="docutils literal">make
+<span class="pre">screenshots-lander</span></tt> from each window's own code, drawn in memory, with
+the lander example's lander flown against its own physics.</p>
 <p>The pad has a flashing light on top of each of its end marks in
 tcs-sim's window, the lander's own view. The ground's window draws the pad
 without them, so that nothing flashing there draws the eye from what has
@@ -630,13 +651,24 @@ where Autoland helped (see &quot;The ratings, sent down&quot;);</li>
 joystick sent down, or its plus when they are nought; the pointer does
 nothing there;</li>
 <li>&quot;Landed&quot;, or &quot;On the Moon, no one can hear you CRASH!&quot;, when the values
-sent down say so; and under &quot;Landed&quot; the seconds left before the lander
-starts again, counted from when the landed signal came down;</li>
+sent down say so; and under either the seconds left before the lander
+starts again, its pad wait or its pause, counted from when the landed or
+crashed signal came down;</li>
 <li>a Restart button, which sends a command up through lander-b's gateway to
 a simulated payload, <tt class="docutils literal">restart</tt>, joined to the lander's <tt class="docutils literal">restart</tt>
 input: each press a new count, the lander starting again at each, a light
 time after the press.</li>
 </ul>
+<p>The Rust ground station, lander-station, shows the same flights as tcs-sim
+does, a light time later, the joystick's lines at what was sent down:</p>
+<div class="figure">
+<img alt="lander-station's window, the lander just over the pad, Landing speed close down, the note &quot;Everything here is 1.3 s behind the lander&quot;, both vehicles connected, and Restart." src="shots/lander-station-flying.png" />
+<p class="caption">lander-station, the lander coming down close to the limit.</p>
+</div>
+<div class="figure">
+<img alt="lander-station's window after the crash, a fireball on the pad and &quot;Starting again in 4 s&quot;." src="shots/lander-station-crashed.png" />
+<p class="caption">lander-station after the crash, counting down to the start again.</p>
+</div>
 <p>The lander always starts again by itself: after a crash once its pause
 has run, and after a landing once its pad wait has, unless it lifts off
 first. Nothing on the ground turns that off.</p>

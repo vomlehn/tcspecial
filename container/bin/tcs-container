@@ -290,6 +290,33 @@ copy() {
 	as_root chown -R tcs:tcs /home/tcs/src
 }
 
+# Starts a D-Bus session bus of tcs's own in the container, where there is
+# none running: at /run/user/UID/bus, where a desktop session has one and a
+# program looks for it. The windows' toolkit asks the session bus for the
+# desktop's settings, its light or dark theme, and says it cannot find one
+# every time a window opens where there is none. A podman exec is no login,
+# so nothing else starts one; started here, it lasts as long as the
+# container runs. An image without dbus-daemon is left without one.
+#
+# Arguments:
+#   $1  tcs's uid in the container.
+#
+# Returns:
+#   0 where the bus is running, 1 where there is none.
+session_bus() {
+	# shellcheck disable=SC2016 # expanded in the container, not here
+	"$podman" exec -u tcs "$name" sh -c '
+		bus=/run/user/$1/bus
+		command -v dbus-daemon > /dev/null || exit 1
+		if pgrep -u "$1" -x dbus-daemon > /dev/null && [ -S "$bus" ]
+		then
+			exit 0
+		fi
+		rm -f "$bus"
+		dbus-daemon --session --address="unix:path=$bus" --fork \
+			--nopidfile > /dev/null' sh "$1"
+}
+
 # Runs a login shell, or a command, in the container.
 #
 # Arguments:
@@ -309,6 +336,9 @@ shell() {
 	uid=$(as_root id -u tcs)
 	as_root install -d -m 700 -o tcs -g tcs "/run/user/$uid"
 	envs="-e XDG_RUNTIME_DIR=/run/user/$uid"
+	if session_bus "$uid"; then
+		envs="$envs -e DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$uid/bus"
+	fi
 	if as_root test -S "$DISPLAY_DIR/wayland-0"; then
 		envs="$envs -e WAYLAND_DISPLAY=$DISPLAY_DIR/wayland-0"
 	fi

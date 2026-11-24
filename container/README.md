@@ -45,7 +45,11 @@ as on the host, and `fresh` gives the container your Wayland and X11
 sockets, your X authority and your GPU, so `bin/tcs-container-shell
 tcs-cfge` opens tcs-cfge's window beside your others. A display gone since,
 as after logging out and in again, needs the container made again, as
-`bin/start --rebuild` makes it. Xvfb is there too, for a program to open
+`bin/start --rebuild` makes it. A shell or an example started there starts a
+D-Bus session bus of `tcs`'s own, at `/run/user/UID/bus`, where there is none
+running, since a podman exec is no login and nothing else would: the windows'
+toolkit asks it for the desktop's light or dark theme, and says it cannot
+find one each time a window opens without it. Xvfb is there too, for a program to open
 its window where nobody sees it. What a package needs it brings with
 it, and what building a project needs that project's `make
 install-tools` installs.

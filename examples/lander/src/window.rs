@@ -17,7 +17,8 @@ use tcsprotocol::node::physical::lander::Resolved;
 
 use crate::readings::{Readings, Sky, State};
 use crate::station::Station;
-use crate::{LanderScene, StationWindow};
+use crate::{LanderScene, NodeBox, NodeLine, StationWindow};
+use slint::{Model, ModelRc, VecModel};
 
 /// How often the window is brought up to what has come down: 20 times a
 /// second, a third as often as tcs-sim's own window. What it shows is a
@@ -52,6 +53,36 @@ struct View {
     sky_drawn: Cell<Option<Instant>>,
     /// The last restart sent, which each counts on from.
     restarts: Cell<u8>,
+    /// Each vehicle's box of panels: its rows, which the window shows, and
+    /// each row's node and whether the station commands it.
+    boxes: Vec<BoxRows>,
+}
+
+/// A vehicle's box of panels as the window is given it: what the box says
+/// at its top left, and each node it holds, in order, with whether the
+/// station commands it.
+pub type Boxed = (String, Vec<(String, bool)>);
+
+/// A vehicle's box of panels as the window keeps it: its rows, which the
+/// window shows, and each row's node with whether the station commands it.
+type BoxRows = (Rc<VecModel<NodeLine>>, Vec<(String, bool)>);
+
+/// What a vehicle's box of panels says, at its top left inside it:
+/// "TCSpecial A" for the first, "TCSpecial B" for the second, as tcs-sim's
+/// window says them.
+///
+/// # Arguments
+///
+/// * `index` - The vehicle's place among them, from nought.
+///
+/// # Returns
+///
+/// The label.
+pub fn box_label(index: usize) -> String {
+    match u8::try_from(index).ok().filter(|n| *n < 26) {
+        Some(n) => format!("TCSpecial {}", char::from(b'A' + n)),
+        None => format!("TCSpecial {}", index + 1),
+    }
 }
 
 /// Opens the window, on the thread windows are made on, and runs it until
@@ -63,6 +94,7 @@ struct View {
 /// * `station`  - The links to the vehicles.
 /// * `readings` - What has come down, nothing yet.
 /// * `note`     - The light time, said under the values.
+/// * `boxes`    - Each vehicle's box of panels: see [`Boxed`].
 /// * `closed`   - What says the window has closed.
 ///
 /// # Errors
@@ -73,6 +105,7 @@ pub fn show(
     station: Station,
     readings: Readings,
     note: String,
+    boxes: Vec<Boxed>,
     closed: Closed,
 ) -> Result<(), slint::PlatformError> {
     let ui = StationWindow::new()?;
@@ -87,6 +120,7 @@ pub fn show(
     scene.set_sky(slint::Image::from_rgba8(sky_of(&figures, [])));
     let said = ui.global::<crate::Said>();
     said.set_note(note.into());
+    let boxes = set_boxes(&said, boxes);
 
     let view = Rc::new(View {
         figures,
@@ -97,6 +131,7 @@ pub fn show(
         opened: Instant::now(),
         sky_drawn: Cell::new(None),
         restarts: Cell::new(0),
+        boxes,
     });
     {
         let view = Rc::clone(&view);
@@ -107,6 +142,9 @@ pub fn show(
             let count = view.restarts.get() % 255 + 1;
             view.restarts.set(count);
             view.station.send("restart", &[count]);
+            view.readings
+                .borrow_mut()
+                .note_sent("restart", u64::from(count));
         });
     }
     tick(&ui, &view);
@@ -123,6 +161,45 @@ pub fn show(
     tcs_ui::windows::run(ui, (timer, view), closed)
 }
 
+/// Gives the window its boxes of panels, each panel's line empty until
+/// the window's tick says it.
+///
+/// # Arguments
+///
+/// * `said`  - The window's global the boxes are shown from.
+/// * `boxes` - Each vehicle's box: see [`Boxed`].
+///
+/// # Returns
+///
+/// Each box's rows, which the tick changes, with each row's node and
+/// whether the station commands it.
+fn set_boxes(said: &crate::Said<'_>, boxes: Vec<Boxed>) -> Vec<BoxRows> {
+    let made: Vec<(String, BoxRows)> = boxes
+        .into_iter()
+        .map(|(label, nodes)| {
+            let rows = Rc::new(VecModel::from(
+                nodes
+                    .iter()
+                    .map(|(name, _)| NodeLine {
+                        name: name.as_str().into(),
+                        line: "".into(),
+                    })
+                    .collect::<Vec<NodeLine>>(),
+            ));
+            (label, (rows, nodes))
+        })
+        .collect();
+    said.set_boxes(ModelRc::new(VecModel::from(
+        made.iter()
+            .map(|(label, (rows, _))| NodeBox {
+                label: label.as_str().into(),
+                nodes: ModelRc::from(rows.clone()),
+            })
+            .collect::<Vec<NodeBox>>(),
+    )));
+    made.into_iter().map(|(_, rows)| rows).collect()
+}
+
 /// Brings the window up to what has come down.
 ///
 /// # Arguments
@@ -134,9 +211,11 @@ fn tick(ui: &StationWindow, view: &View) {
     let mut readings = view.readings.borrow_mut();
     for arrival in view.station.due(now) {
         if arrival.source == "sky" {
+            readings.heard("sky");
             if let Some(generation) = view.sky.borrow_mut().take(&arrival.data)
             {
                 view.station.send("sky_quench", &generation.to_be_bytes());
+                readings.note_sent("sky_quench", u64::from(generation));
             }
         } else {
             readings.take(&arrival.source, &arrival.data, now);
@@ -195,6 +274,20 @@ fn tick(ui: &StationWindow, view: &View) {
         })
         .collect();
     said.set_links(links.join(", ").into());
+
+    // Each node's panel, its line changed where what it says has.
+    for (rows, nodes) in &view.boxes {
+        for (row, (name, commanded)) in nodes.iter().enumerate() {
+            let sky = (name == "sky").then(|| view.sky.borrow().said());
+            let line = readings.panel_line(name, *commanded, sky);
+            if let Some(mut shown) = rows.row_data(row) {
+                if shown.line != line.as_str() {
+                    shown.line = line.into();
+                    rows.set_row_data(row, shown);
+                }
+            }
+        }
+    }
 }
 
 /// Draws the sky again where stars have come since it was last drawn, no
@@ -296,14 +389,17 @@ mod shots {
     use tcs_sim::lander_view::{dot_of, ground_picture, pad, sky, Frame};
 
     use super::set_frame;
+    use crate::station::Craft;
     use crate::{LanderScene, Said, StationWindow};
+    use slint::Model;
 
     /// Where the pictures go, from the crate's directory.
     const SHOTS: &str = "../../docs/shots";
 
     /// The window's size, in logical pixels: the landscape at the width it
-    /// prefers, 600 pixels, with the window's padding.
-    const SIZE: (u32, u32) = (616, 650);
+    /// prefers, 600 pixels, with the window's padding, and the readings and
+    /// both vehicles' boxes of panels under it.
+    const SIZE: (u32, u32) = (616, 1130);
 
     /// A Slint platform whose one window is drawn into memory and never
     /// shown.
@@ -319,6 +415,67 @@ mod shots {
             &self,
         ) -> Result<Rc<dyn WindowAdapter>, slint::PlatformError> {
             Ok(self.0.clone())
+        }
+    }
+
+    /// What a node's panel says of a frame, at ten in the morning, as the
+    /// pictures are taken then: what the frame shows of it, and for a node
+    /// the frame does not show -- the sky, the ratings -- or one the station
+    /// commands, what is said before anything has come or gone.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`      - The node's name.
+    /// * `commanded` - Whether the station commands it.
+    /// * `frame`     - What the window shows.
+    /// * `axes`      - The joystick's values sent down, X and Y.
+    ///
+    /// # Returns
+    ///
+    /// The line.
+    fn line_of(
+        node: &str,
+        commanded: bool,
+        frame: &Frame,
+        axes: (f64, f64),
+    ) -> String {
+        if commanded {
+            return "Last sent: --:--:--".to_string();
+        }
+        let down = frame.state != "Flying";
+        let value = match node {
+            "to_x" => frame.position_x.clone(),
+            "to_y" => frame.position_y.clone(),
+            "to_velocity_x" => frame.velocity_x.clone(),
+            "to_velocity_y" => frame.velocity_y.clone(),
+            "to_accel_x" => frame.acceleration_x.clone(),
+            "to_accel_y" => frame.acceleration_y.clone(),
+            "to_fuel" => format!("{:.2}", frame.fuel),
+            "to_joystick_3_4_x" => format!("{:.2}", axes.0),
+            "to_joystick_3_4_y" => format!("{:.2}", axes.1),
+            "landed" => "not landed".to_string(),
+            "crashed" if down => "crashed".to_string(),
+            "crashed" => "not crashed".to_string(),
+            _ => return "Last recv: --:--:--".to_string(),
+        };
+        format!("Last recv: 10:00:00: {value}")
+    }
+
+    /// Shows a frame in each node's panel.
+    ///
+    /// # Arguments
+    ///
+    /// * `boxes` - Each box's rows and nodes, as the window was given them.
+    /// * `frame` - What the window shows.
+    /// * `axes`  - The joystick's values sent down, X and Y.
+    fn show_panels(boxes: &[super::BoxRows], frame: &Frame, axes: (f64, f64)) {
+        for (rows, nodes) in boxes {
+            for (row, (name, commanded)) in nodes.iter().enumerate() {
+                if let Some(mut shown) = rows.row_data(row) {
+                    shown.line = line_of(name, *commanded, frame, axes).into();
+                    rows.set_row_data(row, shown);
+                }
+            }
         }
     }
 
@@ -387,15 +544,37 @@ mod shots {
         said.set_note("Everything here is 1.3 s behind the lander".into());
         said.set_links("lander-a connected, lander-b connected".into());
         said.set_heard(true);
+        let crafts: Vec<Craft> = crate::VEHICLES
+            .iter()
+            .map(|path| {
+                Craft::read(
+                    &Path::new(env!("CARGO_MANIFEST_DIR"))
+                        .join("../..")
+                        .join(path),
+                )
+                .expect("the configuration reads")
+            })
+            .collect();
+        let boxes = super::set_boxes(
+            &said,
+            crafts
+                .iter()
+                .enumerate()
+                .map(|(n, craft)| (super::box_label(n), craft.panel_nodes()))
+                .collect(),
+        );
         ui.show().expect("shown");
         ui.window()
             .set_size(slint::PhysicalSize::new(SIZE.0, SIZE.1));
 
         let (frame, axes) = lander_flight::flying(&f);
         show(&ui, &frame, axes);
+        show_panels(&boxes, &frame, axes);
         shoot(&ui, "lander-station-flying.png");
 
-        show(&ui, &lander_flight::crashed(&f), (0.0, 0.0));
+        let crashed = lander_flight::crashed(&f);
+        show(&ui, &crashed, (0.0, 0.0));
+        show_panels(&boxes, &crashed, (0.0, 0.0));
         shoot(&ui, "lander-station-crashed.png");
     }
 }

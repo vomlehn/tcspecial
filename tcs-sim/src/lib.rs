@@ -324,24 +324,162 @@ fn payload_info_from(
         // Whether anything is ever sent to this payload, which decides
         // whether its panel has a received line at all.
         triggered: sim.triggered,
+        // Set once the panels are in order: see `main`.
+        group: 0,
+        index: 0,
     }
 }
 
-/// The order of a set of data handlers by their names: the order their
-/// panels are shown in.
+/// The label of each configuration's box of panels, by its place on the
+/// command line: "TCSpecial A", "TCSpecial B" and on. A single
+/// configuration's panels are shown without a box, which an empty label
+/// says.
+///
+/// # Arguments
+///
+/// * `configurations` - How many configurations are simulated.
+///
+/// # Returns
+///
+/// A label for each.
+fn group_labels(configurations: usize) -> Vec<String> {
+    if configurations <= 1 {
+        return vec![String::new()];
+    }
+    (0..configurations)
+        .map(|n| match u8::try_from(n).ok().filter(|n| *n < 26) {
+            Some(n) => format!("TCSpecial {}", char::from(b'A' + n)),
+            None => format!("TCSpecial {}", n + 1),
+        })
+        .collect()
+}
+
+/// Puts the panels in the window: every one's row, numbered by its place
+/// among them, which finds its payload when its button is pressed, and the
+/// boxes they are shown in.
+///
+/// # Arguments
+///
+/// * `ui`     - The main window.
+/// * `model`  - Every panel's row, in order, each saying its group.
+/// * `labels` - Each group's label: see [`group_labels`].
+fn set_panels(
+    ui: &MainWindow,
+    model: &Rc<VecModel<PayloadInfo>>,
+    labels: &[String],
+) {
+    for row in 0..model.row_count() {
+        update_row(model, row, |info| {
+            info.index = i32::try_from(row).unwrap_or(i32::MAX);
+        });
+    }
+    ui.set_payload_model(ModelRc::from(model.clone()));
+    set_groups(ui, model, labels);
+}
+
+/// Gives the window its boxes of panels, one for each configuration, each
+/// following the panels' rows as they change: see `PanelGroup` in
+/// `ui/main.slint`.
+///
+/// # Arguments
+///
+/// * `ui`     - The main window.
+/// * `model`  - Every panel's row, each saying its group.
+/// * `labels` - Each group's label, in order.
+fn set_groups(
+    ui: &MainWindow,
+    model: &Rc<VecModel<PayloadInfo>>,
+    labels: &[String],
+) {
+    let groups: Vec<PanelGroup> = labels
+        .iter()
+        .enumerate()
+        .map(|(group, label)| {
+            let group = i32::try_from(group).unwrap_or(i32::MAX);
+            PanelGroup {
+                label: SharedString::from(label.as_str()),
+                payloads: ModelRc::new(slint::FilterModel::new(
+                    model.clone(),
+                    move |info: &PayloadInfo| info.group == group,
+                )),
+            }
+        })
+        .collect();
+    ui.set_groups(ModelRc::new(VecModel::from(groups)));
+}
+
+/// How tall the panels' area is where they are shown in boxes, one for
+/// each configuration, one above the next: each box's rows and what a box
+/// adds round them.
+///
+/// # Arguments
+///
+/// * `ui`      - The main window, which says what a box adds.
+/// * `sizes`   - What a panel comes to.
+/// * `columns` - How many panels to a row.
+/// * `counts`  - How many panels each box holds.
+///
+/// # Returns
+///
+/// The height, with the window's chrome.
+fn boxed_height(
+    ui: &MainWindow,
+    sizes: &grid::Sizes,
+    columns: usize,
+    counts: &[usize],
+) -> f32 {
+    let rows: usize = counts.iter().map(|n| n.div_ceil(columns.max(1))).sum();
+    rows as f32 * sizes.panel_height
+        + counts.len() as f32 * ui.get_group_chrome()
+        + sizes.chrome_height
+}
+
+/// The order of a set of data handlers' panels: by their configurations,
+/// in the command line's order, and within each by their names.
 ///
 /// # Arguments
 ///
 /// * `dh_configs` - The data handlers, in their configurations' order.
+/// * `groups`     - Which configuration each is a payload of, by its place
+///                  on the command line.
 ///
 /// # Returns
 ///
-/// Each one's place among them, the first name's first; two of one name,
-/// which a configuration refuses, in their own order.
-fn name_order(dh_configs: &[DHConfig]) -> Vec<usize> {
+/// Each one's place among them, the first configuration's first name's
+/// first; two of one name, which a configuration refuses, in their own
+/// order.
+fn panel_order(dh_configs: &[DHConfig], groups: &[usize]) -> Vec<usize> {
     let mut order: Vec<usize> = (0..dh_configs.len()).collect();
-    order.sort_by(|&a, &b| dh_configs[a].name.0.cmp(&dh_configs[b].name.0));
+    order.sort_by(|&a, &b| {
+        groups[a]
+            .cmp(&groups[b])
+            .then_with(|| dh_configs[a].name.0.cmp(&dh_configs[b].name.0))
+    });
     order
+}
+
+/// Each panel's id: its payload's place in its own configuration, counted
+/// from nought in the order the file describes them, which is how tcs-moc
+/// numbers it too. A second configuration's payloads start again at nought.
+///
+/// # Arguments
+///
+/// * `order`  - Each panel's payload, by its place among every
+///              configuration's, in the panels' order: see [`panel_order`].
+/// * `groups` - Which configuration each payload is of, in the
+///              configurations' order, each configuration's payloads
+///              together.
+///
+/// # Returns
+///
+/// Each panel's id, in the panels' order.
+fn places_in_configurations(order: &[usize], groups: &[usize]) -> Vec<usize> {
+    // Where each configuration's payloads start among them all.
+    let start = |group: usize| groups.iter().position(|g| *g == group);
+    order
+        .iter()
+        .map(|&at| at - start(groups[at]).unwrap_or(0))
+        .collect()
 }
 
 /// Puts a list in an order.
@@ -642,13 +780,15 @@ fn thermostat_of(
 }
 
 /// What [`load`] reads out of the pair: the handlers the simulator
-/// simulates, the simulator file, its settings resolved against them, and the
-/// payloads' own configurations.
+/// simulates, the simulator file, its settings resolved against them, the
+/// payloads' own configurations, and which configuration each handler is a
+/// payload of, by its place on the command line.
 type Loaded = (
     Vec<DHConfig>,
     SimConfigFile,
     Vec<ResolvedSim>,
     Vec<PayloadConfig>,
+    Vec<usize>,
 );
 
 /// Reads the pair, once tcs-verify has found nothing wrong with it, and says
@@ -714,7 +854,8 @@ fn load(
     // each payload of exactly one of them.
     let mut graphs = Vec::with_capacity(payload_paths.len());
     let mut dh_configs = Vec::new();
-    for payload_path in payload_paths {
+    let mut groups = Vec::new();
+    for (group, payload_path) in payload_paths.iter().enumerate() {
         let loaded = tcsprotocol::graph::Graph::load(payload_path)
             .map_err(|e| e.to_string())
             .and_then(|read| {
@@ -727,7 +868,10 @@ fn load(
                 handlers
             });
         match loaded {
-            Ok(handlers) => dh_configs.extend(handlers),
+            Ok(handlers) => {
+                groups.extend(std::iter::repeat_n(group, handlers.len()));
+                dh_configs.extend(handlers);
+            }
             Err(e) => {
                 startup.error(format!(
                     "Error loading payload configuration from \
@@ -831,7 +975,7 @@ fn load(
         return None;
     }
 
-    Some((dh_configs, sim_file, sims, configs))
+    Some((dh_configs, sim_file, sims, configs, groups))
 }
 
 /// Holds a simulator file shared by several configurations to naming each
@@ -1490,20 +1634,22 @@ pub fn main() {
     if !startup.is_empty() {
         present(&startup);
     }
-    let Some((dh_configs, sim_file, sims, configs)) =
+    let Some((dh_configs, sim_file, sims, configs, groups)) =
         loaded.filter(|_| !startup.fatal())
     else {
         process::exit(1);
     };
-    // The panels in their payloads' names' order, left to right and top to
-    // bottom: the payloads, their settings and their configurations put in
-    // that order together, since a panel's place is what finds its payload.
-    // Each keeps its id, its place in the configuration.
-    let order = name_order(&dh_configs);
-    let dev_ids = order.clone();
+    // The panels in their configurations' order, and within each in their
+    // payloads' names' order, left to right and top to bottom: the payloads,
+    // their settings and their configurations put in that order together,
+    // since a panel's place is what finds its payload. Each keeps its id,
+    // its place in the configuration.
+    let order = panel_order(&dh_configs, &groups);
+    let dev_ids = places_in_configurations(&order, &groups);
     let dh_configs = in_order(dh_configs, &order);
     let sims = in_order(sims, &order);
     let configs = in_order(configs, &order);
+    let groups = in_order(groups, &order);
     // A world with a lander is shown in a window of its own, beside the
     // panels: see `lander_view`. Found now, while the payloads, which reach
     // the world, are still to hand.
@@ -1570,6 +1716,14 @@ pub fn main() {
         .zip(&dev_ids)
         .map(|((dh, sim), &dev_id)| payload_info_from(dev_id, dh, sim))
         .collect();
+    // Each in its configuration's box.
+    for (row, info) in infos.iter_mut().enumerate() {
+        info.group = groups
+            .get(row)
+            .and_then(|&group| i32::try_from(group).ok())
+            .unwrap_or(0);
+    }
+    let labels = group_labels(payload_paths.len());
     let count = configs.len();
 
     // Every simulated payload made now, and each silent until its panel says
@@ -1610,7 +1764,9 @@ pub fn main() {
     {
         let signalled = signalled.clone();
         tcs_ui::windows::on_window_thread(move |closed| {
-            show_panels(infos, count, lander, payloads, signalled, closed);
+            show_panels(
+                infos, labels, count, lander, payloads, signalled, closed,
+            );
         });
     }
 
@@ -1627,7 +1783,9 @@ pub fn main() {
 ///
 /// # Arguments
 ///
-/// * `infos`     - The panels, in order, as they start.
+/// * `infos`     - The panels, in order, as they start, each saying its
+///                 group.
+/// * `labels`    - Each group's label: see [`group_labels`].
 /// * `count`     - How many payloads there are.
 /// * `lander`    - The lander's world, where there is one, to show beside
 ///                 the panels.
@@ -1641,6 +1799,7 @@ pub fn main() {
 /// If the window cannot be made or run.
 fn show_panels(
     infos: Vec<PayloadInfo>,
+    labels: Vec<String>,
     count: usize,
     lander: Option<lander_view::Scene>,
     payloads: Arc<Mutex<Vec<SimulatedPayload>>>,
@@ -1655,8 +1814,17 @@ fn show_panels(
     }
     let ui_weak = ui.as_weak();
 
+    // How many panels each group's box holds, for its height.
+    let counts: Vec<usize> = (0..labels.len())
+        .map(|group| {
+            infos
+                .iter()
+                .filter(|info| usize::try_from(info.group) == Ok(group))
+                .count()
+        })
+        .collect();
     let model: Rc<VecModel<PayloadInfo>> = Rc::new(VecModel::from(infos));
-    ui.set_payload_model(ModelRc::from(model.clone()));
+    set_panels(&ui, &model, &labels);
     // No more than this in a row, however wide the window is made.
     ui.set_most_columns(i32::try_from(grid::MAX_COLUMNS).unwrap_or(1));
     let sizes = grid::settle(&ui);
@@ -1670,10 +1838,18 @@ fn show_panels(
     // itself never is: the shape rule chooses the grid, and the room rule
     // says how much of the window to give it.
     // And at least as tall as the lander's pane, where there is one.
+    // In boxes, one for each configuration, the rows are each box's and
+    // each box adds its label and border.
     let size = grid::window_size(&sizes, &shape, count);
+    let height = if labels.len() > 1 {
+        size.height
+            .max(boxed_height(&ui, &sizes, shape.columns, &counts))
+    } else {
+        size.height
+    };
     ui.window().set_size(slint::LogicalSize::new(
         size.width,
-        size.height.max(ui.get_least_height()),
+        height.max(ui.get_least_height()),
     ));
 
     handle_transfer_button(&ui, payloads.clone(), model.clone());
@@ -1862,10 +2038,27 @@ fn ask_for_the_edge(ui: &MainWindow, edge: Edge) {
 mod tests {
     use super::*;
 
-    /// A list put in an order has each item once, where the order puts it.
+    /// A list put in an order has each item once, where the order puts it;
+    /// and panels go in their configurations' order, by name within each,
+    /// each numbered within its own configuration.
     #[test]
     fn a_list_goes_into_its_order() {
         assert_eq!(in_order(vec!["c", "a", "b"], &[1, 2, 0]), ["a", "b", "c"]);
+        // Two configurations: their panels kept apart, each by name, and
+        // each numbered from nought in its own file.
+        let names = ["z", "a", "m", "b"];
+        let handlers: Vec<DHConfig> = names
+            .iter()
+            .map(|name| {
+                let mut dh = handler("DH0");
+                dh.name = tcsprotocol::DHName::new(*name);
+                dh
+            })
+            .collect();
+        let groups = [0, 0, 1, 1];
+        let order = panel_order(&handlers, &groups);
+        assert_eq!(order, [1, 0, 3, 2]);
+        assert_eq!(places_in_configurations(&order, &groups), [1, 0, 1, 0]);
         assert!(in_order(Vec::<u8>::new(), &[]).is_empty());
     }
     use std::path::Path;
@@ -1959,7 +2152,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         let (a, b, sim) = two_minimals(dir.path(), "probe", None);
         let mut startup = Startup::default();
-        let (dh_configs, _, _, configs) =
+        let (dh_configs, _, _, configs, _) =
             load(&[&a, &b], &sim, Mode::All, &mut startup)
                 .unwrap_or_else(|| panic!("refused: {:?}", startup.lines()));
         assert!(startup.is_empty(), "{:?}", startup.lines());
@@ -2071,7 +2264,7 @@ mod tests {
         assert!(sim.ends_with("minimal-sim.yaml"), "{sim}");
 
         let mut startup = Startup::default();
-        let (dh_configs, _, sims, configs) =
+        let (dh_configs, _, sims, configs, _) =
             load(&[payload], &sim, Mode::All, &mut startup).expect("it loads");
         assert!(startup.is_empty(), "{:?}", startup.lines());
         assert_eq!(dh_configs.len(), 1);
@@ -2481,7 +2674,7 @@ mod tests {
 
             let ui = MainWindow::new().unwrap();
             let sizes = grid::settle(&ui);
-            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(rows))));
+            set_panels(&ui, &Rc::new(VecModel::from(rows)), &[String::new()]);
 
             // Opened as main() opens it, floor and all.
             let shape = grid::grid_shape(&sizes, panels);
@@ -3629,9 +3822,11 @@ mod tests {
         let shown = |info: PayloadInfo| {
             let ui = MainWindow::new().unwrap();
             let _ = grid::settle(&ui);
-            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
-                info,
-            ]))));
+            set_panels(
+                &ui,
+                &Rc::new(VecModel::from(vec![info])),
+                &[String::new()],
+            );
             ui.show().unwrap();
             (
                 lines_from(&ui, "Sent: "),
@@ -3702,9 +3897,11 @@ mod tests {
             heater.driving = SharedString::from(format!("heater_1: {doing}"));
             let ui = MainWindow::new().unwrap();
             let _ = grid::settle(&ui);
-            ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
-                heater,
-            ]))));
+            set_panels(
+                &ui,
+                &Rc::new(VecModel::from(vec![heater])),
+                &[String::new()],
+            );
             ui.show().unwrap();
             assert_eq!(
                 lines_from(&ui, "heater_1: "),
@@ -3733,10 +3930,14 @@ mod tests {
 
         let ui = MainWindow::new().unwrap();
         let sizes = grid::settle(&ui);
-        ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
-            payload_info_from(0, &first, &settings),
-            payload_info_from(1, &second, &settings),
-        ]))));
+        set_panels(
+            &ui,
+            &Rc::new(VecModel::from(vec![
+                payload_info_from(0, &first, &settings),
+                payload_info_from(1, &second, &settings),
+            ])),
+            &[String::new()],
+        );
         // Opened as main() opens it for two payloads, so both panels are laid
         // out: a panel scrolled out of sight is never built at all.
         let shape = grid::grid_shape(&sizes, 2);
@@ -3775,9 +3976,11 @@ mod tests {
         let sim = sim(1000, 1000, 12);
         let ui = MainWindow::new().unwrap();
         let _ = grid::settle(&ui);
-        ui.set_payload_model(ModelRc::from(Rc::new(VecModel::from(vec![
-            payload_info_from(0, &dh, &sim),
-        ]))));
+        set_panels(
+            &ui,
+            &Rc::new(VecModel::from(vec![payload_info_from(0, &dh, &sim)])),
+            &[String::new()],
+        );
         ui.show().unwrap();
 
         // Every line of text the window has laid out.

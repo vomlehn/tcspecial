@@ -4,7 +4,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use tcsos::time::{Duration, Instant};
+use tcsos::time::{Duration, Instant, SystemTime};
 use tcsprotocol::node::physical::lander::{StarRecord, STAR_RECORD};
 use tcsprotocol::node::vehicle::compute::from_value;
 use tcsprotocol::unit::Unit;
@@ -49,6 +49,12 @@ pub struct Readings {
     values: HashMap<String, Value>,
     /// When each value last changed, on this station's clock.
     changed: HashMap<String, Instant>,
+    /// When each value last changed, by the wall clock, which its node's
+    /// panel says as a time of day.
+    arrived: HashMap<String, SystemTime>,
+    /// The last number sent up to each payload the station commands, and
+    /// when, by the payload's name.
+    sent: HashMap<String, (SystemTime, u64)>,
 }
 
 impl Readings {
@@ -86,6 +92,7 @@ impl Readings {
         };
         if self.values.get(source) != Some(&value) {
             self.changed.insert(source.to_string(), at);
+            self.arrived.insert(source.to_string(), SystemTime::now());
         }
         self.values.insert(source.to_string(), value);
     }
@@ -188,6 +195,99 @@ impl Readings {
             None => NOTHING_YET.to_string(),
         }
     }
+
+    /// Notes that something arrived from a node the readings do not keep
+    /// the value of -- the sky, which the window keeps -- for its panel.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    pub fn heard(&mut self, node: &str) {
+        self.arrived.insert(node.to_string(), SystemTime::now());
+    }
+
+    /// Notes a number sent up to a payload, for its panel.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`   - The payload's name.
+    /// * `number` - What was sent.
+    pub fn note_sent(&mut self, node: &str, number: u64) {
+        self.sent
+            .insert(node.to_string(), (SystemTime::now(), number));
+    }
+
+    /// A node's latest value in the words its panel says it in: a decision
+    /// by its name -- `landed` or `not landed` -- the latest rating as
+    /// tcs-moc's panels say one, and any other value as a number.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node's name.
+    ///
+    /// # Returns
+    ///
+    /// The words, or `None` before anything has arrived.
+    pub fn node_said(&self, node: &str) -> Option<String> {
+        let value = self.values.get(node)?;
+        Some(match (node, value) {
+            ("landed" | "crashed", _) if self.said(node) => node.to_string(),
+            ("landed" | "crashed", _) => format!("not {node}"),
+            ("ratings", Value::Bytes(bytes)) => {
+                match tcsprotocol::node::physical::lander::ratings_said(bytes) {
+                    Some(all) => {
+                        all.split("; ").next().unwrap_or("").to_string()
+                    }
+                    None => "none yet".to_string(),
+                }
+            }
+            (_, Value::Number(_)) => self.text(node, 2),
+            (_, Value::Bytes(bytes)) => format!("{} bytes", bytes.len()),
+        })
+    }
+
+    /// What a node's panel says of it: when its value last arrived and what
+    /// it was, or for a payload the station commands, when it was last sent
+    /// a number and what; each time of day in UTC, as every panel's is.
+    ///
+    /// # Arguments
+    ///
+    /// * `node`      - The node's name.
+    /// * `commanded` - Whether the station sends it numbers, rather than
+    ///                 hearing from it.
+    /// * `said`      - What to say of its value, where the readings do not
+    ///                 keep it: the sky's stars, which the window keeps.
+    ///
+    /// # Returns
+    ///
+    /// The line: `Last recv: 10:03:12: 450.00`, `Last sent: 10:03:12: 3`,
+    /// or the time as dashes before there is one.
+    pub fn panel_line(
+        &self,
+        node: &str,
+        commanded: bool,
+        said: Option<String>,
+    ) -> String {
+        let clock =
+            |when: SystemTime| tcsprotocol::Timestamp::at(when).time_of_day();
+        if commanded {
+            return match self.sent.get(node) {
+                Some(&(when, number)) => {
+                    format!("Last sent: {}: {number}", clock(when))
+                }
+                None => "Last sent: --:--:--".to_string(),
+            };
+        }
+        match (
+            self.arrived.get(node),
+            said.or_else(|| self.node_said(node)),
+        ) {
+            (Some(&when), Some(said)) => {
+                format!("Last recv: {}: {said}", clock(when))
+            }
+            _ => "Last recv: --:--:--".to_string(),
+        }
+    }
 }
 
 /// The lander's sky, as its records come down: no stars until the first
@@ -211,6 +311,15 @@ pub struct Sky {
 }
 
 impl Sky {
+    /// What the sky's panel says of it: the stars come down so far.
+    ///
+    /// # Returns
+    ///
+    /// The words: `57 of 120 stars`.
+    pub fn said(&self) -> String {
+        format!("{} of {} stars", self.stars.len(), self.total)
+    }
+
     /// Takes a packet of records.
     ///
     /// # Arguments
@@ -356,5 +465,36 @@ mod tests {
         assert_eq!(sky.fresh().map(|s| s.len()), Some(3));
         assert_eq!(sky.take(&packet(&[star(5, 0)])), None);
         assert_eq!(sky.fresh().map(|s| s.len()), Some(1));
+    }
+
+    /// A panel says when a value came and what it was, a decision in words,
+    /// what was last sent to a payload the station commands, and dashes
+    /// before anything.
+    #[test]
+    fn a_panel_says_what_arrived_and_what_was_sent() {
+        let mut readings = readings();
+        assert_eq!(
+            readings.panel_line("to_x", false, None),
+            "Last recv: --:--:--"
+        );
+        assert_eq!(
+            readings.panel_line("restart", true, None),
+            "Last sent: --:--:--"
+        );
+        readings.take("to_x", &bytes_of(450.0, Unit::Metre), Instant::now());
+        readings.take("landed", b"0", Instant::now());
+        let line = readings.panel_line("to_x", false, None);
+        assert!(line.starts_with("Last recv: "), "{line}");
+        assert!(line.ends_with(": 450.00"), "{line}");
+        let line = readings.panel_line("landed", false, None);
+        assert!(line.ends_with(": not landed"), "{line}");
+        readings.note_sent("restart", 3);
+        let line = readings.panel_line("restart", true, None);
+        assert!(line.starts_with("Last sent: "), "{line}");
+        assert!(line.ends_with(": 3"), "{line}");
+        readings.heard("sky");
+        let line =
+            readings.panel_line("sky", false, Some("4 of 120 stars".into()));
+        assert!(line.ends_with(": 4 of 120 stars"), "{line}");
     }
 }

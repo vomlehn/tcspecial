@@ -605,6 +605,12 @@ shows the same, a light time later;</li>
 Autoland, which tries to land the lander by flying it through the
 joystick, a landing not being certain.</li>
 </ul>
+<p>Beside the pane, the payload panels are in two boxes, one above the other:
+&quot;TCSpecial A&quot;, lander-a's payloads, and under it &quot;TCSpecial B&quot;,
+lander-b's, each label inside its box at the top left, and each box's
+panels three across in their names' order. Each panel's number is its
+payload's place in its own configuration, so each box's count from
+nought.</p>
 <p>Here is the pane flown by hand, low over the pad and coming down at
 &quot;close&quot; to the limit, the joystick's lines showing where it is held:</p>
 <div class="figure">
@@ -659,10 +665,21 @@ crashed signal came down;</li>
 <li>a Restart button, which sends a command up through lander-b's gateway to
 a simulated payload, <tt class="docutils literal">restart</tt>, joined to the lander's <tt class="docutils literal">restart</tt>
 input: each press a new count, the lander starting again at each, a light
-time after the press.</li>
+time after the press;</li>
+<li>under them, a box for each vehicle, &quot;TCSpecial A&quot; above &quot;TCSpecial B&quot; as
+in tcs-sim's window, each holding a panel for each node the ground hears
+from or commands through that vehicle's gateway, three across in their
+names' order: the node's name, and when its value last came down and what
+it was -- <tt class="docutils literal">Last recv: 10:03:12: 450.00</tt>, a decision in words such as
+<tt class="docutils literal">not landed</tt>, the latest rating as above, the stars come down so far --
+or for a payload the ground commands, <tt class="docutils literal">restart</tt> or <tt class="docutils literal">sky_quench</tt>, when
+it was last sent a number and what: <tt class="docutils literal">Last sent: 10:03:15: 3</tt>. Each time
+of day is in UTC, as every panel's is.</li>
 </ul>
 <p>The Rust ground station, lander-station, shows the same flights as tcs-sim
-does, a light time later, the joystick's lines at what was sent down:</p>
+does, a light time later, the joystick's lines at what was sent down, and
+the same boxes of node panels under its Restart button (in the pictures,
+each value's time is the pictures' ten in the morning):</p>
 <div class="figure">
 <img alt="lander-station's window, the lander just over the pad, Landing speed close down, the note &quot;Everything here is 1.3 s behind the lander&quot;, both vehicles connected, and Restart." src="shots/lander-station-flying.png" />
 <p class="caption">lander-station, the lander coming down close to the limit.</p>

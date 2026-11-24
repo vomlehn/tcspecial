@@ -111,6 +111,52 @@ class Vehicles(unittest.TestCase):
         self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
 
 
+class Panels(unittest.TestCase):
+    """The boxes of node panels under the window's readings."""
+
+    def test_each_vehicle_has_a_box_of_its_nodes(self):
+        """A box for each vehicle, labelled TCSpecial A and B as tcs-sim's
+        window labels them, of the nodes the ground hears from or commands
+        through its gateway, in their names' order."""
+        crafts = [lander_yamcs.Craft(name) for name in lander_yamcs.VEHICLES]
+        self.assertEqual(
+            [lander_yamcs.box_label(n, 2) for n in range(2)],
+            ["TCSpecial A", "TCSpecial B"])
+        self.assertEqual(lander_yamcs.box_label(0, 1), "")
+        a, b = (lander_yamcs.panel_nodes(craft) for craft in crafts)
+        self.assertEqual(a, sorted(a))
+        self.assertIn("to_x", a)
+        self.assertIn("sky_quench", a)
+        self.assertIn("ratings", b)
+        self.assertIn("restart", b)
+        self.assertFalse(set(a) & set(b), "each node in one box")
+
+    def test_a_panel_says_what_arrived_and_what_was_sent(self):
+        """A value that came down is said with its time of day, in words
+        where it is a decision or a rating; a payload the ground commands
+        says what was last sent to it; and nothing yet is dashes."""
+        crafts = [lander_yamcs.Craft(name) for name in lander_yamcs.VEHICLES]
+        readings = lander_yamcs.Readings([(None, craft) for craft in crafts])
+        self.assertEqual(readings.panel_line("to_y"), "Last recv: --:--:--")
+        self.assertEqual(readings.panel_line("restart"),
+                         "Last sent: --:--:--")
+        import calendar
+        noon = calendar.timegm((2026, 11, 24, 12, 0, 0, 0, 0, 0))
+        readings.values.update({"to_y": 450.0, "landed": "1",
+                                "crashed": "0"})
+        readings.arrived.update({"to_y": noon, "landed": noon,
+                                 "crashed": noon})
+        self.assertEqual(readings.panel_line("to_y"),
+                         "Last recv: 12:00:00: 450.00")
+        self.assertEqual(readings.panel_line("landed"),
+                         "Last recv: 12:00:00: landed")
+        self.assertEqual(readings.panel_line("crashed"),
+                         "Last recv: 12:00:00: not crashed")
+        readings.sent["restart"] = (noon + 5, 3)
+        self.assertEqual(readings.panel_line("restart"),
+                         "Last sent: 12:00:05: 3")
+
+
 class Relays(unittest.TestCase):
     """The relays that stand between Yamcs and each vehicle."""
 

@@ -18,6 +18,50 @@ import { PoweredBy } from "../../../tcs-ui/ui/powered.slint";
 
 export { LanderScene }
 
+// What one node's panel says: its name, and when its value last came down
+// and what it was, or for a payload the station commands, when it was last
+// sent a number and what.
+export struct NodeLine {
+    // The node's name.
+    name: string,
+    // "Last recv: 10:03:12: 450.00", "Last sent: 10:03:12: 3".
+    line: string,
+}
+
+// One vehicle's panels, in a box of their own labelled inside at its top
+// left, as tcs-sim's window boxes each configuration's payloads.
+export struct NodeBox {
+    // "TCSpecial A", "TCSpecial B".
+    label: string,
+    // Its nodes' panels, in their names' order.
+    nodes: [NodeLine],
+}
+
+// One node's panel: its name, bold, over its line.
+component NodePanel inherits Rectangle {
+    in property <string> name;
+    in property <string> line;
+    background: #f0f0f0;
+    border-width: 1px;
+    border-color: #808080;
+    VerticalLayout {
+        padding: 4px;
+        spacing: 1px;
+        // At the top, however tall a neighbour's wrapped line makes the
+        // row.
+        alignment: start;
+        Text {
+            text: root.name;
+            font-weight: 700;
+            overflow: elide;
+        }
+        Text {
+            text: root.line;
+            wrap: word-wrap;
+        }
+    }
+}
+
 // What the station says of itself, and the commands it sends up.
 export global Said {
     // The seed and the light time: everything here is that late.
@@ -28,6 +72,10 @@ export global Said {
     in-out property <bool> heard: false;
     // Restart the lander, wherever it is.
     callback restart-clicked();
+    // A box of panels for each vehicle, the first above the next: each
+    // node the station hears from or commands through its gateway, three
+    // across in their names' order.
+    in-out property <[NodeBox]> boxes;
 }
 
 export component StationWindow inherits Window {
@@ -163,6 +211,37 @@ export component StationWindow inherits Window {
             Button {
                 text: "Restart";
                 clicked => { Said.restart-clicked(); }
+            }
+        }
+
+        // A box for each vehicle, the first above the next, labelled
+        // inside at its top left, its panels three across.
+        for b in Said.boxes: Rectangle {
+            border-width: 1px;
+            border-color: #808080;
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+                Text {
+                    text: b.label;
+                    font-weight: 700;
+                    horizontal-alignment: left;
+                }
+                GridLayout {
+                    spacing: 0px;
+                    for n[i] in b.nodes: NodePanel {
+                        row: Math.floor(i / 3);
+                        col: Math.mod(i, 3);
+                        name: n.name;
+                        line: n.line;
+                        // A third of the box each, however long its line:
+                        // no column asks for more than another, and each
+                        // takes an equal share.
+                        preferred-width: 1px;
+                        min-width: 1px;
+                        horizontal-stretch: 1;
+                    }
+                }
             }
         }
     }

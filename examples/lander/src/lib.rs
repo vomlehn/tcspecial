@@ -60,7 +60,7 @@ Run from the repository's root, as the paths below are taken from it.
 ";
 
 /// The vehicles' configurations, from the repository's root.
-const VEHICLES: [&str; 2] = [
+pub(crate) const VEHICLES: [&str; 2] = [
     "examples/lander-a/lander-a.ytcs",
     "examples/lander-b/lander-b.ytcs",
 ];
@@ -265,6 +265,13 @@ fn run(asked: &Asked) -> Result<(), String> {
         .map(|path| Craft::read(Path::new(path)))
         .collect::<Result<Vec<Craft>, String>>()?;
     let units = crafts.iter().flat_map(Craft::units).collect();
+    // A box of panels for each vehicle, labelled as tcs-sim's window labels
+    // each configuration's: TCSpecial A, TCSpecial B.
+    let boxes: Vec<window::Boxed> = crafts
+        .iter()
+        .enumerate()
+        .map(|(n, craft)| (window::box_label(n), craft.panel_nodes()))
+        .collect();
     let station = Station::open(&crafts, asked.delay)?;
 
     let mut children = vec![start_simulator(&sim_path, mode)?];
@@ -282,9 +289,14 @@ fn run(asked: &Asked) -> Result<(), String> {
         asked.delay.as_secs_f64()
     );
     tcs_ui::windows::on_window_thread(move |closed| {
-        if let Err(e) =
-            window::show(figures, station, Readings::new(units), note, closed)
-        {
+        if let Err(e) = window::show(
+            figures,
+            station,
+            Readings::new(units),
+            note,
+            boxes,
+            closed,
+        ) {
             eprintln!("lander-station: the window: {e}");
         }
     });
@@ -330,5 +342,37 @@ mod tests {
         assert!(asked_of(&["--seed=x"]).is_err());
         assert!(asked_of(&["--delay=-1"]).is_err());
         assert!(asked_of(&["--yamcs"]).is_err());
+    }
+
+    /// Each vehicle's box holds the nodes the station hears from or
+    /// commands through its gateway, in their names' order, each in one
+    /// box only; and the boxes are labelled as tcs-sim's window labels its
+    /// own.
+    #[test]
+    fn each_vehicle_has_a_box_of_its_nodes() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let boxes: Vec<Vec<(String, bool)>> = VEHICLES
+            .iter()
+            .map(|path| {
+                Craft::read(&root.join(path))
+                    .expect("it reads")
+                    .panel_nodes()
+            })
+            .collect();
+        for nodes in &boxes {
+            let names: Vec<&String> = nodes.iter().map(|(n, _)| n).collect();
+            let mut sorted = names.clone();
+            sorted.sort();
+            assert_eq!(names, sorted);
+        }
+        let has = |n: usize, name: &str, commanded: bool| {
+            boxes[n].contains(&(name.to_string(), commanded))
+        };
+        assert!(has(0, "to_x", false));
+        assert!(has(0, "sky_quench", true));
+        assert!(has(1, "ratings", false));
+        assert!(has(1, "restart", true));
+        assert_eq!(window::box_label(0), "TCSpecial A");
+        assert_eq!(window::box_label(1), "TCSpecial B");
     }
 }

@@ -984,6 +984,13 @@ foot of the window. Nothing in the window names a payload or fixes how many
 there are: the two configuration files decide that, so a payload added to or
 removed from them adds or removes a panel.
 
+Simulating several configurations together, as the lander's two do, tcs-sim
+shows each one's panels in a box of its own, one above the next, in the
+order the command line names them: "TCSpecial A" for the first, "TCSpecial
+B" for the second, each label inside its box at the top left. Within a box
+the panels are three across in their names' order, and each panel's number
+is its payload's place in its own configuration.
+
 SIGHUP, SIGINT and SIGTERM do what ``Quit All`` does: every payload stops and
 its simulated device is cleared, and then tcs-sim exits with the status a shell
 gives a program the signal ended, 128 more than the signal's number -- 130 for

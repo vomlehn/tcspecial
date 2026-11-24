@@ -34,7 +34,7 @@ use slint::platform::software_renderer::{
     MinimalSoftwareWindow, PremultipliedRgbaColor, RepaintBufferType,
 };
 use slint::platform::{Platform, WindowAdapter, WindowEvent};
-use slint::{ComponentHandle, LogicalSize, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, LogicalSize, Model, VecModel};
 use tcs_verify::startup::Startup;
 use tcsprotocol::node::physical::lander::Resolved;
 use tcsprotocol::simulate::Mode;
@@ -180,7 +180,7 @@ impl Scene {
     /// If the files are refused, which a shipped set is not.
     fn new(windows: &Windows, payload_path: &Path, sim_path: &Path) -> Self {
         let mut startup = Startup::default();
-        let (dh_configs, _, sims, configs) = load(
+        let (dh_configs, _, sims, configs, _) = load(
             &[payload_path.to_str().expect("a path")],
             sim_path.to_str().expect("a path"),
             Mode::All,
@@ -199,7 +199,7 @@ impl Scene {
                 .map(|(row, (dh, sim))| payload_info_from(row, dh, sim))
                 .collect::<Vec<_>>(),
         ));
-        ui.set_payload_model(ModelRc::from(model.clone()));
+        crate::set_panels(&ui, &model, &[String::new()]);
         // After the payloads, as main() measures: see grid::Sizes::of.
         let sizes = grid::settle(&ui);
         let shape = grid::grid_shape(&sizes, configs.len());

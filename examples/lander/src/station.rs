@@ -8,7 +8,7 @@
 //! it is asked for, and what arrives is shown [`Station::delay`] after it
 //! arrives. The vehicles' own links are as their configurations state them.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
 use tcsmoc::gateway::GatewayReceiver;
@@ -151,6 +151,34 @@ impl Craft {
             }
         }
         found
+    }
+
+    /// The nodes the window's box of this vehicle's panels shows, in their
+    /// names' order: each the station hears from through the vehicle's
+    /// gateways, and each it commands through them.
+    ///
+    /// # Returns
+    ///
+    /// Each node's name, and whether the station commands it.
+    pub fn panel_nodes(&self) -> Vec<(String, bool)> {
+        let gateways = self.gateways();
+        let mut nodes: BTreeMap<String, bool> = telemetry::of(&self.graph)
+            .map(|links| {
+                links
+                    .into_iter()
+                    .filter(|link| {
+                        gateways
+                            .iter()
+                            .any(|g| link.via == Via::Gateway(g.to_string()))
+                    })
+                    .map(|link| (link.source, false))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (payload, _) in self.uplinked() {
+            nodes.insert(payload, true);
+        }
+        nodes.into_iter().collect()
     }
 
     /// The unit of each node drawn into a gateway that sends a number.

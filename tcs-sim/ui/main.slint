@@ -51,6 +51,23 @@ export struct PayloadInfo {
     last-recv-data: string,
     packets-sent: int,
     packets-recv: int,
+    // Which configuration this is a payload of, by its place on tcs-sim's
+    // command line, from nought: the box it is shown in. See PanelGroup.
+    group: int,
+    // Its place among all the panels, which is what finds its payload when
+    // its button is pressed: its place in its box is another number.
+    index: int,
+}
+
+// The panels of one configuration, in a box of their own, labelled inside
+// at its top left: tcs-sim simulating several configurations together -- the
+// lander's two tcspecials -- shows each one's apart. With one configuration
+// there is one group, with no label, and no box is drawn.
+export struct PanelGroup {
+    // What the box says: "TCSpecial A", "TCSpecial B". Empty for no box.
+    label: string,
+    // The configuration's panels, in their names' order.
+    payloads: [PayloadInfo],
 }
 
 component PayloadPanel inherits Rectangle {
@@ -369,6 +386,27 @@ export component MainWindow inherits Window {
 
     // The simulated payloads, read from the configuration files by Rust.
     in-out property <[PayloadInfo]> payload-model: [];
+    // The same payloads, a group for each configuration, each shown in a
+    // box of its own, one above the next: see PanelGroup. Rust makes them
+    // from payload-model, which they follow as it changes.
+    in-out property <[PanelGroup]> groups: [];
+    // Whether the groups are drawn as boxes: where they have labels.
+    property <bool> boxed: root.groups.length > 0 && root.groups[0].label != "";
+    // A box's border and the room inside it, round its label and panels.
+    property <length> box-padding: 4px;
+    // What a box adds to the height of its panels: its label, its padding
+    // and border, and the room between it and the next. Rust adds it for
+    // each box as it works out the height the window opens at.
+    out property <length> group-chrome: group-label.preferred-height
+        + 2 * (root.box-padding + 1px) + root.box-spacing
+        + root.grid-padding * 2;
+    property <length> box-spacing: 6px;
+    // Measures a box's label, which each box draws alike.
+    group-label := Text {
+        text: "TCSpecial A";
+        font-weight: 700;
+        visible: false;
+    }
 
     // How many panels to a row, from the width the window actually has.
     //
@@ -411,7 +449,12 @@ export component MainWindow inherits Window {
     // The panels' area beside a lander's pane: exactly its columns wide,
     // so that a panel keeps its size as the window grows.
     property <length> grid-width: root.lander-columns * root.panel-width
-        + grid.padding * 2;
+        + root.box-inset * 2 + root.grid-padding * 2;
+    // The room the panels' grid keeps round its panels inside its box.
+    property <length> grid-padding: 8px;
+    // How far a box's panels are from the edge of the scrolling area: its
+    // border and padding, where there are boxes.
+    property <length> box-inset: root.boxed ? root.box-padding + 1px : 0px;
 
     // One callback for the one button a panel has. Which way a press goes is
     // Rust's to decide, from the status the button's own label comes from.
@@ -442,12 +485,12 @@ export component MainWindow inherits Window {
     // Everything the window needs besides the panels: the padding round the
     // whole of it, the line saying what powers it, the row holding the quit
     // button, and the grid's own padding inside the scrolling area.
-    out property <length> chrome-width: outer.padding * 2 + grid.padding * 2
-        + root.lander-width;
+    out property <length> chrome-width: outer.padding * 2 + root.box-inset * 2
+        + root.grid-padding * 2 + root.lander-width;
     out property <length> chrome-height: outer.padding * 2
         + powered.height
         + quit-row.height
-        + grid.padding * 2;
+        + root.grid-padding * 2;
 
 
     outer := VerticalLayout {
@@ -484,38 +527,58 @@ export component MainWindow inherits Window {
                 // with no height of its own takes what is left over, and the
                 // grid, which states its height, takes none of it.
                 VerticalLayout {
-                        grid := GridBox {
-                        spacing: 0px;
-                        height: payload-model.length == 0
-                            ? 0px
-                            : Math.ceil(payload-model.length / columns)
-                                * panel-height;
+                    spacing: root.box-spacing;
+                    for g in root.groups: Rectangle {
+                        border-width: root.boxed ? 1px : 0px;
+                        border-color: #808080;
+                        VerticalLayout {
+                            padding: root.box-inset;
+                            spacing: 2px;
+                            // Inside the box, at its top left.
+                            if root.boxed: Text {
+                                text: g.label;
+                                font-weight: 700;
+                                horizontal-alignment: left;
+                            }
+                            grid := GridBox {
+                                spacing: 0px;
+                                padding: root.grid-padding;
+                                height: g.payloads.length == 0
+                                    ? 0px
+                                    : Math.ceil(g.payloads.length / columns)
+                                        * panel-height
+                                        + root.grid-padding * 2;
 
-                        for p[i] in payload-model: PayloadPanel {
-                            row: Math.floor(i / columns);
-                            col: Math.mod(i, columns);
-                            // A minimum rather than a size: the window opens at
-                            // exactly this, and the layout stretches the panels
-                            // if it is made larger. Below it a panel's rows
-                            // stop fitting.
-                            min-width: panel-width;
-                            min-height: panel-height;
+                                for p[i] in g.payloads: PayloadPanel {
+                                    row: Math.floor(i / columns);
+                                    col: Math.mod(i, columns);
+                                    // A minimum rather than a size: the
+                                    // window opens at exactly this, and the
+                                    // layout stretches the panels if it is
+                                    // made larger. Below it a panel's rows
+                                    // stop fitting.
+                                    min-width: panel-width;
+                                    min-height: panel-height;
 
-                            payload-name: p.name;
-                            dev-id: p.dev-id;
-                            payload-config: p.config;
-                            payload-status: p.status;
-                            last-sent-time: p.last-sent-time;
-                            last-sent-data: p.last-sent-data;
-                            last-recv-time: p.last-recv-time;
-                            last-recv-data: p.last-recv-data;
-                            packets-sent: p.packets-sent;
-                            packets-recv: p.packets-recv;
-                            parameters: p.parameters;
-                            triggered: p.triggered;
-                            driving: p.driving;
+                                    payload-name: p.name;
+                                    dev-id: p.dev-id;
+                                    payload-config: p.config;
+                                    payload-status: p.status;
+                                    last-sent-time: p.last-sent-time;
+                                    last-sent-data: p.last-sent-data;
+                                    last-recv-time: p.last-recv-time;
+                                    last-recv-data: p.last-recv-data;
+                                    packets-sent: p.packets-sent;
+                                    packets-recv: p.packets-recv;
+                                    parameters: p.parameters;
+                                    triggered: p.triggered;
+                                    driving: p.driving;
 
-                            transfer-clicked => { transfer-payload(i); }
+                                    transfer-clicked => {
+                                        transfer-payload(p.index);
+                                    }
+                                }
+                            }
                         }
                     }
                     Rectangle { }

@@ -239,6 +239,13 @@ pane at the left of its payload panels:
   Autoland, which tries to land the lander by flying it through the
   joystick, a landing not being certain.
 
+Beside the pane, the payload panels are in two boxes, one above the other:
+"TCSpecial A", lander-a's payloads, and under it "TCSpecial B",
+lander-b's, each label inside its box at the top left, and each box's
+panels three across in their names' order. Each panel's number is its
+payload's place in its own configuration, so each box's count from
+nought.
+
 Here is the pane flown by hand, low over the pad and coming down at
 "close" to the limit, the joystick's lines showing where it is held:
 
@@ -306,10 +313,21 @@ second and shows:
 * a Restart button, which sends a command up through lander-b's gateway to
   a simulated payload, ``restart``, joined to the lander's ``restart``
   input: each press a new count, the lander starting again at each, a light
-  time after the press.
+  time after the press;
+* under them, a box for each vehicle, "TCSpecial A" above "TCSpecial B" as
+  in tcs-sim's window, each holding a panel for each node the ground hears
+  from or commands through that vehicle's gateway, three across in their
+  names' order: the node's name, and when its value last came down and what
+  it was -- ``Last recv: 10:03:12: 450.00``, a decision in words such as
+  ``not landed``, the latest rating as above, the stars come down so far --
+  or for a payload the ground commands, ``restart`` or ``sky_quench``, when
+  it was last sent a number and what: ``Last sent: 10:03:15: 3``. Each time
+  of day is in UTC, as every panel's is.
 
 The Rust ground station, lander-station, shows the same flights as tcs-sim
-does, a light time later, the joystick's lines at what was sent down:
+does, a light time later, the joystick's lines at what was sent down, and
+the same boxes of node panels under its Restart button (in the pictures,
+each value's time is the pictures' ten in the morning):
 
 .. figure:: shots/lander-station-flying.png
    :alt: lander-station's window, the lander just over the pad, Landing

@@ -792,6 +792,15 @@ class Readings:
         self.values = {}
         #: When each value last changed, on this program's monotonic clock.
         self.changed = {}
+        #: When each value last changed, in seconds since the epoch, which
+        #: its node's panel says as a time of day.
+        self.arrived = {}
+        #: The last number sent up to each payload the ground commands, and
+        #: when, in seconds since the epoch, by the payload's name.
+        self.sent = {}
+        #: The vehicles, in their order, whose nodes the window's boxes of
+        #: panels show.
+        self.crafts = [craft for _, craft in reads]
         self._lock = threading.Lock()
         #: Each axis's thrust as last worked out before a crash, which
         #: stands from the crash until the lander starts again.
@@ -813,6 +822,7 @@ class Readings:
                         value = latest[parameter][0]
                         if self.values.get(node) != value:
                             self.changed[node] = now
+                            self.arrived[node] = time.time()
                             if node == "sky" and self.sky is not None:
                                 fresh.append(value)
                             if node == "ratings":
@@ -821,6 +831,89 @@ class Readings:
             # Outside the lock: a whole sky sends a quench.
             for value in fresh:
                 self.sky.take(value)
+
+    def note_sent(self, node, number):
+        """Notes a number sent up to a payload, for its panel.
+
+        Args:
+            node:   The payload's name.
+            number: What was sent.
+        """
+        with self._lock:
+            self.sent[node] = (time.time(), number)
+
+    def node_said(self, node):
+        """A node's latest value in the words its panel says it in: a
+        decision by its name -- ``landed`` or ``not landed`` -- the latest
+        rating as the ratings list says it, the stars come down so far, and
+        any other value as a number.
+
+        Args:
+            node: The node's name.
+
+        Returns:
+            The words, or ``None`` before anything has arrived.
+        """
+        if node not in self.values:
+            return None
+        if node in ("landed", "crashed"):
+            return node if self.said(node) else f"not {node}"
+        if node == "ratings":
+            lines = self.ratings.lines()
+            return lines[0] if lines else "none yet"
+        if node == "sky" and self.sky is not None:
+            return f"{len(self.sky.stars)} of {self.sky.total} stars"
+        return self.text(node)
+
+    def panel_line(self, node):
+        """What a node's panel says of it: when its value last arrived and
+        what it was, or for a payload the ground commands, when it was last
+        sent a number and what, each time of day in UTC as every panel's
+        is.
+
+        Args:
+            node: The node's name.
+
+        Returns:
+            The line: ``Last recv: 10:03:12: 450.00``, ``Last sent:
+            10:03:12: 3``, or the time as dashes before there is one.
+        """
+        with self._lock:
+            sent = self.sent.get(node)
+            arrived = self.arrived.get(node)
+
+        def clock(when):
+            """A moment as a panel says it.
+
+            Args:
+                when: Seconds since the epoch.
+
+            Returns:
+                Its time of day, in UTC.
+            """
+            return time.strftime("%H:%M:%S", time.gmtime(when))
+
+        if self.is_commanded(node):
+            if sent is None:
+                return "Last sent: --:--:--"
+            return f"Last sent: {clock(sent[0])}: {sent[1]}"
+        said = self.node_said(node)
+        if arrived is None or said is None:
+            return "Last recv: --:--:--"
+        return f"Last recv: {clock(arrived)}: {said}"
+
+    def is_commanded(self, node):
+        """Whether the ground sends a node numbers, rather than hearing from
+        it.
+
+        Args:
+            node: The node's name.
+
+        Returns:
+            True for a payload a vehicle's gateway passes the ground's
+            commands to.
+        """
+        return any(node in craft.commands for craft in self.crafts)
 
     def estimate(self, axis, now=None):
         """Where the lander is along an axis now, by dead reckoning: its
@@ -1155,6 +1248,39 @@ def lander_lights(lander):
     return (middle, half), [(middle, max(ys)), front, (min(xs), half)]
 
 
+def panel_nodes(craft):
+    """The nodes a vehicle's box of panels shows, in their names' order:
+    each the ground hears from through the vehicle's gateway, and each the
+    ground commands through it.
+
+    Args:
+        craft: The :class:`Craft`.
+
+    Returns:
+        The nodes' names.
+    """
+    return sorted(set(craft.parameters) | set(craft.commands))
+
+
+def box_label(index, boxes):
+    """What a vehicle's box of panels says, at its top left inside it:
+    ``TCSpecial A`` for the first, ``TCSpecial B`` for the second, as
+    tcs-sim's window says them.
+
+    Args:
+        index: The vehicle's place among them, from nought.
+        boxes: How many there are.
+
+    Returns:
+        The label, or ``""`` where there is one vehicle and no box.
+    """
+    if boxes <= 1:
+        return ""
+    if index < 26:
+        return f"TCSpecial {chr(ord('A') + index)}"
+    return f"TCSpecial {index + 1}"
+
+
 class Uplink:
     """Has Yamcs send a vehicle's gateway a number, which the gateway passes
     to a payload of the vehicle's.
@@ -1169,6 +1295,9 @@ class Uplink:
         self._yamcs = yamcs
         self._command = command
         self._what = what
+        #: Told of each number sent, with the payload it goes to, for the
+        #: window's panel of that payload: ``None`` for nobody.
+        self.on_sent = None
 
     def send(self, byte, octets=1):
         """Sends a number, from a thread of its own, so that the window does
@@ -1194,6 +1323,8 @@ class Uplink:
                       flush=True)
 
         threading.Thread(target=send, daemon=True).start()
+        if self.on_sent is not None:
+            self.on_sent(self._what, byte)
         return args
 
 
@@ -1512,6 +1643,48 @@ def run_the_window(readings, lander, delay, stopped, restarter,
         ttk.Button(buttons, text="Restart",
                    command=restarter.restart).pack(side="left")
 
+    # Under them, a box for each vehicle, the first above the next, each
+    # labelled inside at its top left -- "TCSpecial A", "TCSpecial B", as
+    # tcs-sim's window labels its own -- and holding a panel for each node
+    # the ground hears from or commands through that vehicle's gateway,
+    # three across in their names' order.
+    crafts = readings.crafts
+    per_row = 3
+    inset = round(4 * zoom)
+    wrap = max(1, round((wide - 2 * inset) / per_row) - 2 * inset)
+    small = ("TkDefaultFont", fonts.POINTS - 2)
+    panel_lines = []
+    for index, craft in enumerate(crafts):
+        title = box_label(index, len(crafts))
+        box = tk.Frame(window, background="#ffffff",
+                       highlightthickness=1 if title else 0,
+                       highlightbackground="#808080")
+        box.pack(fill="x", padx=between, pady=(0, between))
+        if title:
+            tk.Label(box, text=title, background="#ffffff",
+                     font=small + ("bold",)).grid(
+                row=0, column=0, columnspan=per_row, sticky="w",
+                padx=inset, pady=(inset, 0))
+        for n, node in enumerate(panel_nodes(craft)):
+            cell = tk.Frame(box, background="#f0f0f0", highlightthickness=1,
+                            highlightbackground="#808080")
+            cell.grid(row=1 + n // per_row, column=n % per_row,
+                      sticky="nsew",
+                      padx=(inset if n % per_row == 0 else 0,
+                            inset if n % per_row == per_row - 1 else 0),
+                      pady=(inset if n < per_row else 0, 0))
+            tk.Label(cell, text=node, background="#f0f0f0",
+                     font=small + ("bold",), anchor="w").pack(
+                fill="x", padx=inset)
+            line = tk.Label(cell, text="", background="#f0f0f0", font=small,
+                            anchor="w", justify="left", wraplength=wrap)
+            line.pack(fill="x", padx=inset, pady=(0, inset))
+            panel_lines.append((line, node))
+        for column in range(per_row):
+            box.columnconfigure(column, weight=1, uniform="panels")
+        tk.Frame(box, height=inset, background="#ffffff").grid(
+            row=2 + len(panel_nodes(craft)) // per_row, column=0)
+
     # The joystick, as it was sent down, as tcs-sim's draws it: the square,
     # its dead zone, and rectangles extending from its left, right and top,
     # each hatched along its outside -- there is no thrust down -- with a
@@ -1569,6 +1742,8 @@ def run_the_window(readings, lander, delay, stopped, restarter,
         fuel.configure(text="Fuel --" if left is None
                        else f"Fuel {round(left * 100)}%")
         scene.itemconfigure(state, text=readings.state_text(lander))
+        for line, node in panel_lines:
+            line.configure(text=readings.panel_line(node))
         lines = readings.ratings.lines()
         scene.itemconfigure(listed, text="\n".join(
             ["Ratings"] + lines if lines else []))
@@ -1774,6 +1949,9 @@ def main(argv):
         sky = Sky(None if quencher is None
                   else lambda generation: quencher.send(generation, 2))
         readings = Readings(list(zip(yamcses, crafts)), sky)
+        # Each number sent up said in its payload's panel.
+        for uplink in uplinks.values():
+            uplink.on_sent = readings.note_sent
         restarter = (Restarter(uplinks["restart"]) if "restart" in uplinks
                      else None)
         if options.seconds is None:

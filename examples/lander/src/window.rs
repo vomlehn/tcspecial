@@ -13,7 +13,7 @@ use tcs_sim::lander_view::{
 };
 use tcs_ui::windows::Closed;
 use tcsos::time::{Duration, Instant};
-use tcsprotocol::node::physics::lander::Resolved;
+use tcsprotocol::node::physical::lander::Resolved;
 
 use crate::readings::{Readings, Sky, State};
 use crate::station::Station;
@@ -279,9 +279,9 @@ mod shots {
     //!
     //! which `make screenshots-lander` runs. The window is the station's
     //! own, drawn by Slint's software renderer into memory, with the lander
-    //! example's lander flown against its own physics as tcs-sim's pictures
-    //! fly it -- see `tcs_sim::lander_flight` -- every star come down, and
-    //! both vehicles connected. Ignored, and run alone: Slint takes one
+    //! example's lander flown against its own physical model as tcs-sim's
+    //! pictures fly it -- see `tcs_sim::lander_flight` -- every star come down,
+    //! and both vehicles connected. Ignored, and run alone: Slint takes one
     //! platform per process.
 
     use std::path::Path;

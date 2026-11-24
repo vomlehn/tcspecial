@@ -8785,7 +8785,7 @@ Requirement
     page: its nodes, the boxes of the subdiagrams its file includes, drawn
     as the top page's are, its edge in a margin either side with the
     terminals a line from another file crosses by, a node outside it drawn
-    at that edge, and the Physics pane holding the components the editor
+    at that edge, and the Physical pane holding the components the editor
     put on that page. Its links are lit as the top page's are, a line lit
     on every page it is drawn on: one with an end on the page, or with its
     two ends in two of the page's boxes, or in one and outside the page.
@@ -8961,12 +8961,12 @@ Requirement
     ``lines`` in sorted order, whatever order the file lists them in.
 
 Requirement
-    The same rule holds for simulator files and their physics models. Their
+    The same rule holds for simulator files and their physical models. Their
     type groups, entries, settings and groups are in no meaningful order;
     the simulator file's digest is taken over what it says, its world
-    included, in canonical order; and in a physics model, events due at the same instant
-    are taken by component name, and a terminal's inputs are summed in the
-    order of the names of the terminals they come from.
+    included, in canonical order; and in a physical model, events due at the
+    same instant are taken by component name, and a terminal's inputs are summed
+    in the order of the names of the terminals they come from.
 
 Requirement
     The digest is taken over the configuration in the canonical order. So

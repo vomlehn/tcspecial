@@ -62,7 +62,7 @@
     },
     "world": {
       "type": "object",
-      "description": "The world the simulated payloads are joined to: the temperature its surroundings are about, and its physics. YAML only: a simulator file written in XML has none.",
+      "description": "The world the simulated payloads are joined to: the temperature its surroundings are about, and its physical model. YAML only: a simulator file written in XML has none.",
       "properties": {
         "ambient_temp": {
           "type": [
@@ -71,7 +71,7 @@
           ],
           "description": "The temperature every thermal mass's surroundings are about, written with its unit: `288.15 K`. One for the world, every zone being in the one set of surroundings; each zone says how they vary about it with its swing and its wander. Required where there is a thermal mass."
         },
-        "physics": {
+        "physical": {
           "type": "object",
           "description": "The vehicle's physical components, which the simulated payloads measure and act on, and how they are joined. Each component is a part simulated alone, with fixed terminals of its type's; a connection joins an output to an input of the same kind. A simulated payload joins a terminal with connects: component.terminal. Every figure is written with its unit.",
           "properties": {
@@ -327,7 +327,7 @@
               "string",
               "null"
             ],
-            "description": "The terminal of the physics model this simulated payload is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+            "description": "The terminal of the physical model this simulated payload is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
           },
           "offset": {
             "type": [
@@ -398,7 +398,7 @@
       }
     },
     "tcs-cfge": {
-      "description": "What the editor arranged: where each physics component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcs-sim simulates and this says where somebody put the boxes on a screen; tcs-sim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcs-cfge section names its nodes.",
+      "description": "What the editor arranged: where each physical component of the world was drawn. Last in the file and in a section of its own, because the sections above say what tcs-sim simulates and this says where somebody put the boxes on a screen; tcs-sim ignores it. A component named here and not in the world is a position left behind, and kept; a component named nowhere here is laid out by the editor. Each entry names the component it is about by its first key, `node: <name>`, as a configuration's tcs-cfge section names its nodes.",
       "type": "object",
       "properties": {
         "nodes": {
@@ -407,7 +407,7 @@
             "type": "object",
             "properties": {
               "node": {
-                "description": "The physics component this is about, as its `component:` names it.",
+                "description": "The physical component this is about, as its `component:` names it.",
                 "type": "string",
                 "minLength": 1
               },
@@ -608,7 +608,7 @@
             "string",
             "null"
           ],
-          "description": "The terminal of the physics model this simulated payload is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
+          "description": "The terminal of the physical model this simulated payload is joined to, as the component's name and the terminal's joined by a dot: `zone.temperature`, `heater_1.on`. Joined to an output, it reports it, in the encoding the conversion -- `to_kelvin` or `to_value` -- its readings go to expects, so the format, the scale and the offset are taken from that node and not stated here. A decision output is sent as `1` or `0`, at once when it changes and again every packet interval. Joined to an input, it drives it with what the vehicle sends -- a decision, or a value in the input's unit -- and sends nothing, being driven the whole of what it is for; its packet interval is how often it looks for what the vehicle sent."
         },
         "offset": {
           "type": [

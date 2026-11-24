@@ -370,7 +370,7 @@ ul.auto-toc {
 <li><a class="reference internal" href="#simulator-configuration-files" id="toc-entry-1">Simulator Configuration Files</a><ul>
 <li><a class="reference internal" href="#file-structure" id="toc-entry-2">File Structure</a></li>
 <li><a class="reference internal" href="#what-a-simulated-payload-simulates" id="toc-entry-3">What a Simulated Payload Simulates</a></li>
-<li><a class="reference internal" href="#the-physics-model" id="toc-entry-4">The Physics Model</a></li>
+<li><a class="reference internal" href="#the-physical-model" id="toc-entry-4">The Physical Model</a></li>
 <li><a class="reference internal" href="#fault-injection" id="toc-entry-5">Fault Injection</a></li>
 <li><a class="reference internal" href="#matching" id="toc-entry-6">Matching</a></li>
 <li><a class="reference internal" href="#example" id="toc-entry-7">Example</a></li>
@@ -734,40 +734,49 @@ terminal, and two of the three are on a different kind of bus from the
 third.</dd>
 </dl>
 </div>
-<div class="section" id="the-physics-model">
-<h2><a class="toc-backref" href="#toc-entry-4">The Physics Model</a></h2>
+<div class="section" id="the-physical-model">
+<h2><a class="toc-backref" href="#toc-entry-4">The Physical Model</a></h2>
 <p>Every other simulated payload makes its bytes up. A buffer filled from a
 random number generator exercises a link and nothing at all of a control loop:
 three sensors sending noise never agree, so the vote over them produces
 nothing anybody can check, and a thermostat downstream of it cannot be watched
 holding a band.</p>
-<p>A physics model is what makes them agree. It is the vehicle's physical parts --
+<p>A physical model is what makes them agree. It is the vehicle's physical parts --
 a zone, the heaters that warm it -- each simulated alone and joined to the
 others, and the simulated payloads are joined to it: the sensors report the
 zone's temperature, each in its own encoding, and the heaters' simulated
 payloads switch the heaters -- so what the vehicle reads is a consequence of
 what the vehicle drove, and the whole loop can be watched closing.</p>
+<p>The models the examples ship are small, each only what its example needs, but
+nothing in the layer limits a model to that. A component is simulated alone and
+reaches the others only through its terminals, so a model grows by adding
+components and connections, and a new kind of part by adding a component type.
+In the end it can be the entire vehicle: its power, its heat, its mass and its
+motion together, so that a fault in one part shows wherever it would aboard.
+The requirements below hold for a model of any size.</p>
 <dl class="docutils">
 <dt>Requirement</dt>
-<dd>The model is in the simulator file, under <tt class="docutils literal">world: physics:</tt>, beside the
+<dd>The model is in the simulator file, under <tt class="docutils literal">world: physical:</tt>, beside the
 simulated payloads joined to it, so that one file says the whole of what the
 simulator simulates and a simulated payload's <tt class="docutils literal">connects</tt> names a terminal
 the same file says is there. The world also states <tt class="docutils literal">ambient_temp</tt>, the one
 temperature every thermal mass's surroundings are about, required where
 there is a zone. The world is YAML only: a simulator file written in XML has
-none, and one with a <tt class="docutils literal">world</tt> or a <tt class="docutils literal">physics</tt> element is refused.</dd>
+none, and one with a <tt class="docutils literal">world</tt> or a <tt class="docutils literal">physical</tt> element is refused.</dd>
 <dt>Requirement</dt>
 <dd>The shapes a model had before are refused, each told where it goes: a
 simulator file naming a model in a file of its own,
 <tt class="docutils literal">physics: <span class="pre">zone-physics.yaml</span></tt>; such a file given as a simulator file;
-a <tt class="docutils literal">physics</tt> section at the top of a simulator file; a zone stating
-its own <tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt> now; and
-a simulator file that still declares masses itself.</dd>
+a <tt class="docutils literal">physics</tt> or <tt class="docutils literal">physical</tt> section at the top of a simulator file;
+the world's model under <tt class="docutils literal">physics</tt>, its name until 2026-11-23, which
+is told to call it <tt class="docutils literal">physical</tt>; a zone stating its own
+<tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt> now; and a
+simulator file that still declares masses itself.</dd>
 <dt>Requirement</dt>
 <dd>The model is the components it is made of, grouped by type as a
 configuration's nodes are, and a list of connections between them, as a
 configuration has links: <tt class="docutils literal">components</tt> and <tt class="docutils literal">connections</tt>, under
-<tt class="docutils literal">physics</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type, <tt class="docutils literal">- type
+<tt class="docutils literal">physical</tt>. Each entry of <tt class="docutils literal">components</tt> is <tt class="docutils literal">type</tt> and a type, <tt class="docutils literal">- type
 heater:</tt>, holding the components of that type, each named by <tt class="docutils literal">component</tt>.
 The types are <tt class="docutils literal">heater</tt>, <tt class="docutils literal">thermal_mass</tt>, <tt class="docutils literal">sun</tt>, <tt class="docutils literal">solar_array</tt>,
 <tt class="docutils literal">load</tt>, <tt class="docutils literal">bus</tt>, <tt class="docutils literal">battery</tt>, <tt class="docutils literal">engine</tt>, <tt class="docutils literal">body</tt>, <tt class="docutils literal">lander</tt> and
@@ -775,8 +784,8 @@ The types are <tt class="docutils literal">heater</tt>, <tt class="docutils lite
 other is refused; a <tt class="docutils literal">thermal_zone</tt>, which is what a <tt class="docutils literal">thermal_mass</tt> was
 called before, is told the name it has now. A type is written once, with a
 component under it. Each type's settings, terminals and rules are stated
-once, in <tt class="docutils literal"><span class="pre">tcsprotocol::node::physics</span></tt>; its arithmetic is the
-simulator's, in <tt class="docutils literal"><span class="pre">tcs_sim::physics</span></tt>.</dd>
+once, in <tt class="docutils literal"><span class="pre">tcsprotocol::node::physical</span></tt>; its arithmetic is the
+simulator's, in <tt class="docutils literal"><span class="pre">tcs_sim::physical</span></tt>.</dd>
 <dt>Requirement</dt>
 <dd>A <tt class="docutils literal">thermal_mass</tt> has two heaters of its own, <tt class="docutils literal">heater_1</tt> and
 <tt class="docutils literal">heater_2</tt>: inputs taking a decision, each adding its stated
@@ -850,7 +859,7 @@ foresees at that event's moment on the wall clock, so the vehicle hears of a
 touchdown when it happens and not at the simulated payload's next turn.</dd>
 <dt>Requirement</dt>
 <dd>A simulated payload joined to records -- a lander's <tt class="docutils literal">sky</tt>, its stars,
-made where its pane's are, in <tt class="docutils literal"><span class="pre">physics::sky</span></tt>, so that a ground station
+made where its pane's are, in <tt class="docutils literal"><span class="pre">physical::sky</span></tt>, so that a ground station
 drawing what it is sent shows the pane's sky -- sends a few whole records
 a packet, round and round, every packet interval: none is split between
 packets, so a packet lost costs only its own. While the input that
@@ -1093,7 +1102,7 @@ first look, and the hand that takes it later is where it is rated from.
 Propellant is counted as the change of velocity it buys: fuel flows as
 <tt class="docutils literal">|Fx| + |Fy|</tt>, so by the rocket equation the mass falls as <tt class="docutils literal"><span class="pre">exp(-D/ve)</span></tt>,
 <tt class="docutils literal">D</tt> being the integral of <tt class="docutils literal">|ax| + |ay|</tt>, and what was used is <tt class="docutils literal">ve
-ln(m0/m1)</tt>. The least is a lower bound, worked out under physics more
+ln(m0/m1)</tt>. The least is a lower bound, worked out under physical more
 generous than the lander's so that no rating can pass 100 %: thrust along X
 is instant; thrust along Y is no more than full thrust over the mass the
 visitor's lander had at touchdown, which the best flight, burning no more,
@@ -1354,7 +1363,7 @@ no dummy device is needed. Shortened:</p>
 
 </span><span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;288.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-  </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">physical</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
@@ -1404,7 +1413,7 @@ the simulator file beside it, named by <tt class="docutils literal">PAYLOAD_SIM_
 Files</a>.</p>
 <p>Several configurations can be simulated together, in one world: two
 tcspecials on one vehicle, each with its own configuration, whose payloads
-read one physics model. tcs-sim is then given every configuration, and one
+read one physical model. tcs-sim is then given every configuration, and one
 simulator file they share, named by <tt class="docutils literal"><span class="pre">--simulator=FILE</span></tt> or
 <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>, since it is beside none of them:</p>
 <pre class="code console literal-block">

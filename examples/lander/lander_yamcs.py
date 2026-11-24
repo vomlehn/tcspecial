@@ -12,7 +12,7 @@ share. See docs/lander-design.rst.
 This program puts the pieces together:
 
 * it makes a landscape at random from a seed -- ``--seed``, or one it
-  chooses and says -- keeping the rules the lander's physics holds a
+  chooses and says -- keeping the rules the lander's physical model holds a
   landscape to, and writes it into the run's copy of the simulator file,
   which tcs-sim and this program's window both read;
 * it writes a Yamcs server with an instance for each vehicle, with
@@ -104,8 +104,8 @@ SIMULATE = "all"
 #: How long tcs-sim is given to say it is ready, in seconds.
 SIMULATOR_PATIENCE = 60
 
-#: The landscape's rules, as the lander's physics holds a landscape to them
-#: in tcsprotocol/src/node/physics/lander.rs: the steepest slope, in
+#: The landscape's rules, as the lander's physical model holds a landscape to
+#: them in tcsprotocol/src/node/physical/lander.rs: the steepest slope, in
 #: degrees; the highest ground and the highest pad, as fractions of the
 #: display's height; and how many times the lander's width the pad is.
 STEEPEST = 70.0
@@ -143,7 +143,7 @@ TOUCHDOWN = {"ok": ("ok", "#009E73"),
 
 #: The least the bottom engine burns at, as a share of its full thrust,
 #: once it burns at all: tcs-sim's ``LEAST_THROTTLE``, in
-#: tcs-sim/src/node/physics/lander.rs.
+#: tcs-sim/src/node/physical/lander.rs.
 LEAST_THROTTLE = 0.1
 
 #: How often the window takes in what the reading loop has read, in
@@ -180,7 +180,7 @@ ARM = 105
 #: bytes each; its radius, in tenths of a pixel, and its brightness, from
 #: nought to 255, a byte each; and its place across and up, in centimetres,
 #: four bytes each; most significant byte first. tcsprotocol's
-#: ``node::physics::lander``, "Sky", is where they are said.
+#: ``node::physical::lander``, "Sky", is where they are said.
 STAR_RECORD = 16
 STAR_LAYOUT = ">HHHBBII"
 
@@ -188,7 +188,7 @@ STAR_LAYOUT = ">HHHBBII"
 #: ``ratings`` node, :data:`STAR_RECORD` bytes: when it was rated, in
 #: milliseconds since the Unix epoch, eight bytes; the rating, in tenths of
 #: a percent, two bytes; one where Autoland helped and nought where not, a
-#: byte; and five bytes of nought. tcsprotocol's ``node::physics::lander``,
+#: byte; and five bytes of nought. tcsprotocol's ``node::physical::lander``,
 #: "Ratings", is where they are said.
 RATING_LAYOUT = ">QHB5x"
 
@@ -393,7 +393,7 @@ def lander_settings(sim):
     Raises:
         ValueError: The file has no lander, or more than one.
     """
-    components = (sim.get("world") or {}).get("physics", {}).get(
+    components = (sim.get("world") or {}).get("physical", {}).get(
         "components", [])
     found = [entry for group in components
              for entry in group.get("type lander", [])]
@@ -405,7 +405,7 @@ def lander_settings(sim):
 
 def landscape(seed, width, height, lander_width):
     """A landscape made at random from a seed, keeping the rules the
-    lander's physics holds a landscape to.
+    lander's physical model holds a landscape to.
 
     The pad first, level, twice the lander's width, its middle within the
     middle half of the width and its height within the lowest fifth; then

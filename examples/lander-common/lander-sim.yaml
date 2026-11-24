@@ -22,7 +22,7 @@ tcs-sim:
   ready: "127.0.0.24:7914"
 
 world:
-  physics:
+  physical:
     components:
       - type lander:
           - component: lander

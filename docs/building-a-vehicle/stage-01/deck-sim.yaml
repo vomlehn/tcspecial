@@ -13,7 +13,7 @@ tcs-sim:
 
 simulated_payloads:
   - type network:
-      # A reading a second. There is no ground motion in tcs-sim's physics,
+      # A reading a second. There is no ground motion in tcs-sim's physical,
       # so what it sends is bytes of its own making, as for examples/minimal.
       - payload: seismometer
         packet_interval: 1 s

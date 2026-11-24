@@ -80,7 +80,7 @@ pub mod sim_config;
 /// How a simulator file groups its simulated payloads by type and names its
 /// groups.
 pub mod sim_grouped;
-/// The shapes simulator files and physics models were written in before
+/// The shapes simulator files and physical models were written in before
 /// that, refused by line.
 pub mod sim_reshaped;
 /// The simulation mode, `--simulate`, as tcspecial, tcs-sim and tcs-moc take

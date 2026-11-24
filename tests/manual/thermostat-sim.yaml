@@ -10,7 +10,7 @@
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
 #
-# The three sensors report the zone of the physics model rather than noise,
+# The three sensors report the zone of the physical model rather than noise,
 # which is what makes the vehicle's half of the loop watchable: three
 # readings of one temperature agree, so the vote produces a temperature and
 # the thermostat decides on it.
@@ -33,9 +33,9 @@ description: Simulator settings for the payloads of thermostat.ytcs
 tcs-sim:
   ready: "127.0.0.1:7907"
 
-# The physics of the vehicle: the zone its sensors read, and the two
+# The physical of the vehicle: the zone its sensors read, and the two
 # heaters that warm it. The thermostat example's vehicle, this being it with
-# its payloads on buses: this section is a copy of the physics section of
+# its payloads on buses: this section is a copy of the physical section of
 # examples/thermostat-common/thermostat-sim.yaml, which the thermostat and
 # thermostat-yamcs examples share, held the same by
 # examples/thermostat-yamcs/tests/shared.rs. Change the two together.
@@ -43,7 +43,7 @@ tcs-sim:
 # The zone is the one part: it takes the heat of its own two heaters and
 # has a temperature. The simulated payloads below are joined to its
 # terminals by name -- a sensor to zone.temperature, a heater's line to
-# zone.heater_1 -- and the physics says nothing about them.
+# zone.heater_1 -- and the physical says nothing about them.
 world:
   # The temperature the zone's surroundings are about: 288.15 K, three
   # kelvin below the bottom of the thermostat's band of 291.15 to 295.15 K,
@@ -54,7 +54,7 @@ world:
   # surroundings.
   ambient_temp: "288.15 K"
 
-  physics:
+  physical:
     components:
       - type thermal_mass:
           # The zone loses the difference between itself and its

@@ -86,7 +86,7 @@ impl Where {
             About::SimGroup(name) => (&["simulated_payload_groups"], name),
             About::Node(name) => (&["gateways", "vehicle", "payloads"], name),
             About::NodeGroup(name) => (&["payload_groups"], name),
-            About::PhysicsComponent(name) => (&["world"], name),
+            About::PhysicalComponent(name) => (&["world"], name),
         };
 
         sections
@@ -133,7 +133,7 @@ impl Where {
 ///
 /// A node is named by the word for its section -- `- payload: temp_1` --
 /// a simulated payload by `payload`, a group of their settings by `group`,
-/// a physics component by `component`, and everything else by `name`.
+/// a physical component by `component`, and everything else by `name`.
 ///
 /// # Arguments
 ///
@@ -218,13 +218,13 @@ fn yaml(text: &str) -> Where {
             continue;
         }
 
-        // The world's ambient temperature and its physics' connections,
+        // The world's ambient temperature and its physical model's connections,
         // which a problem with either is reported at: see
-        // `tcsprotocol::node::physics::AMBIENT` and `CONNECTIONS`.
+        // `tcsprotocol::node::physical::AMBIENT` and `CONNECTIONS`.
         if section == "world" {
             for (key, at) in [
-                ("ambient_temp:", tcsprotocol::node::physics::AMBIENT),
-                ("connections:", tcsprotocol::node::physics::CONNECTIONS),
+                ("ambient_temp:", tcsprotocol::node::physical::AMBIENT),
+                ("connections:", tcsprotocol::node::physical::CONNECTIONS),
             ] {
                 if trimmed.starts_with(key) {
                     found.note_section(at, number);
@@ -494,7 +494,7 @@ simulated_payloads:
         );
     }
 
-    /// A simulator file in XML, and a physics section, say where each entry
+    /// A simulator file in XML, and a physical section, say where each entry
     /// is by the word that names it.
     #[test]
     fn a_simulator_file_in_xml_and_a_model_say_where_each_entry_is() {
@@ -507,20 +507,24 @@ simulated_payloads:
         assert_eq!(found.line_of(&About::SimGroup("steady".to_string())), 3);
         assert_eq!(found.line_of(&About::SimPayload("DH0".to_string())), 7);
 
-        let model = "world:\n  ambient_temp: \"1 K\"\n  physics:\n    \
+        let model = "world:\n  ambient_temp: \"1 K\"\n  physical:\n    \
                      components:\n      - type heater:\n          \
                      - component: h\n    connections:\n      \
                      - from: h.heat\n";
         let found = Where::of(model, ConfigFormat::Yaml);
-        assert_eq!(found.line_of(&About::PhysicsComponent("h".to_string())), 6);
+        assert_eq!(
+            found.line_of(&About::PhysicalComponent("h".to_string())),
+            6
+        );
         assert_eq!(
             found.line_of(&About::Section(
-                tcsprotocol::node::physics::CONNECTIONS
+                tcsprotocol::node::physical::CONNECTIONS
             )),
             7
         );
         assert_eq!(
-            found.line_of(&About::Section(tcsprotocol::node::physics::AMBIENT)),
+            found
+                .line_of(&About::Section(tcsprotocol::node::physical::AMBIENT)),
             2
         );
     }

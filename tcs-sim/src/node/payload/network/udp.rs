@@ -64,7 +64,7 @@ pub fn run_udp_node(
         || config
             .attachment
             .as_ref()
-            .is_some_and(crate::node::physics::Attachment::drives)
+            .is_some_and(crate::node::physical::Attachment::drives)
     {
         run_driven_udp_node(config, running, stats, &handler);
         return;
@@ -139,7 +139,7 @@ pub fn run_udp_node(
                 // A heater is driven by what arrives: the world is told
                 // before the statistics are, so that nothing holds the stats
                 // lock across the world's own.
-                crate::node::physics::driven(
+                crate::node::physical::driven(
                     &config.attachment,
                     &config.name,
                     &buf[..n],
@@ -262,8 +262,8 @@ fn run_driven_udp_node(
             // holds the stats lock across the world's own. Where the panel has
             // the device disabled, what arrives is counted, as every simulated
             // payload counts it, and kept as the latest, and the part stays
-            // off: see `crate::node::physics::Power`.
-            crate::node::physics::driven(
+            // off: see `crate::node::physical::Power`.
+            crate::node::physical::driven(
                 &config.attachment,
                 &config.name,
                 &buf[..n],

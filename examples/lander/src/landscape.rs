@@ -1,6 +1,7 @@
 //! The run's landscape: made at random from a seed, keeping the rules the
-//! lander's physics holds a landscape to, and written into the run's copy of
-//! the simulator file, which tcs-sim and the station's window both read.
+//! lander's physical model holds a landscape to, and written into the run's
+//! copy of the simulator file, which tcs-sim and the station's window both
+//! read.
 //!
 //! Made as `lander_yamcs.py` makes it -- the pad first, then the ground out
 //! from each of its ends -- from the same figures, but from Rust's random
@@ -10,13 +11,13 @@
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use tcsprotocol::format::ConfigFormat;
-use tcsprotocol::node::physics::lander::{
+use tcsprotocol::node::physical::lander::{
     Point, Resolved, HIGHEST_GROUND, HIGHEST_PAD, PAD_TO_LANDER,
 };
-use tcsprotocol::node::physics::Resolution;
+use tcsprotocol::node::physical::Resolution;
 use tcsprotocol::sim_config::SimConfigFile;
 
-/// The steepest the ground is made, in degrees: under the 70 the physics
+/// The steepest the ground is made, in degrees: under the 70 the physical model
 /// allows, so that a slope rounded to a tenth of a metre stays under it.
 const STEEPEST_MADE: f64 = 62.0;
 
@@ -164,9 +165,9 @@ pub fn lander_of(sim_text: &str) -> Result<Resolved, String> {
     let file = SimConfigFile::parse(sim_text, ConfigFormat::Yaml)
         .map_err(|e| e.to_string())?;
     let model = file
-        .physics()
+        .physical()
         .map_err(|e| e.to_string())?
-        .ok_or("the simulator file has no physics model")?;
+        .ok_or("the simulator file has no physical model")?;
     let landers: Vec<Resolved> = model
         .components
         .into_iter()
@@ -296,8 +297,8 @@ mod tests {
         most - least
     }
 
-    /// Every landscape made keeps the rules the physics holds one to: the
-    /// run's file, made from it, is read and checked as tcs-sim reads and
+    /// Every landscape made keeps the rules the physical model holds one to:
+    /// the run's file, made from it, is read and checked as tcs-sim reads and
     /// checks it.
     #[test]
     fn every_landscape_made_keeps_the_rules() {

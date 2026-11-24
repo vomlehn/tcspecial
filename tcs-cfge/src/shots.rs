@@ -232,7 +232,7 @@ impl Session {
             ..Default::default()
         };
         let divider = Rc::new(std::cell::Cell::new(Dividers {
-            physics: pane::physics_width(settings.physics_percent),
+            physical: pane::physical_width(settings.physical_percent),
             ..dividers_for(settings.gateway_percent, settings.vehicle_percent)
         }));
         let lists = Rc::new(std::cell::Cell::new((

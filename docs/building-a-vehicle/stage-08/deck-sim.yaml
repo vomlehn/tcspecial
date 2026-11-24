@@ -11,13 +11,13 @@ description: Simulator settings for stage 8 of Building a Vehicle
 tcs-sim:
   ready: "127.0.0.36:7927"
 
-# The physics of the deck: the regolith around the thermometer's probe,
+# The physical of the deck: the regolith around the thermometer's probe,
 # which the probe's heater warms. The surroundings are the lunar ground's,
 # twenty degrees below freezing.
 world:
   ambient_temp: "253.15 K"
 
-  physics:
+  physical:
     components:
       - type thermal_mass:
           # The regolith the probe sits in, starting at its surroundings'
@@ -52,7 +52,7 @@ simulated_payload_groups:
 
 simulated_payloads:
   - type network:
-      # A reading a second. There is no ground motion in tcs-sim's physics,
+      # A reading a second. There is no ground motion in tcs-sim's physical,
       # so what it sends is bytes of its own making, as for examples/minimal.
       - payload: seismometer
         packet_interval: 1 s

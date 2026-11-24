@@ -75,7 +75,7 @@
       <xs:element name="silent_after" type="xs:string"/>
       <xs:element name="close_after" type="xs:string"/>
       <xs:element name="ignore_trigger_percent" type="xs:string"/>
-      <!-- What a payload is joined to: the terminal of the physics model
+      <!-- What a payload is joined to: the terminal of the physical model
            it reports or drives, and where on it a sensor sits. -->
       <xs:element name="connects" type="xs:string"/>
       <xs:element name="offset" type="xs:string"/>
@@ -156,7 +156,7 @@
         <xs:element name="simulated_payload_groups" type="groups"
                     minOccurs="0"/>
         <!-- No world: the world the payloads are joined to, its ambient
-             temperature and its physics model, is written only in a
+             temperature and its physical model, is written only in a
              simulator file in YAML. -->
         <xs:element name="simulated_payloads" type="payloads"
                     minOccurs="0"/>

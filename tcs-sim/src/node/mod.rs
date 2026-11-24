@@ -24,8 +24,8 @@
 
 /// What the vehicle carries: simulations of hardware that is not here.
 pub mod payload;
-/// The physics model the simulated payloads measure and act on: one module
+/// The physical model the simulated payloads measure and act on: one module
 /// per component type, beside the payloads that are joined to them.
-pub mod physics;
+pub mod physical;
 /// What the vehicle computes, where the simulator simulates it.
 pub mod vehicle;

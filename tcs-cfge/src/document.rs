@@ -1353,8 +1353,8 @@ impl Document {
                         });
                     }
                 }
-                // No node of a configuration's is a physics component.
-                crate::pane::Pane::Physics => {}
+                // No node of a configuration's is a physical component.
+                crate::pane::Pane::Physical => {}
             }
         }
 
@@ -1508,7 +1508,7 @@ impl Document {
         }
     }
 
-    /// Why a physics component may not be renamed to this, if it may not.
+    /// Why a physical component may not be renamed to this, if it may not.
     ///
     /// The rules a node's name is held to -- see [`Document::rename_refused`]
     /// -- because a component is drawn and named as a node is, and the
@@ -1524,7 +1524,7 @@ impl Document {
     /// # Returns
     ///
     /// What to say about it, or `None` for a name it may have.
-    pub fn rename_physics_refused(
+    pub fn rename_physical_refused(
         &self,
         component: &str,
         now: &str,
@@ -1536,7 +1536,7 @@ impl Document {
             .map(|simulator| &simulator.world.components);
         if !components.is_some_and(|all| all.contains_key(component)) {
             return Some(format!(
-                "There is no physics component called \"{component}\"."
+                "There is no physical component called \"{component}\"."
             ));
         }
         if now.is_empty() {
@@ -1554,7 +1554,7 @@ impl Document {
         }
         if components.is_some_and(|all| all.contains_key(now)) {
             return Some(format!(
-                "\"{now}\" is already the name of a physics component."
+                "\"{now}\" is already the name of a physical component."
             ));
         }
         if let Some(node) = self.nodes.iter().find(|node| node.name == now) {
@@ -1564,7 +1564,7 @@ impl Document {
             };
             return Some(format!(
                 "\"{now}\" is already the name of a node {file}; a name has \
-                 to be its own across the configuration and its physics."
+                 to be its own across the configuration and its physical model."
             ));
         }
         None
@@ -1645,12 +1645,12 @@ impl Document {
     /// every file of it: the reader allows no two nodes one name across the
     /// top file and everything it includes, and a link names a node by it
     /// alone. So a name any other node has is refused, wherever that node is
-    /// drawn -- a physics component's included, the simulator file joining
+    /// drawn -- a physical component's included, the simulator file joining
     /// payloads to components by name. So is a name with a dot in it, which a
     /// line reads as the node's name and an input's, or a slash, which the
     /// editor reads as a page's name and a node's; and no name at all. A
     /// subdiagram is renamed as a node is, its box being its name, and a
-    /// physics component as well: see [`Document::rename_physics_refused`].
+    /// physical component as well: see [`Document::rename_physical_refused`].
     ///
     /// # Arguments
     ///
@@ -1698,7 +1698,7 @@ impl Document {
         });
         if component {
             return Some(format!(
-                "\"{now}\" is already the name of a physics component, which \
+                "\"{now}\" is already the name of a physical component, which \
                  the simulator file joins payloads to by name."
             ));
         }
@@ -1951,7 +1951,7 @@ impl Document {
         let room = ((right - left) / (width + gap)).max(1) as usize;
         let column_of = |at: usize| -> usize {
             match panes[at] {
-                Pane::Physics | Pane::Payloads => 0,
+                Pane::Physical | Pane::Payloads => 0,
                 Pane::Vehicle => 1 + step[at].min(room - 1),
                 Pane::Gateway => room + 1,
             }
@@ -2568,18 +2568,18 @@ impl Document {
                     );
                 }
             }
-            Edit::AddPhysics { name, kind } => {
+            Edit::AddPhysical { name, kind } => {
                 if let Some(simulator) = &mut self.simulator {
                     simulator.world.components.insert(
                         name.clone(),
-                        crate::sim::PhysicsComponent {
+                        crate::sim::PhysicalComponent {
                             kind: kind.clone(),
                             settings: Default::default(),
                         },
                     );
                 }
             }
-            Edit::RemovePhysics { name, joins, .. } => {
+            Edit::RemovePhysical { name, joins, .. } => {
                 if let Some(simulator) = &mut self.simulator {
                     let world = &mut simulator.world;
                     for joined in world.connections_of(name) {
@@ -2607,7 +2607,7 @@ impl Document {
                     }
                 }
             }
-            Edit::RestorePhysics {
+            Edit::RestorePhysical {
                 name,
                 kind,
                 settings,
@@ -2625,7 +2625,7 @@ impl Document {
                     let world = &mut simulator.world;
                     world.components.insert(
                         name.clone(),
-                        crate::sim::PhysicsComponent {
+                        crate::sim::PhysicalComponent {
                             kind: kind.clone(),
                             settings: settings.iter().cloned().collect(),
                         },
@@ -2633,7 +2633,7 @@ impl Document {
                     world.connections.extend(connections.iter().cloned());
                 }
             }
-            Edit::SetPhysics {
+            Edit::SetPhysical {
                 component,
                 setting,
                 now,
@@ -2657,7 +2657,7 @@ impl Document {
                     }
                 }
             }
-            Edit::PagePhysics { component, now, .. } => {
+            Edit::PagePhysical { component, now, .. } => {
                 if let Some(simulator) = &mut self.simulator {
                     let pages = &mut simulator.world.pages;
                     match now {
@@ -2670,7 +2670,7 @@ impl Document {
                     }
                 }
             }
-            Edit::MovePhysics { component, now, .. } => {
+            Edit::MovePhysical { component, now, .. } => {
                 if let Some(simulator) = &mut self.simulator {
                     let placed = &mut simulator.world.placed;
                     match now {
@@ -2691,7 +2691,7 @@ impl Document {
                         .insert((from.clone(), to.clone()));
                 }
             }
-            Edit::RenamePhysics { was, now } => {
+            Edit::RenamePhysical { was, now } => {
                 if let Some(simulator) = &mut self.simulator {
                     simulator.rename_component(was, now);
                 }
@@ -5803,15 +5803,15 @@ mod tests {
                 Edit::AddSimGroup { .. } => (),
                 Edit::RemoveSimGroup { .. } => (),
                 Edit::RestoreSimGroup { .. } => (),
-                Edit::AddPhysics { .. } => (),
-                Edit::RemovePhysics { .. } => (),
-                Edit::RestorePhysics { .. } => (),
-                Edit::SetPhysics { .. } => (),
-                Edit::MovePhysics { .. } => (),
-                Edit::PagePhysics { .. } => (),
+                Edit::AddPhysical { .. } => (),
+                Edit::RemovePhysical { .. } => (),
+                Edit::RestorePhysical { .. } => (),
+                Edit::SetPhysical { .. } => (),
+                Edit::MovePhysical { .. } => (),
+                Edit::PagePhysical { .. } => (),
                 Edit::AddConnection { .. } => (),
                 Edit::RemoveConnection { .. } => (),
-                Edit::RenamePhysics { .. } => (),
+                Edit::RenamePhysical { .. } => (),
                 Edit::AddGroup { .. } => (),
                 Edit::RemoveGroup { .. } => (),
                 Edit::SetGroupInterval { .. } => (),
@@ -5850,7 +5850,7 @@ mod tests {
             document.apply(&Edit::AddSimGroup {
                 name: "steady_1hz".into(),
             });
-            // A physics connection, so that taking one away has one to take.
+            // A physical connection, so that taking one away has one to take.
             document.apply(&Edit::AddConnection {
                 from: "heater_1.heat".into(),
                 to: "zone.heat".into(),
@@ -5995,15 +5995,15 @@ mod tests {
                 name: "bay".into(),
                 settings: vec![("packet_interval".into(), "250 ms".into())],
             },
-            // A physics component put somewhere, from being laid out by
+            // A physical component put somewhere, from being laid out by
             // name; and a connection made, and one taken away.
-            Edit::MovePhysics {
+            Edit::MovePhysical {
                 component: "zone".into(),
                 was: None,
                 now: Some((-180, 98)),
             },
             // A component put on a subdiagram's page.
-            Edit::PagePhysics {
+            Edit::PagePhysical {
                 component: "zone".into(),
                 was: None,
                 now: Some("thermostat-common".into()),
@@ -7434,11 +7434,11 @@ mod tests {
         assert!(document.exports.contains_key("zone"));
     }
 
-    /// A physics component is renamed as a node is, to a name no node and
+    /// A physical component is renamed as a node is, to a name no node and
     /// no other component has, and every connection, simulated payload and
     /// group that names it says the new name.
     #[test]
-    fn a_physics_component_is_renamed_wherever_it_is_named() {
+    fn a_physical_component_is_renamed_wherever_it_is_named() {
         let mut document = Document::new();
         document.apply(&Edit::AddNode {
             name: "temp_1".into(),
@@ -7449,7 +7449,7 @@ mod tests {
             std::path::Path::new("vehiclesim.yaml"),
         ));
         for (name, kind) in [("heater_1", "heater"), ("zone", "thermal_mass")] {
-            document.apply(&Edit::AddPhysics {
+            document.apply(&Edit::AddPhysical {
                 name: name.into(),
                 kind: kind.into(),
             });
@@ -7476,19 +7476,19 @@ mod tests {
 
         let refused = |now: &str| {
             document
-                .rename_physics_refused("zone", now)
+                .rename_physical_refused("zone", now)
                 .unwrap_or_default()
         };
-        assert!(refused("heater_1").contains("physics component"));
+        assert!(refused("heater_1").contains("physical component"));
         assert!(refused("temp_1").contains("name of a node"));
         assert!(refused("a.b").contains("dot"));
         assert!(refused("").contains("has to have a name"));
         assert_eq!(refused("cabin_air"), "");
         assert!(document
             .rename_refused("temp_1", "zone")
-            .is_some_and(|why| why.contains("physics component")));
+            .is_some_and(|why| why.contains("physical component")));
 
-        document.apply(&Edit::RenamePhysics {
+        document.apply(&Edit::RenamePhysical {
             was: "zone".into(),
             now: "air".into(),
         });

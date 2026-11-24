@@ -81,14 +81,14 @@ pub const DEFAULT_VEHICLE: i32 = 55;
 pub const DEFAULT_LIST_GATEWAY: i32 = 20;
 pub const DEFAULT_LIST_VEHICLE: i32 = 35;
 
-/// How wide the Physics pane is until somebody drags it, as a percentage of
+/// How wide the Physical pane is until somebody drags it, as a percentage of
 /// the working width beside which it is drawn: see `crate::pane`.
-pub const DEFAULT_PHYSICS: i32 = 20;
+pub const DEFAULT_PHYSICAL: i32 = 20;
 
-/// And how much of the selection column the physics list takes until
+/// And how much of the selection column the physical list takes until
 /// somebody drags it: enough for its heading and its first rows, the
 /// payload list keeping what is left.
-pub const DEFAULT_LIST_PHYSICS: i32 = 20;
+pub const DEFAULT_LIST_PHYSICAL: i32 = 20;
 
 /// Whether the editor writes the configuration after every edit until
 /// somebody says otherwise: yes, which is what it has always done.
@@ -107,11 +107,11 @@ pub struct Settings {
     /// And how much the vehicle list takes. The payload list takes what is
     /// left.
     pub list_vehicle_percent: i32,
-    /// How wide the Physics pane is, as a percentage of the working width.
-    pub physics_percent: i32,
-    /// And how much of the selection column the physics list takes, at its
+    /// How wide the Physical pane is, as a percentage of the working width.
+    pub physical_percent: i32,
+    /// And how much of the selection column the physical list takes, at its
     /// top; the payload list takes what is left after it and the two above.
-    pub list_physics_percent: i32,
+    pub list_physical_percent: i32,
     /// Whether every edit is written to the configuration as it is made, or
     /// only when Save is asked for and as the editor exits. Either way the
     /// undo history is written after every edit, so a crash costs nothing
@@ -126,8 +126,8 @@ impl Default for Settings {
             vehicle_percent: DEFAULT_VEHICLE,
             list_gateway_percent: DEFAULT_LIST_GATEWAY,
             list_vehicle_percent: DEFAULT_LIST_VEHICLE,
-            physics_percent: DEFAULT_PHYSICS,
-            list_physics_percent: DEFAULT_LIST_PHYSICS,
+            physical_percent: DEFAULT_PHYSICAL,
+            list_physical_percent: DEFAULT_LIST_PHYSICAL,
             autosave: DEFAULT_AUTOSAVE,
         }
     }
@@ -169,53 +169,53 @@ pub fn shares(gateway_percent: i32, vehicle_percent: i32) -> (i32, i32) {
     }
 }
 
-/// The physics list's share of the selection column, kept inside what the
+/// The physical list's share of the selection column, kept inside what the
 /// other three leave: at least [`LEAST`], and never so much that the payload
 /// list, which takes what is left, has less than [`LEAST`].
 ///
 /// # Arguments
 ///
-/// * `physics` - The share asked for, in per cent.
+/// * `physical` - The share asked for, in per cent.
 /// * `gateway` - The gateway list's share, in per cent.
 /// * `vehicle` - The vehicle list's share, in per cent.
 ///
 /// # Returns
 ///
-/// The physics list's share, in per cent.
-pub fn physics_list_share(physics: i32, gateway: i32, vehicle: i32) -> i32 {
-    physics.clamp(LEAST, (100 - gateway - vehicle - LEAST).max(LEAST))
+/// The physical list's share, in per cent.
+pub fn physical_list_share(physical: i32, gateway: i32, vehicle: i32) -> i32 {
+    physical.clamp(LEAST, (100 - gateway - vehicle - LEAST).max(LEAST))
 }
 
 /// The selection column's shares, all four lists kept open together.
 ///
 /// The column holds four lists where the canvas holds three working panes,
 /// so [`shares`], which keeps a third share open, is not enough here: the
-/// gateway and vehicle lists are kept to what leaves the physics list and the
-/// payload list a [`LEAST`] each, and the physics list to what leaves the
+/// gateway and vehicle lists are kept to what leaves the physical list and the
+/// payload list a [`LEAST`] each, and the physical list to what leaves the
 /// payload list its own. The payload list takes what is left, and is the
-/// one that gives way first; then the physics list.
+/// one that gives way first; then the physical list.
 ///
 /// # Arguments
 ///
 /// * `gateway` - The share asked for the gateway list, in per cent.
 /// * `vehicle` - The share asked for the vehicle list, in per cent.
-/// * `physics` - The share asked for the physics list, in per cent.
+/// * `physical` - The share asked for the physical list, in per cent.
 ///
 /// # Returns
 ///
-/// The gateway, vehicle and physics lists' shares, in per cent, each at
+/// The gateway, vehicle and physical lists' shares, in per cent, each at
 /// least [`LEAST`] and leaving the payload list at least [`LEAST`].
 pub fn list_shares(
     gateway: i32,
     vehicle: i32,
-    physics: i32,
+    physical: i32,
 ) -> (i32, i32, i32) {
     let gateway = gateway.clamp(LEAST, 100 - 3 * LEAST);
     let vehicle = vehicle.clamp(LEAST, 100 - 2 * LEAST - gateway);
     (
         gateway,
         vehicle,
-        physics_list_share(physics, gateway, vehicle),
+        physical_list_share(physical, gateway, vehicle),
     )
 }
 
@@ -348,11 +348,11 @@ fn settings_in(text: &str, whose: &str) -> Settings {
     // written before the lists could be resized says nothing about them,
     // which is the defaults -- not a share taken out of anything, because
     // nobody arranged these yet.
-    // The Physics pane and its list, which a file written before there was a
-    // Physics pane says nothing about: the defaults. The four lists are
+    // The Physical pane and its list, which a file written before there was a
+    // Physical pane says nothing about: the defaults. The four lists are
     // brought inside the rule together, because each is allowed alone and
     // four allowed shares can still add up to more than the column.
-    let (list_gateway_percent, list_vehicle_percent, list_physics_percent) =
+    let (list_gateway_percent, list_vehicle_percent, list_physical_percent) =
         list_shares(
             percent_in(
                 text,
@@ -366,23 +366,27 @@ fn settings_in(text: &str, whose: &str) -> Settings {
                 "vehicle_list_percent",
                 DEFAULT_LIST_VEHICLE,
             ),
-            percent_in(
+            renamed_percent_in(
                 text,
                 whose,
-                "physics_list_percent",
-                DEFAULT_LIST_PHYSICS,
+                ("physical_list_percent", "physics_list_percent"),
+                DEFAULT_LIST_PHYSICAL,
             ),
         );
-    let physics_percent =
-        percent_in(text, whose, "physics_pane_percent", DEFAULT_PHYSICS);
+    let physical_percent = renamed_percent_in(
+        text,
+        whose,
+        ("physical_pane_percent", "physics_pane_percent"),
+        DEFAULT_PHYSICAL,
+    );
 
     Settings {
         gateway_percent,
         vehicle_percent,
         list_gateway_percent,
         list_vehicle_percent,
-        physics_percent,
-        list_physics_percent,
+        physical_percent,
+        list_physical_percent,
         autosave: yes_or_no_in(text, whose, "autosave", DEFAULT_AUTOSAVE),
     }
 }
@@ -451,6 +455,38 @@ fn percent_in(text: &str, whose: &str, name: &str, default: i32) -> i32 {
     }
 }
 
+/// A percentage whose element was renamed, as this text states it under
+/// either name, or `default`.
+///
+/// The Physical pane was the Physics pane until 2026-11-23, and a file saved
+/// before then says its shares under the old names. They are the person's
+/// own arrangement and not a configuration to be corrected, so they are
+/// read, and the next save writes them under the new names.
+///
+/// # Arguments
+///
+/// * `text`    - The settings file's text.
+/// * `whose`   - What to call the file in a message on the error output.
+/// * `names`   - The element's name now, and the name it had before.
+/// * `default` - The percentage where the text states neither.
+///
+/// # Returns
+///
+/// The percentage.
+fn renamed_percent_in(
+    text: &str,
+    whose: &str,
+    (name, old): (&str, &str),
+    default: i32,
+) -> i32 {
+    let said = if element(text, name).is_some() {
+        name
+    } else {
+        old
+    };
+    percent_in(text, whose, said, default)
+}
+
 /// The settings file's text.
 ///
 /// XML by the same conventions the configuration uses -- every value a child
@@ -471,8 +507,8 @@ pub fn written(settings: &Settings) -> String {
         vehicle_percent: vehicle,
         list_gateway_percent: list_gateway,
         list_vehicle_percent: list_vehicle,
-        physics_percent: physics,
-        list_physics_percent: list_physics,
+        physical_percent: physical,
+        list_physical_percent: list_physical,
         autosave,
     } = *settings;
     format!(
@@ -504,12 +540,12 @@ pub fn written(settings: &Settings) -> String {
     <gateway_list_percent>{list_gateway}</gateway_list_percent>
     <vehicle_list_percent>{list_vehicle}</vehicle_list_percent>
 
-    <!-- And the Physics pane, left of the payloads, which holds the
-         simulator file's physics components: its width, as a percentage of
+    <!-- And the Physical pane, left of the payloads, which holds the
+         simulator file's physical components: its width, as a percentage of
          the working width it is drawn beside rather than a share of it; and
          its list, at the top of the selection column. -->
-    <physics_pane_percent>{physics}</physics_pane_percent>
-    <physics_list_percent>{list_physics}</physics_list_percent>
+    <physical_pane_percent>{physical}</physical_pane_percent>
+    <physical_list_percent>{list_physical}</physical_list_percent>
 
     <!-- Whether every edit is written to the configuration as it is made:
          true or false, as the File menu's Autosave says. Either way the
@@ -520,7 +556,7 @@ pub fn written(settings: &Settings) -> String {
 </settings>
 ",
         rest = 100 - gateway - vehicle,
-        list_rest = 100 - list_gateway - list_vehicle - list_physics
+        list_rest = 100 - list_gateway - list_vehicle - list_physical
     )
 }
 
@@ -596,7 +632,7 @@ mod tests {
             // canvas allows can be more than the column can give one list
             // beside three others, and that is brought in, not read wrong.
             let (kept_gateway, kept_vehicle, _) =
-                list_shares(list_gateway, list_vehicle, DEFAULT_LIST_PHYSICS);
+                list_shares(list_gateway, list_vehicle, DEFAULT_LIST_PHYSICAL);
             assert_eq!(
                 (settings.list_gateway_percent, settings.list_vehicle_percent),
                 (kept_gateway, kept_vehicle)
@@ -624,8 +660,8 @@ mod tests {
             vehicle_percent: 60,
             list_gateway_percent: 20,
             list_vehicle_percent: 30,
-            physics_percent: 17,
-            list_physics_percent: 10,
+            physical_percent: 17,
+            list_physical_percent: 10,
             autosave: false,
         });
         assert!(text.contains("15"), "{text}");
@@ -633,8 +669,8 @@ mod tests {
         assert!(text.contains("25%"), "the payload pane's share: {text}");
         assert!(text.contains("40%"), "the payload list's share: {text}");
         let settings = settings_in(&text, "a test");
-        assert_eq!(settings.physics_percent, 17);
-        assert_eq!(settings.list_physics_percent, 10);
+        assert_eq!(settings.physical_percent, 17);
+        assert_eq!(settings.list_physical_percent, 10);
         assert!(!settings.autosave, "autosave read as written: {text}");
         // A file written before there was the setting autosaves, as the
         // editor always did; one that says neither true nor false, too.
@@ -644,17 +680,17 @@ mod tests {
         ] {
             assert!(settings_in(&older, "another file").autosave, "{older}");
         }
-        // And a file written before there was a Physics pane takes the
+        // And a file written before there was a Physical pane takes the
         // defaults for it.
         let older = text
-            .replace("<physics_pane_percent>", "<was_physics_pane_percent>")
-            .replace("<physics_list_percent>", "<was_physics_list_percent>");
+            .replace("<physical_pane_percent>", "<was_physical_pane_percent>")
+            .replace("<physical_list_percent>", "<was_physical_list_percent>");
         let settings = settings_in(&older, "a file from before");
-        assert_eq!(settings.physics_percent, DEFAULT_PHYSICS);
-        assert_eq!(settings.list_physics_percent, DEFAULT_LIST_PHYSICS);
-        // And the physics list never leaves the payload list less than its
+        assert_eq!(settings.physical_percent, DEFAULT_PHYSICAL);
+        assert_eq!(settings.list_physical_percent, DEFAULT_LIST_PHYSICAL);
+        // And the physical list never leaves the payload list less than its
         // share.
-        assert_eq!(physics_list_share(90, 20, 30), 100 - 20 - 30 - LEAST);
+        assert_eq!(physical_list_share(90, 20, 30), 100 - 20 - 30 - LEAST);
     }
 
     /// Four list shares, each allowed alone, that leave the payload list
@@ -666,22 +702,22 @@ mod tests {
     /// the payload list was not drawn at all.
     #[test]
     fn every_list_keeps_a_tenth() {
-        for (gateway, vehicle, physics) in [
-            (58, DEFAULT_LIST_VEHICLE, DEFAULT_LIST_PHYSICS),
+        for (gateway, vehicle, physical) in [
+            (58, DEFAULT_LIST_VEHICLE, DEFAULT_LIST_PHYSICAL),
             (MOST, MOST, MOST),
             (0, 0, 0),
             (
                 DEFAULT_LIST_GATEWAY,
                 DEFAULT_LIST_VEHICLE,
-                DEFAULT_LIST_PHYSICS,
+                DEFAULT_LIST_PHYSICAL,
             ),
         ] {
-            let (g, v, p) = list_shares(gateway, vehicle, physics);
+            let (g, v, p) = list_shares(gateway, vehicle, physical);
             let payload = 100 - g - v - p;
             for share in [g, v, p, payload] {
                 assert!(
                     share >= LEAST,
-                    "{gateway}, {vehicle} and {physics} became {g}, {v}, {p} \
+                    "{gateway}, {vehicle} and {physical} became {g}, {v}, {p} \
                      and {payload} for the payloads"
                 );
             }
@@ -693,13 +729,13 @@ mod tests {
         // came in.
         let text = "<settings><gateway_list_percent>58</gateway_list_percent>\
                     <vehicle_list_percent>5</vehicle_list_percent>\
-                    <physics_list_percent>20</physics_list_percent>\
+                    <physical_list_percent>20</physical_list_percent>\
                     </settings>";
         let settings = settings_in(text, "the test");
         let payload = 100
             - settings.list_gateway_percent
             - settings.list_vehicle_percent
-            - settings.list_physics_percent;
+            - settings.list_physical_percent;
         assert!(payload >= LEAST, "{settings:?}");
     }
 
@@ -735,6 +771,26 @@ mod tests {
         );
         assert_eq!(settings.gateway_percent, DEFAULT_GATEWAY);
         assert_eq!(settings.vehicle_percent, 75 - DEFAULT_GATEWAY);
+    }
+
+    /// A file saved while the Physical pane was the Physics pane keeps its
+    /// shares, read under the old names; the new names win where a file
+    /// says both.
+    #[test]
+    fn a_file_from_before_the_physical_pane_keeps_its_shares() {
+        let settings = settings_in(
+            "<settings><physics_pane_percent>30</physics_pane_percent>\
+             <physics_list_percent>25</physics_list_percent></settings>",
+            "a test",
+        );
+        assert_eq!(settings.physical_percent, 30);
+        assert_eq!(settings.list_physical_percent, 25);
+        let settings = settings_in(
+            "<settings><physics_pane_percent>30</physics_pane_percent>\
+             <physical_pane_percent>35</physical_pane_percent></settings>",
+            "a test",
+        );
+        assert_eq!(settings.physical_percent, 35);
     }
 
     /// An element that is not there is not an error.

@@ -18,7 +18,7 @@ never flies.
 
 It edits, in one session, everything a person draws a vehicle with: the top
 configuration file, every file it includes, and, where you name one, the
-simulator's own file, whose physics model tcs-cfge draws beside the
+simulator's own file, whose physical model tcs-cfge draws beside the
 configuration. What the files mean -- node types, attributes, links, includes,
 the ``tcspecial`` section -- is described in `the tcspecial manual
 <tcspecial.html>`__; this manual says how tcs-cfge shows them and how to change
@@ -148,9 +148,9 @@ side, the selection column on the left and the sheet on the right.
          markers. Along the top the menus File, Edit and View (1). Under
          them the bar: the Undo and Redo arrows, greyed, the Save button,
          Arrange, 2 concerns, 0 edits can be undone and saved (2). Down the
-         left the selection column, its lists headed Physics node types,
+         left the selection column, its lists headed Physical node types,
          Payload node types, Vehicle node types and Gateway node types (3).
-         The rest is the sheet, divided into the Physics pane, with the
+         The rest is the sheet, divided into the Physical pane, with the
          simulator's components such as battery and sun as hexagons (4);
          the Payloads pane, with shunt, monitor and science as
          parallelograms (5); the Vehicle pane, with battery_amps, bus_volts,
@@ -160,7 +160,7 @@ side, the selection column on the left and the sheet on the right.
          nodes.
 
    The battery example as it opens, with its simulator file: (1) the
-   menus, (2) the bar, (3) the selection column, (4) to (7) the Physics,
+   menus, (2) the bar, (3) the selection column, (4) to (7) the Physical,
    Payloads, Vehicle and Gateway panes, (8) a divider's handle.
 
 The sheet and its panes
@@ -177,8 +177,8 @@ configuration read from a file that draws a node in the wrong pane, or off
 the grid, or on top of another, is shown with the node moved into place;
 that is not an edit, and nothing is written until the node is moved by hand.
 
-Left of the Payloads pane is a fourth, labelled ``Physics``, which holds the
-simulator file's physics model: see `The simulator file`_. It is drawn
+Left of the Payloads pane is a fourth, labelled ``Physical``, which holds the
+simulator file's physical model: see `The simulator file`_. It is drawn
 whether or not a simulator file was given.
 
 Each pane is painted its own pale tint, but the pane is never told by its
@@ -195,7 +195,7 @@ The selection column
 --------------------
 
 Down the left of the window are the selection lists, one per pane and in the
-same order: the physics list at the top, then the payloads, the vehicle's
+same order: the physical list at the top, then the payloads, the vehicle's
 nodes and the gateway's. Each list shows its types drawn as they will be
 drawn on the sheet, under headings, in alphabetical order within each
 heading. The lines between the lists can be dragged to share the column
@@ -245,7 +245,7 @@ The menus
     nodes**.
 
 **View**
-    **Zoom to the drawing** fits every node and physics component in the
+    **Zoom to the drawing** fits every node and physical component in the
     view; **Zoom to the selection** fits the node, line or component selected,
     and is greyed while nothing is; **Actual size** draws the sheet at its own
     size; **Fit the width**, which is how a window starts, draws the sheet as
@@ -291,10 +291,10 @@ A **subdiagram's box** is a little taller than a node, says under its name
 how many nodes it holds and how many lines cross its edge, and has a mark in
 the middle of its bottom edge that opens it.
 
-A **physics component** is a hexagon pointed at both ends with a dotted
+A **physical component** is a hexagon pointed at both ends with a dotted
 edge, narrower than any node, with its type along its top and its name in
 the middle. It has at most two terminals, both on its right: an output at the
-top and an input below it. The lines of the physics model are dashed, where a
+top and an input below it. The lines of the physical model are dashed, where a
 configuration's links are solid.
 
 **Red means something is wrong**, and nothing else on the sheet is red. A
@@ -423,7 +423,7 @@ Renaming
 
 A node is renamed in its window's name field. The new name is refused, with
 the reason under the field, if any other node in any file of the
-configuration has it, if a physics component has it, if it is empty, or if it
+configuration has it, if a physical component has it, if it is empty, or if it
 has a dot or a slash in it, which a line reads as separators. A rename is one
 edit and takes everything that names the node with it: its lines, its
 simulator settings, the command bindings that name it and its showing at its
@@ -581,7 +581,7 @@ The simulator file
 
 Given a simulator file, tcs-cfge edits it in the same session: one Save writes
 both files, and one Undo takes back whichever the last edit touched. Without
-one, the physics list is greyed and the Physics pane says to open a simulator
+one, the physical list is greyed and the Physical pane says to open a simulator
 file.
 
 **A payload's simulator settings** are in its own node window, under their
@@ -592,9 +592,9 @@ its type and nothing else; a setting is written only when it holds a value.
 groups**, which can also make a group with **New** and remove one with
 **Remove**.
 
-**Physics components** are placed from the physics list, under ``Thermal``,
+**Physical components** are placed from the physical list, under ``Thermal``,
 ``Power`` and ``Motion``, as nodes are from theirs: click a type and it is
-put down the Physics pane, or drag it there. A new component is named after
+put down the Physical pane, or drag it there. A new component is named after
 its type, an underscore and a free number -- ``heater_3`` -- and its window
 opens at once, showing its type's settings and what the simulator's own
 reader says is wrong with them, such as a figure without its unit. A
@@ -602,7 +602,7 @@ component the reader would refuse is drawn red.
 
 A component is handled as a node is: dragged to move it, right-clicked for
 **Edit** and **Delete**, renamed in its window. A line from its output or
-input terminal to another component makes a physics connection; to a
+input terminal to another component makes a physical connection; to a
 payload, or a subdiagram's box, it sets that payload's ``connects``. A line
 from a payload's terminal to a component does the same: from a ``moc``
 terminal it offers the component's inputs, from a ``world`` terminal its
@@ -878,7 +878,7 @@ pages of one PDF. Each page is headed by which it is: the configuration's
 file name, or the subdiagram's name and the file it comes from. A page with
 nothing on it is left out.
 
-Each page is its working panes -- Physics, Payloads, Vehicle and Gateway --
+Each page is its working panes -- Physical, Payloads, Vehicle and Gateway --
 as the window draws them, without the selection lists down the left, trimmed
 to the nodes and the lines between them, with a margin round them and the
 panes' names along the top. A subdiagram's page takes in the whole of its
@@ -1089,7 +1089,7 @@ Node descriptions and schemas
 In the configuration itself
     The ``tcs-cfge`` section at the end of each file: where each node was
     drawn and which concerns were set aside. In the simulator file: where
-    each physics component was drawn and on which page.
+    each physical component was drawn and on which page.
 
 Installed, tcs-cfge is ``bin/tcs-cfge`` with its descriptions in
 ``share/tcs-cfge`` under the same prefix, ``/opt/tcs`` by default, and the
@@ -1106,7 +1106,7 @@ See Also
 * `The tcspecial manual <tcspecial.html>`__: the flight software and the
   configuration files tcs-cfge edits.
 * `The tcs-sim manual <tcs-sim.html>`__: the simulator and its file, including
-  the physics model drawn in the Physics pane.
+  the physical model drawn in the Physical pane.
 * `The tcs-verify manual <tcs-verify.html>`__: the checks tcs-cfge reports.
 * `The tcs-moc manual <tcs-moc.html>`__: the ground station a configuration is
   run against.

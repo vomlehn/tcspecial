@@ -14,7 +14,7 @@ description: Simulator settings for the payloads of fprime.ytcs
 tcs-sim:
   ready: "127.0.0.18:7902"
 
-# The physics of the fprime example's vehicle: the zone its thermometer
+# The physical of the fprime example's vehicle: the zone its thermometer
 # reads and its heater warms. The simulated payloads below are joined to
 # its terminals by name, with connects.
 world:
@@ -23,7 +23,7 @@ world:
   # set of surroundings.
   ambient_temp: "283.15 K"
 
-  physics:
+  physical:
     components:
       - type heater:
           # A heater of twenty watts, which on the zone below is a kelvin a

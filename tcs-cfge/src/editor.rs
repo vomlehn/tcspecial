@@ -1510,17 +1510,17 @@ tcs-cfge:
             .expect("the simulator should read what the editor wrote");
     }
 
-    /// A physics component placed, given a figure and removed with its
+    /// A physical component placed, given a figure and removed with its
     /// connections reaches the simulator file each time, and each is taken
     /// back by one undo.
     #[test]
-    fn a_physics_component_is_placed_set_and_removed_in_the_world() {
+    fn a_physical_component_is_placed_set_and_removed_in_the_world() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehicle-sim.yaml");
         std::fs::write(
             &sim,
-            "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
+            "world:\n  ambient_temp: \"283.15 K\"\n  physical:\n    \
              components:\n      - type thermal_mass:\n          \
              - component: zone\n            capacity: \"20 J/K\"\n            \
              time_constant: \"50 s\"\n",
@@ -1542,12 +1542,12 @@ tcs-cfge:
 
         let name = world(&editor).fresh_name("heater");
         assert_eq!(name, "heater_1");
-        editor.edit(Edit::AddPhysics {
+        editor.edit(Edit::AddPhysical {
             name: name.clone(),
             kind: "heater".into(),
         });
         for (setting, value) in [("power", "4 W"), ("voltage", "28 V")] {
-            editor.edit(Edit::SetPhysics {
+            editor.edit(Edit::SetPhysical {
                 component: name.clone(),
                 setting: setting.into(),
                 was: None,
@@ -1567,7 +1567,7 @@ tcs-cfge:
             .insert(("heater_1.heat".into(), "zone.heat".into()));
         editor.document.simulator.as_mut().expect("one").world = joined;
         let before = world(&editor);
-        editor.edit(Edit::RemovePhysics {
+        editor.edit(Edit::RemovePhysical {
             name: name.clone(),
             kind: "heater".into(),
             settings: before.components[&name]
@@ -1592,20 +1592,20 @@ tcs-cfge:
             .expect("the simulator reads what the editor wrote");
     }
 
-    /// A physics component moved, a connection made and a simulated payload
+    /// A physical component moved, a connection made and a simulated payload
     /// joined each reach the simulator file, are read back by a second
     /// session and by the simulator's own reader, and are each taken back by
     /// one undo:
     /// the position goes from the file with the undo, and with the
     /// component.
     #[test]
-    fn a_physics_component_is_moved_and_joined_in_the_world() {
+    fn a_physical_component_is_moved_and_joined_in_the_world() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehicle-sim.yaml");
         std::fs::write(
             &sim,
-            "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
+            "world:\n  ambient_temp: \"283.15 K\"\n  physical:\n    \
              components:\n      - type heater:\n          \
              - component: heater_1\n            power: \"4 W\"\n            \
              voltage: \"28 V\"\n      - type thermal_mass:\n          \
@@ -1629,7 +1629,7 @@ tcs-cfge:
         };
         let read = || std::fs::read_to_string(&sim).expect("the file");
 
-        editor.edit(Edit::MovePhysics {
+        editor.edit(Edit::MovePhysical {
             component: "zone".into(),
             was: None,
             now: Some((-180, 162)),
@@ -1679,7 +1679,7 @@ tcs-cfge:
                 .expect("a simulator file")
         };
         let before = simulator(&editor);
-        editor.edit(Edit::RemovePhysics {
+        editor.edit(Edit::RemovePhysical {
             name: "zone".into(),
             kind: "thermal_mass".into(),
             settings: Vec::new(),
@@ -1989,7 +1989,7 @@ tcs-cfge:
     /// The file names each payload by its own name, as tcs-sim does, and the
     /// editor holds a node in a subdiagram under the subdiagram's name too:
     /// joining the two by the editor's name refused the shipped example, and
-    /// the Physics pane with it.
+    /// the Physical pane with it.
     #[test]
     fn the_thermostat_example_opens_with_its_simulator_file() {
         let where_ = tempfile::tempdir().expect("a directory");
@@ -2005,7 +2005,7 @@ tcs-cfge:
             editor.document().simulator.as_ref().expect("it is adopted");
         assert!(
             !simulator.world.components.is_empty(),
-            "the world's components, for the Physics pane"
+            "the world's components, for the Physical pane"
         );
         assert!(simulator.payloads.contains_key("gpio-out-tmass1"));
         let tmass = editor
@@ -3110,9 +3110,9 @@ tcs-cfge:
         set(&mut editor, "jitter", Some("10 ms"), None);
         only_changed(&before, root, &[(common, "        jitter: 10 ms\n", "")]);
 
-        // A physics figure its author quoted, which keeps its quotes.
+        // A physical figure its author quoted, which keeps its quotes.
         let before = every_file(root);
-        editor.edit(Edit::SetPhysics {
+        editor.edit(Edit::SetPhysical {
             component: "zone".to_string(),
             setting: "heater_2_power".to_string(),
             was: Some("4 W".to_string()),

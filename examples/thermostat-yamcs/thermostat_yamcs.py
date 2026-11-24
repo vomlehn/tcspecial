@@ -4,7 +4,7 @@
 The vehicle is the thermostat example's: three sensors of one zone, each
 converted to kelvin, a vote between them, and a thermostat that switches two
 heaters as the zone's temperature leaves a band about its setpoint, with
-tcs-sim simulating the sensors and the heaters on a physics model of the
+tcs-sim simulating the sensors and the heaters on a physical model of the
 zone. What differs is the ground end of the link: Yamcs
 (https://yamcs.org), which speaks CCSDS packets, so the configuration's
 gateway is ``yamcs``, and every packet to and from the ground carries a

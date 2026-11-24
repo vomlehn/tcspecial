@@ -16,7 +16,7 @@
 //! `|ax| + |ay|` and `ve` the exhaust velocity: the propellant used and `D`
 //! say the same thing, and `D` does not depend on how full the tank was.
 //!
-//! The best is a lower bound, worked out under physics more generous than
+//! The best is a lower bound, worked out under physical more generous than
 //! the lander's, so that no landing can be rated over 100 %:
 //!
 //! - thrust along X is taken as instant, any change of sideways speed being
@@ -32,9 +32,9 @@
 //! are apart, the cost along each depending only on `T`; the best over every
 //! `T` is the bound.
 
-use tcsprotocol::node::physics::lander::{Point, Resolved};
+use tcsprotocol::node::physical::lander::{Point, Resolved};
 
-use crate::node::physics::lander::STANDARD_GRAVITY;
+use crate::node::physical::lander::STANDARD_GRAVITY;
 
 /// How long, at most, a landing is looked for over, in seconds: far longer
 /// than any lander could hover for, hovering costing gravity each second.

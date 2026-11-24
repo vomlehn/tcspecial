@@ -44,10 +44,10 @@ pub mod app;
 /// What the vehicle carries: a device on a bus, a line it drives, a link to
 /// something aboard.
 pub mod payload;
-/// The physics model: the vehicle's physical components, which the simulator's
+/// The physical model: the vehicle's physical components, which the simulator's
 /// simulated payloads measure and act on. Nodes of the simulator's own pane,
 /// drawn and joined as the others are, and here beside them now that there are
 /// more of them.
-pub mod physics;
+pub mod physical;
 /// What the vehicle itself runs: a computation, a log.
 pub mod vehicle;

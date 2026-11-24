@@ -26,7 +26,7 @@ manual <tcspecial.html#running-the-programs>`__, describes, and tcspecial's
          sensors send readings to tcspecial over UDP at each payload's
          sim_address. Arrow 2: tcspecial's thermostat sends the switches on
          or off. Inside tcs-sim the switches drive the zone's heater inputs
-         in the physics model's world, and the sensors read the zone's
+         in the physical model's world, and the sensors read the zone's
          temperature. Arrow 3: the person at tcs-sim's window enables and
          disables payloads and changes their sizes and intervals.
 
@@ -233,18 +233,26 @@ which is why the thermostat's simulator file leaves them with the payloads.
    segment_size           bytes in one segment; defaults to the whole packet,
                           whose size the tcspecial configuration gives
 
-**The physics model**
+**The physical model**
 
 Every simulated payload above sends bytes from a random number generator,
 which exercises a link and no control loop at all: three sensors sending noise
 never agree, so a vote over them says nothing and a thermostat downstream of
 it cannot be seen working.
 
-A physics model gives them something to agree about. It is the vehicle's
+A physical model gives them something to agree about. It is the vehicle's
 physical parts -- a zone, the heaters that warm it -- each simulated alone and
 joined to the others. Join the sensors to what they measure and the heaters'
 switches to the heaters, and what the vehicle reads becomes a consequence of
 what the vehicle drove.
+
+The examples' models are small -- a zone and its heaters, a power bus through
+an orbit, a lander's engine and the body it brakes -- because each models only
+what its example needs. The physical layer is not limited to that. Every
+component is simulated alone and joined to the others through its terminals,
+so components can be added until the model is the entire vehicle: its power,
+its heat, its mass and its motion, each payload's readings a consequence of
+all the rest, and a fault in one part seen where it shows up in another.
 
 The model is in the simulator file's ``world`` section, beside the simulated
 payloads joined to it, so that one file says the whole of what tcs-sim simulates
@@ -259,7 +267,7 @@ written in XML has none.
      ambient_temp         the temperature every thermal mass's surroundings
                           are about: "288.15 K". Required where there is a
                           thermal_mass
-     physics
+     physical
        components         the components, grouped by type
        connections        how they are joined, each from an output to an
                           input
@@ -276,10 +284,12 @@ their components' names, and the outputs an input sums are added in the order
 of theirs. The shapes a model had before are refused, each told where it goes
 now: a simulator file still naming a model in a file of its own,
 ``physics: zone-physics.yaml``; such a file given as a simulator file; a
-``physics`` section at the top of a simulator file, not under ``world``; a
-zone stating its own ``environment``, which is the world's ``ambient_temp``;
-a component with ``name:`` and ``type:`` of its own; and a simulator file
-still declaring masses itself.
+``physics`` or ``physical`` section at the top of a simulator file, not under
+``world``; the world's model written as ``physics``, which is what it was
+called until 2026-11-23, told to call it ``physical``; a zone stating its own
+``environment``, which is the world's ``ambient_temp``; a component with
+``name:`` and ``type:`` of its own; and a simulator file still declaring masses
+itself.
 
 Where tcs-cfge drew each component is kept last in the simulator file, in a
 ``tcs-cfge`` section of its own, as a configuration keeps its nodes' places:
@@ -293,13 +303,13 @@ Where tcs-cfge drew each component is kept last in the simulator file, in a
        thermostat-common: [zone]
 
 tcs-sim ignores it. A component it does not name is laid out down tcs-cfge's
-Physics pane by name, so the section is never needed, and it is written as
+Physical pane by name, so the section is never needed, and it is written as
 components are moved there. Each component is drawn on the page it was placed
 from: one placed on a subdiagram's page is listed under that subdiagram's name
 in ``pages``, and one listed nowhere is drawn on the top page. A component
-is placed from the physics list
+is placed from the physical list
 as a node is from its own list: click its type, and it is put down the
-pane where the others are, or drag the type onto the Physics pane, and it
+pane where the others are, or drag the type onto the Physical pane, and it
 is put where it is let go. In tcs-cfge a component is moved, edited, deleted
 and joined as a node is: drag it, right click it for Edit and Delete, and
 draw a line from its output or input terminal to another component, for a
@@ -579,7 +589,7 @@ moment rather than for its next turn, and again every packet interval. A
 payload joined to records -- a lander's ``sky`` -- sends four whole records
 a packet, never one split between two, every packet interval, round and
 round, and nothing while they are quenched: a lander's sky's records are each
-16 bytes, laid out as tcsprotocol's ``node::physics::lander`` says. A
+16 bytes, laid out as tcsprotocol's ``node::physical::lander`` says. A
 payload joined to an input drives it with what the vehicle sends: a whole
 number -- a set of lines, or a thermostat's decision as the ``u8`` a switch
 takes, a thermal mass's heater being on where it is not nought -- or a value,
@@ -623,7 +633,7 @@ A simulator file with a model, and its payloads joined to it:
 
    world:
      ambient_temp: "283.15 K"         # ten kelvin below the setpoint
-     physics:
+     physical:
        components:
          - type heater:
              - component: heater_1
@@ -866,7 +876,7 @@ meant to be left out.
 
 Several configurations can share one simulator file, and so one world: two
 tcspecials on one vehicle, say, each flying its own configuration and both
-reading one physics model. tcs-sim is then given every configuration and
+reading one physical model. tcs-sim is then given every configuration and
 the file, which is beside none of them, so it is named, with
 ``--simulator=FILE`` or ``PAYLOAD_SIM_YAML``:
 
@@ -919,7 +929,7 @@ example shares with thermostat-yamcs, its world shortened here:
 
    world:
      ambient_temp: "288.15 K"
-     physics:
+     physical:
        components:
          - type thermal_mass:
              - component: zone
@@ -1009,7 +1019,7 @@ under `Seeing what was read <tcspecial.html#seeing-what-was-read>`__ -- and then
 ``Sent``
   When the last packet went, and the first few bytes of it. A part the
   vehicle drives sends nothing, and this line says what it is doing instead,
-  in words, naming the heater it switches in the physics model: ``heating``
+  in words, naming the heater it switches in the physical model: ``heating``
   or ``off``, and ``disabled, so off`` while its panel has it disabled --
   see `Starting and stopping a payload
   <tcspecial.html#starting-and-stopping-a-payload>`__. A switch joined to a

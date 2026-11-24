@@ -47,7 +47,7 @@ pub fn payload_config_from(
 ///
 /// `attachment` is what `main` made of the `connects` the simulator file
 /// states: `None` for a payload joined to nothing, which is every payload of
-/// a file that has no physics model.
+/// a file that has no physical model.
 ///
 /// Apart from the function above so that every test of the pacing, the
 /// faults and the addresses goes on saying nothing about the world: what
@@ -71,7 +71,7 @@ pub fn payload_config_from(
 pub fn payload_config_attached(
     dh: &DHConfig,
     sim: &ResolvedSim,
-    attachment: Option<crate::node::physics::Attachment>,
+    attachment: Option<crate::node::physical::Attachment>,
 ) -> Result<PayloadConfig, String> {
     // What the simulator cannot be, which is tcsprotocol's rule so that
     // tcs-verify asks it too: see `tcsprotocol::simulable`.
@@ -231,7 +231,7 @@ pub fn payload_config_attached(
     };
 
     let sending = match &attachment {
-        Some(crate::node::physics::Attachment::Drives { power, .. }) => {
+        Some(crate::node::physical::Attachment::Drives { power, .. }) => {
             power.enabled_flag()
         }
         _ => Arc::new(tcsos::sync::atomic::AtomicBool::new(false)),
@@ -264,7 +264,7 @@ pub fn payload_config_attached(
             sim.segment_interval.as_millis() as u32,
         )),
         // A driven part's panel button is its power, so the two are one
-        // flag: see `crate::node::physics::Power`.
+        // flag: see `crate::node::physical::Power`.
         sending,
         standing: Default::default(),
         driven: dh.driven,

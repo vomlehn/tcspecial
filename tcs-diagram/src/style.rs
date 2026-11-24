@@ -61,10 +61,10 @@ pub enum Outline {
     /// vehicle types of one outline need the edges to be told apart by.
     Rounded,
     /// A hexagon, pointed at both ends. A component of the simulator's
-    /// physics, every one: a heater, a zone, anything the simulator models
+    /// physical, every one: a heater, a zone, anything the simulator models
     /// and the vehicle does not hold.
     ///
-    /// Not a node type at all, and so a shape no node type has: a physics
+    /// Not a node type at all, and so a shape no node type has: a physical
     /// component drawn in an outline a node also had would be read as that
     /// node's kind of thing. The points are [`POINT`] deep whatever the
     /// height, so a tall block -- a zone with its heaters drawn inside it --
@@ -264,7 +264,7 @@ pub enum Ground {
     Gateway,
     Vehicle,
     Payloads,
-    Physics,
+    Physical,
 }
 
 /// Which ground a pane is painted.
@@ -284,7 +284,7 @@ pub fn ground_of(pane: crate::pane::Pane) -> Ground {
         crate::pane::Pane::Gateway => Ground::Gateway,
         crate::pane::Pane::Vehicle => Ground::Vehicle,
         crate::pane::Pane::Payloads => Ground::Payloads,
-        crate::pane::Pane::Physics => Ground::Physics,
+        crate::pane::Pane::Physical => Ground::Physical,
     }
 }
 
@@ -312,7 +312,7 @@ pub const WIDTH: u32 = 152;
 /// type that has stopped saying what the node is. So it is set in the
 /// diagram's own small size, as the names are, rather than the window's: the
 /// one label on the canvas that is, and the reason. At this size the longest,
-/// `subdiagram` and a physics `thermal_mass` in the narrow face, fit as they
+/// `subdiagram` and a physical `thermal_mass` in the narrow face, fit as they
 /// are drawn, which is a little wider than a font's own measure says.
 pub const TYPE_SIZE: u32 = 9;
 
@@ -1130,7 +1130,7 @@ const EDGE_ROW: u32 = TERMINAL.1 + 18;
 /// * `inside`   - Where what is inside the page begins and ends, in the
 ///                working panes' own coordinates: the left margin ends at
 ///                the first and the right one begins at the second. The
-///                Physics pane is inside -- it is the page's, left of the
+///                Physical pane is inside -- it is the page's, left of the
 ///                payloads -- so the first is below nought by its width.
 ///
 /// # Returns
@@ -2334,7 +2334,7 @@ mod tests {
     /// working panes' own edge: never in the margin, never below nought.
     #[test]
     fn the_edge_is_the_box_seen_from_inside() {
-        // The Physics pane, 200 wide, left of nought and inside the page.
+        // The Physical pane, 200 wide, left of nought and inside the page.
         let (left, width) = (-200.0, 960.0);
         for terminal in ["world-in", "world-out", "moc-in", "moc-out"] {
             let corner = corner_of(terminal).expect("a corner");
@@ -2345,7 +2345,7 @@ mod tests {
             if corner.left {
                 assert!(
                     x >= left - EDGE as f32 && x + w <= left,
-                    "{terminal}: in the margin left of the Physics pane"
+                    "{terminal}: in the margin left of the Physical pane"
                 );
                 assert_eq!(ax, left, "{terminal}");
             } else {
@@ -2822,7 +2822,7 @@ mod tests {
         // the thing a reader of the canvas sees first.
         //
         // But for discrete lines, which have terminals on their left as well,
-        // facing the physics pane: what a watched line senses arrives from
+        // facing the physical pane: what a watched line senses arrives from
         // the world it is wired to, and what a driven line drives leaves for
         // it.
         for t in NodeType::ALL.iter().filter(|t| t.is_payload()) {

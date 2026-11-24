@@ -332,7 +332,7 @@ fn each_section_takes_the_node_types_the_software_knows() {
 ///
 /// The kinds are `DHType`'s, which is what the simulator reads a type with.
 /// And the XSD offers every setting the one list of them has, which the XSD
-/// once did not: it was missing what attaches a payload to the physics
+/// once did not: it was missing what attaches a payload to the physical
 /// model.
 #[test]
 fn the_simulator_schemas_take_the_kinds_and_words_the_simulator_reads() {
@@ -1023,16 +1023,16 @@ fn every_key_of_a_shipped_simulator_file_is_in_its_schema() {
                             world["properties"].get(key).is_some(),
                             "{file}: world: {key} is not allowed"
                         );
-                        if key != "physics" {
+                        if key != "physical" {
                             continue;
                         }
-                        let physics = &world["properties"]["physics"];
+                        let physical = &world["properties"]["physical"];
                         for (key, said) in said.as_mapping().expect("a mapping")
                         {
                             let key = key.as_str().expect("named");
                             assert!(
-                                physics["properties"].get(key).is_some(),
-                                "{file}: world: physics: {key} is not allowed"
+                                physical["properties"].get(key).is_some(),
+                                "{file}: world: physical: {key} is not allowed"
                             );
                             if key == "components" {
                                 grouped(file, said, "component", &|named| {
@@ -1050,9 +1050,9 @@ fn every_key_of_a_shipped_simulator_file_is_in_its_schema() {
 
 /// Every shipped simulator file is valid against the simulator schema, as
 /// an editor's language server would hold it, by a JSON Schema validator:
-/// every word, every type and every shape. And the shapes the physics model
-/// had before -- a file of its own named by `physics: <path>`, or a
-/// `physics` section at the top of the file -- are not.
+/// every word, every type and every shape. And the shapes the physical model
+/// had before -- a file of its own named by `physical: <path>`, or a
+/// `physical` section at the top of the file -- are not.
 #[test]
 fn every_shipped_simulator_file_is_valid_against_its_schema() {
     let validator =
@@ -1084,7 +1084,7 @@ fn every_shipped_simulator_file_is_valid_against_its_schema() {
         assert!(errors.is_empty(), "{file}: {errors:#?}");
     }
 
-    let world = "world:\n  ambient_temp: \"288.15 K\"\n  physics:\n    \
+    let world = "world:\n  ambient_temp: \"288.15 K\"\n  physical:\n    \
                  components:\n      - type heater:\n          \
                  - component: h\n            power: \"4 W\"\n            \
                  voltage: \"28 V\"\n      - type thermal_mass:\n          \
@@ -1374,7 +1374,7 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
         world["ambient_temp"].is_object(),
         "the world's ambient_temp"
     );
-    let item = &world["physics"]["properties"]["components"]["items"];
+    let item = &world["physical"]["properties"]["components"]["items"];
     assert_eq!(item["maxProperties"], 1, "one type an entry");
     let entries = item["properties"].as_object().expect("one entry a type");
     let types: BTreeSet<&str> = entries
@@ -1382,7 +1382,7 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
         .map(|key| key.strip_prefix("type ").expect("the word type and a type"))
         .collect();
     let wanted: BTreeSet<&str> =
-        tcsprotocol::node::physics::TYPES.iter().copied().collect();
+        tcsprotocol::node::physical::TYPES.iter().copied().collect();
     assert_eq!(types, wanted);
     for name in types {
         let component = &json["$defs"][name];
@@ -1399,7 +1399,7 @@ fn the_simulator_schema_takes_the_types_and_settings_the_model_reads() {
             .filter(|key| *key != "component")
             .collect();
         said.sort_unstable();
-        let mut wanted = tcsprotocol::node::physics::settings_of(name)
+        let mut wanted = tcsprotocol::node::physical::settings_of(name)
             .expect("a type the model reads")
             .to_vec();
         wanted.sort_unstable();

@@ -1,4 +1,4 @@
-//! The shapes a simulator file and a physics model used to be written in,
+//! The shapes a simulator file and a physical model used to be written in,
 //! refused.
 //!
 //! A simulated payload was an entry of its own, its name and its kind beside
@@ -15,7 +15,7 @@
 //!     group: zone_temps
 //! ```
 //!
-//! and a physics model's components were written the same way, `name:` and
+//! and a physical model's components were written the same way, `name:` and
 //! `type:` beside the figures. In XML a simulated payload was a
 //! `<simulated_payloads>` element of its own, with `<name>` and `<type>` in
 //! it, and a group a `<simulated_payload_groups>` element.
@@ -23,22 +23,28 @@
 //! The simulated payloads are grouped by type now, a payload named by the
 //! word `payload`; a group is named by the word `group`; and a model's
 //! components are grouped by type, each named by the word `component`: see
-//! [`crate::sim_grouped`] and [`crate::node::physics::grouped`]. A file in the old
-//! shape is refused here, at the line of its first entry, and shown how that
-//! entry is written now, as [`crate::graph::reshaped`] refuses a
+//! [`crate::sim_grouped`] and [`crate::node::physical::grouped`]. A file in the
+//! old shape is refused here, at the line of its first entry, and shown how
+//! that entry is written now, as [`crate::graph::reshaped`] refuses a
 //! configuration in its old shape and for the same reason: a file that was
 //! right once deserves to be told what to write, and not what serde did not
 //! expect.
 //!
-//! The physics model was a file of its own, too, named by the simulator
+//! The physical model was a file of its own, too, named by the simulator
 //! file -- `physics: thermostat-physics.yaml` -- with its components in a
-//! `physics` list and its `connections` beside it. It is the `physics` of
+//! `physics` list and its `connections` beside it. It is the `physical` of
 //! the simulator file's `world` section now, those two under it, and the
 //! temperature each thermal mass gave as its `environment` is the world's
-//! `ambient_temp`: see [`crate::node::physics`]. A simulator file that names a
-//! model, a model given where a simulator file is wanted, and a `physics`
-//! section at the top of a file, are refused here with where it goes; and
-//! so is a `world` in XML, which a model has never been written in.
+//! `ambient_temp`: see [`crate::node::physical`]. A simulator file that
+//! names a model, a model given where a simulator file is wanted, and a
+//! `physics` or `physical` section at the top of a file, are refused here
+//! with where it goes; and so is a `world` in XML, which a model has never
+//! been written in.
+//!
+//! The world's `physical` was called `physics` until 2026-11-23, and a
+//! `physics` under `world` is refused here too, told the word now. The
+//! shapes above were all written with the old word, so they are recognised
+//! by it, and by the new one in case a file was renamed but not moved.
 //!
 //! What a file says is read as its language reads it, so that a word in a
 //! comment is not taken for a key; the text is searched only for the line
@@ -69,25 +75,31 @@ pub fn sim_refused(text: &str, format: ConfigFormat) -> Option<String> {
     }
 }
 
-/// What a physics model written anywhere but under `world:` is told: where
+/// What a physical model written anywhere but under `world:` is told: where
 /// it goes now.
 const MOVE_THE_MODEL: &str = "Write the model in the simulator file's \
-    world section now, its components under physics: components:, its \
-    connections under physics: connections:, and the temperature its zones' \
+    world section now, its components under physical: components:, its \
+    connections under physical: connections:, and the temperature its zones' \
     surroundings are about, which each thermal_mass stated as its \
     environment, once as the world's ambient_temp, as `world: { \
-    ambient_temp: \"288.15 K\", physics: { components: [ { type heater: [ { \
+    ambient_temp: \"288.15 K\", physical: { components: [ { type heater: [ { \
     component: heater_1, ... } ] } ], connections: [ { from: heater_1.heat, \
     to: zone.heat } ] } }`";
 
-/// Says how the physics of a YAML simulator file, still written in a shape
-/// it had before, must be written now.
+/// The two words a physical model's section has been written as: the word
+/// it had before, and the word now.
+const MODEL_WORDS: [&str; 2] = ["physics", "physical"];
+
+/// Says how the physical model of a YAML simulator file, still written in a
+/// shape or by a word it had before, must be written now.
 ///
-/// Four shapes: `physics: <file>`, naming a model of its own; a `physics`
+/// Five shapes: `physics: <file>`, naming a model of its own; a `physics`
 /// list, which is a model's own file given as a simulator file; a `physics`
-/// section at the top of the file, as it was before it was the world's;
-/// and a component of the world's `physics: components:` written with
-/// `name:` and `type:`, as one was before they were grouped by type.
+/// section at the top of the file, as it was before it was the world's
+/// (each recognised by `physical` too); the world's section called by its
+/// old word, `physics`; and a component of the world's `physical:
+/// components:` written with `name:` and `type:`, as one was before they
+/// were grouped by type.
 ///
 /// # Arguments
 ///
@@ -97,29 +109,42 @@ const MOVE_THE_MODEL: &str = "Write the model in the simulator file's \
 /// # Returns
 ///
 /// A message naming the line and showing the shape now, or `None`.
-fn physics_refused(text: &str, file: &serde_norway::Value) -> Option<String> {
-    if let Some(physics) = file.get("physics") {
-        let line = line_of_section(text, "physics");
-        let what = if let Some(named) = physics.as_str() {
+fn physical_refused(text: &str, file: &serde_norway::Value) -> Option<String> {
+    let top = MODEL_WORDS
+        .iter()
+        .find_map(|word| Some((*word, file.get(*word)?)));
+    if let Some((word, model)) = top {
+        let line = line_of_section(text, word);
+        let what = if let Some(named) = model.as_str() {
             format!(
-                "physics names {named}, a physics model in a file of its \
+                "{word} names {named}, a physical model in a file of its \
                  own, as a simulator file once did"
             )
-        } else if physics.is_sequence() {
-            "physics is a list of components, as a physics model written \
-             in a file of its own was; move its connections: too, and delete \
-             its file once nothing names it"
-                .to_string()
+        } else if model.is_sequence() {
+            format!(
+                "{word} is a list of components, as a physical model written \
+                 in a file of its own was; move its connections: too, and \
+                 delete its file once nothing names it"
+            )
         } else {
-            "physics is written at the top of the file, and is the world's \
-             now, beside its ambient_temp"
-                .to_string()
+            format!(
+                "{word} is written at the top of the file, and is the \
+                 world's now, beside its ambient_temp"
+            )
         };
         return Some(format!("at line {line}, {what}. {MOVE_THE_MODEL}"));
     }
-    let (name, component_type) = file
-        .get("world")?
-        .get("physics")?
+    let world = file.get("world")?;
+    if world.get("physics").is_some() {
+        let line = line_of_key(text, "world", "physics", "");
+        return Some(format!(
+            "at line {line}, the world's physics is called physical now: \
+             rename it, as `world: {{ physical: {{ components: [ ... ], \
+             connections: [ ... ] }} }}`"
+        ));
+    }
+    let (name, component_type) = world
+        .get("physical")?
         .get("components")?
         .as_sequence()?
         .iter()
@@ -127,10 +152,10 @@ fn physics_refused(text: &str, file: &serde_norway::Value) -> Option<String> {
         .map(|entry| (scalar(entry.get("name")), scalar(entry.get("type"))))?;
     let line = line_of_key(text, "world", "name", &name);
     Some(format!(
-        "at line {line}, the physics component \"{name}\" is written as a \
+        "at line {line}, the physical component \"{name}\" is written as a \
          component was before components were grouped by type, with name: \
          and type: of its own. Write it under its type now, named by the \
-         word component, as `world: {{ physics: {{ components: [ {{ type \
+         word component, as `world: {{ physical: {{ components: [ {{ type \
          {component_type}: [ {{ component: {name}, ... }} ] }} ] }} }}`"
     ))
 }
@@ -169,11 +194,15 @@ fn sim_in_yaml(text: &str) -> Option<String> {
     let groups = entries("simulated_payload_groups");
     let mut found: Vec<(usize, String)> = Vec::new();
 
-    if let Some(why) = physics_refused(text, &file) {
-        let line = match file.get("physics") {
-            Some(_) => line_of_section(text, "physics"),
-            None => line_of_section(text, "world"),
-        };
+    if let Some(why) = physical_refused(text, &file) {
+        // Whichever comes first: a model at the top, or the world's.
+        let line = MODEL_WORDS
+            .iter()
+            .find(|word| file.get(**word).is_some())
+            .map_or_else(
+                || line_of_section(text, "world"),
+                |word| line_of_section(text, word),
+            );
         found.push((line, why));
     }
 
@@ -271,12 +300,15 @@ fn sim_in_xml(text: &str) -> Option<String> {
             Event::Start(tag) | Event::Empty(tag) => {
                 let element = tag.name().as_ref().to_string();
                 let level = depth + 1;
-                if level == 2 && (element == "physics" || element == "world") {
+                if level == 2
+                    && (MODEL_WORDS.contains(&element.as_str())
+                        || element == "world")
+                {
                     return Some(format!(
                         "at line {at}, {element} is written in XML, which a \
-                         physics model has never been: the world, its \
-                         ambient_temp and its physics, is a section of a \
-                         simulator file written in YAML. Write this \
+                         physical model has never been: the world, its \
+                         ambient_temp and its physical model, is a section \
+                         of a simulator file written in YAML. Write this \
                          simulator file in YAML, named .yaml, with the model \
                          under world:"
                     ));
@@ -430,11 +462,11 @@ mod tests {
         assert!(why.contains("<group name=\"g\">"), "{why}");
     }
 
-    /// A physics component of the old shape is refused at its line.
+    /// A physical component of the old shape is refused at its line.
     #[test]
-    fn a_physics_component_of_the_old_shape_is_refused_at_its_line() {
+    fn a_physical_component_of_the_old_shape_is_refused_at_its_line() {
         let text =
-            "description: d\nworld:\n  physics:\n    components:\n      \
+            "description: d\nworld:\n  physical:\n    components:\n      \
                     - name: zone\n        type: thermal_mass\n";
         let why = sim_refused(text, ConfigFormat::Yaml).expect("refused");
         assert!(why.starts_with("at line 5,"), "{why}");
@@ -444,7 +476,8 @@ mod tests {
 
     /// A simulator file naming a model of its own, and a model given as a
     /// simulator file, are refused at the line of physics, told to move the
-    /// model into the simulator file.
+    /// model into the simulator file; and so is a model at the top called by
+    /// the word now.
     #[test]
     fn a_model_of_its_own_is_told_to_move_in() {
         for (text, said) in [
@@ -463,10 +496,16 @@ mod tests {
                  - component: b\n",
                 "is the world's now",
             ),
+            (
+                "physical:\n  components:\n    - type bus:\n        \
+                 - component: b\n",
+                "physical is written at the top",
+            ),
         ] {
             let why = sim_refused(text, ConfigFormat::Yaml).expect("refused");
             assert!(why.contains(said), "{why}");
             assert!(why.contains("world: { ambient_temp:"), "{why}");
+            assert!(why.contains("physical: { components:"), "{why}");
             assert!(why.contains("{ from: heater_1.heat"), "{why}");
             assert!(!why.contains("{{"), "{why}");
         }
@@ -479,11 +518,27 @@ mod tests {
         assert!(why.starts_with("at line 4,"), "{why}");
     }
 
-    /// A physics section, or a world, in an XML simulator file is refused
-    /// at its line.
+    /// The world's physical model called by its old word, physics, is
+    /// refused at its line and told the word now.
+    #[test]
+    fn the_worlds_physics_is_told_it_is_physical_now() {
+        let text = "description: d\nworld:\n  ambient_temp: \"288.15 K\"\n  \
+                    physics:\n    components:\n      - type bus:\n          \
+                    - component: b\n";
+        let why = sim_refused(text, ConfigFormat::Yaml).expect("refused");
+        assert!(why.starts_with("at line 4,"), "{why}");
+        assert!(
+            why.contains("physics is called physical now: rename it"),
+            "{why}"
+        );
+        assert!(!why.contains("{{"), "{why}");
+    }
+
+    /// A physics or physical section, or a world, in an XML simulator file
+    /// is refused at its line.
     #[test]
     fn a_world_in_xml_is_refused() {
-        for element in ["physics", "world"] {
+        for element in ["physics", "physical", "world"] {
             let text = format!(
                 "<simulator>\n<{element}>zone</{element}>\n</simulator>\n"
             );
@@ -512,9 +567,9 @@ mod tests {
                    <payload name=\"a\"><group>g</group></payload></type>\
                    </simulated_payloads>\n</simulator>\n";
         assert_eq!(sim_refused(xml, ConfigFormat::Xml), None);
-        let physics = "world:\n  physics:\n    components:\n      \
+        let physical = "world:\n  physical:\n    components:\n      \
                        - type bus:\n          - component: b\n    \
                        connections: []\n";
-        assert_eq!(sim_refused(physics, ConfigFormat::Yaml), None);
+        assert_eq!(sim_refused(physical, ConfigFormat::Yaml), None);
     }
 }

@@ -105,13 +105,13 @@ On a desktop
    The same software, every connection made on one desktop.
 
 None of it needs a vehicle. On one desktop, **tcs-sim** stands in for the
-payloads, on a physics model of the world they act on, and **tcs-moc** for
+payloads, on a physical model of the world they act on, and **tcs-moc** for
 the mission operations center, and between them runs the same tcspecial that
 flies. ``make runmocy`` starts all three on one
 configuration, and every connection in the figure above is made on the
 desktop: commands, telemetry and beacons over sockets on the loopback
 interface, and the devices as pseudo-terminals and loopback addresses that
-tcs-sim answers on a physics model of the payloads. A configuration can be
+tcs-sim answers on a physical model of the payloads. A configuration can be
 developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.
 
@@ -278,7 +278,7 @@ Verification tools
 ------------------
 
 `The tcs-sim design <tcs-sim-design.html>`__
-    The payload simulator: its configuration files, the physics model,
+    The payload simulator: its configuration files, the physical model,
     fault injection, and the program.
 
 `The tcs-moc design <tcs-moc-design.html>`__

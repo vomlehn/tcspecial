@@ -67,7 +67,7 @@ use slint::{Model, ModelRc, VecModel};
 // where the panes are divided. Named here so that `crate::pane` and the rest
 // read as they did while these were this program's own.
 use tcs_diagram::look::ground_of;
-use tcs_diagram::{look, pane, physics, route, style};
+use tcs_diagram::{look, pane, physical, route, style};
 
 use document::{Concern, Document, Fault, Seen};
 use editor::Editor;
@@ -170,8 +170,8 @@ const _: () = assert!(GATEWAY_PLACE.1 >= pane::NAMES.0 + pane::NAMES.1);
 enum Picked {
     /// A line, which is selected by a right click on it.
     Link(Link),
-    /// A physics component, by its name.
-    Physics(String),
+    /// A physical component, by its name.
+    Physical(String),
 }
 
 /// What is to happen once the offer to save, if one is made, is answered:
@@ -259,7 +259,7 @@ struct Views {
     /// follow the other.
     chosen: Rc<RefCell<BTreeMap<String, String>>>,
     /// What each window has selected that is not a node, by the window's
-    /// home: a line or a physics component. A window has a node in `chosen`
+    /// home: a line or a physical component. A window has a node in `chosen`
     /// or something here, never both, and whichever it has is what the
     /// Delete key takes.
     picked: Rc<RefCell<BTreeMap<String, Picked>>>,
@@ -336,14 +336,14 @@ struct Views {
     /// for what one node says about itself.
     sim_groups: Option<SimWindow>,
     showing_sim_group: Rc<RefCell<String>>,
-    /// The physics components' window, if one is open, and which component
+    /// The physical components' window, if one is open, and which component
     /// it shows: the simulator groups' window, pointed at the world's
-    /// components instead. See [`show_physics`].
-    physics: Option<SimWindow>,
-    showing_physics: Rc<RefCell<String>>,
-    /// The physics list's share of the selection column, at its top, in per
+    /// components instead. See [`show_physical`].
+    physical: Option<SimWindow>,
+    showing_physical: Rc<RefCell<String>>,
+    /// The physical list's share of the selection column, at its top, in per
     /// cent: kept beside `lists` and saved with it.
-    physics_list: Rc<std::cell::Cell<i32>>,
+    physical_list: Rc<std::cell::Cell<i32>>,
     /// Whether every edit is written as it is made, as the File menu's
     /// Autosave says: kept beside the shares and saved with them.
     autosave: Rc<std::cell::Cell<bool>>,
@@ -413,11 +413,11 @@ impl Views {
         if !matches!(picked, Some(Picked::Link(_))) {
             window.set_selected_link(-1);
         }
-        let physics = match picked {
-            Some(Picked::Physics(name)) => name,
+        let physical = match picked {
+            Some(Picked::Physical(name)) => name,
             _ => String::new(),
         };
-        window.set_selected_physics(physics.into());
+        window.set_selected_physical(physical.into());
     }
 
     /// Selects one thing on a page, or nothing, in place of whatever was
@@ -771,8 +771,8 @@ impl Views {
             .borrow()
             .as_ref()
             .and_then(|drawing| drawing.holding.clone());
-        if let Some(window) = &self.physics {
-            put_physics(window, editor, &self.showing_physics.borrow());
+        if let Some(window) = &self.physical {
+            put_physical(window, editor, &self.showing_physical.borrow());
         }
         if let Some(window) = &self.group {
             put_group(window, editor, &self.showing.borrow());
@@ -828,9 +828,9 @@ impl Views {
             window.set_aside_count(aside.len() as i32);
         }
         // How the selection column is shared, in every window alike.
-        let physics_list = self.physics_list.get();
+        let physical_list = self.physical_list.get();
         for window in self.top.upgrade().iter().chain(self.open.values()) {
-            window.set_physics_list_percent(physics_list);
+            window.set_physical_list_percent(physical_list);
         }
     }
 }
@@ -1103,7 +1103,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // brought into its own as the file is read.
     let settings = settings::load();
     let divider = Rc::new(std::cell::Cell::new(Dividers {
-        physics: pane::physics_width(settings.physics_percent),
+        physical: pane::physical_width(settings.physical_percent),
         ..dividers_for(settings.gateway_percent, settings.vehicle_percent)
     }));
     // And how the selection column was divided, which is the same preference
@@ -1274,7 +1274,7 @@ fn print_to(
     let _ = READ_ONLY.set(true);
     let settings = settings::Settings::default();
     let dividers = Dividers {
-        physics: pane::physics_width(settings.physics_percent),
+        physical: pane::physical_width(settings.physical_percent),
         ..dividers_for(settings.gateway_percent, settings.vehicle_percent)
     };
     let lists = (settings.list_gateway_percent, settings.list_vehicle_percent);
@@ -1297,9 +1297,9 @@ fn print_to(
     let ui = MainWindow::new().map_err(|e| e.to_string())?;
     session!(&ui);
     furnish!(&ui, descriptions());
-    ui.set_physics_palette(physics_palette());
-    ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
-    ui.set_physics_list_percent(settings.list_physics_percent);
+    ui.set_physical_palette(physical_palette());
+    ui.set_physical_ground(colour(&ground_of(style::Ground::Physical)));
+    ui.set_physical_list_percent(settings.list_physical_percent);
     ui.show().map_err(|e| e.to_string())?;
     let draw = |window: &MainWindow| {
         headless::drawn(window.window(), PRINT_WINDOW);
@@ -1362,11 +1362,11 @@ fn open_main(
     let ui = MainWindow::new()?;
     session!(&ui);
     furnish!(&ui, descriptions());
-    // The physics list and its pane's tint, which only the main window has:
-    // see `physics_palette`.
-    ui.set_physics_palette(physics_palette());
-    ui.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
-    ui.set_physics_list_percent(settings.list_physics_percent);
+    // The physical list and its pane's tint, which only the main window has:
+    // see `physical_palette`.
+    ui.set_physical_palette(physical_palette());
+    ui.set_physical_ground(colour(&ground_of(style::Ground::Physical)));
+    ui.set_physical_list_percent(settings.list_physical_percent);
     ui.on_titled(|base, path, width| title::titled(&base, &path, width).into());
 
     let views = Rc::new(RefCell::new(Views {
@@ -1390,10 +1390,10 @@ fn open_main(
         faulted: Rc::new(RefCell::new(Default::default())),
         sim_groups: None,
         showing_sim_group: Rc::new(RefCell::new(String::new())),
-        physics: None,
-        showing_physics: Rc::new(RefCell::new(String::new())),
-        physics_list: Rc::new(std::cell::Cell::new(
-            settings.list_physics_percent,
+        physical: None,
+        showing_physical: Rc::new(RefCell::new(String::new())),
+        physical_list: Rc::new(std::cell::Cell::new(
+            settings.list_physical_percent,
         )),
         autosave: Rc::new(std::cell::Cell::new(settings.autosave)),
         showing: Rc::new(RefCell::new(String::new())),
@@ -1442,7 +1442,7 @@ fn open_main(
     // the line being dragged off the drawing: see Views::drawing.
     views.borrow_mut().drawing = drawing.clone();
     wire(&ui, editor, &views, &drawing, &chosen, &None);
-    wire_physics(&ui, editor, &views, &None);
+    wire_physical(&ui, editor, &views, &None);
 
     // And the warning about whatever is wrong with the file as it arrived,
     // in front of the window that is already up: see `warn_of_errors`.
@@ -1978,7 +1978,7 @@ fn wire(
                 stop_joining(&window, &drawing);
                 return;
             };
-            // A line from a payload, clicked on a physics component: what
+            // A line from a payload, clicked on a physical component: what
             // the payload's simulation can be joined to there, as a line
             // from the component to the payload would offer.
             let dividers = views.borrow().divider.get();
@@ -1995,7 +1995,7 @@ fn wire(
                     );
                     return;
                 }
-                let offers = physics_offers(&editor.borrow(), &meant);
+                let offers = physical_offers(&editor.borrow(), &meant);
                 window.set_join_heading(component.into());
                 window.set_join_offers(offers_model(&offers));
                 *asking.borrow_mut() = offers;
@@ -2247,9 +2247,9 @@ fn wire(
                 None,
                 lit.as_ref(),
             )))));
-            let (_, physics) = physics_views_of(&document, dividers, &home);
-            window.set_physics_links(ModelRc::from(Rc::new(VecModel::from(
-                physics,
+            let (_, physical) = physical_views_of(&document, dividers, &home);
+            window.set_physical_links(ModelRc::from(Rc::new(VecModel::from(
+                physical,
             ))));
         });
     }
@@ -2359,11 +2359,11 @@ fn wire(
         });
     }
     {
-        // A physics component pressed, selected as a node is.
+        // A physical component pressed, selected as a node is.
         let views = views.clone();
         let home = home.clone();
-        window.on_physics_picked(move |name| {
-            let picked = Picked::Physics(name.to_string());
+        window.on_physical_picked(move |name| {
+            let picked = Picked::Physical(name.to_string());
             views.borrow().select(&home, None, Some(picked));
         });
     }
@@ -2577,14 +2577,14 @@ fn open_page(
     };
     window.set_editing(name.into());
     furnish!(&window, descriptions());
-    window.set_physics_palette(physics_palette());
-    window.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+    window.set_physical_palette(physical_palette());
+    window.set_physical_ground(colour(&ground_of(style::Ground::Physical)));
     window.on_titled(|base, path, width| {
         title::titled(&base, &path, width).into()
     });
     let home = Some(name.to_string());
     wire(&window, editor, views, drawing, chosen, &home);
-    wire_physics(&window, editor, views, &home);
+    wire_physical(&window, editor, views, &home);
     if let Err(e) = window.show() {
         eprintln!("tcs-cfge: {name} cannot be shown: {e}");
         return;
@@ -2627,15 +2627,19 @@ fn put(
     ui.set_gateway_list_percent(lists.0);
     ui.set_vehicle_list_percent(lists.1);
     ui.set_has_simulator(editor.document().simulator.is_some());
-    let (physics_nodes, physics_links) =
-        physics_views_of(editor.document(), dividers, home);
-    // The Physics pane whether or not there is a simulator file for it to be
+    let (physical_nodes, physical_links) =
+        physical_views_of(editor.document(), dividers, home);
+    // The Physical pane whether or not there is a simulator file for it to be
     // the world of: some of every pane is always to be seen, and a pane that
     // appeared only with a second file would be one nobody knew to look for.
     // Without one it says so, as the list does.
-    ui.set_physics_width(dividers.physics as f32);
-    ui.set_physics_nodes(ModelRc::from(Rc::new(VecModel::from(physics_nodes))));
-    ui.set_physics_links(ModelRc::from(Rc::new(VecModel::from(physics_links))));
+    ui.set_physical_width(dividers.physical as f32);
+    ui.set_physical_nodes(ModelRc::from(Rc::new(VecModel::from(
+        physical_nodes,
+    ))));
+    ui.set_physical_links(ModelRc::from(Rc::new(VecModel::from(
+        physical_links,
+    ))));
     // A subdiagram's page has an edge, in its margins, where what comes
     // from outside it arrives and what leaves it goes: see
     // tcs_diagram::style::edge_box. The top page has nothing outside it.
@@ -2659,9 +2663,9 @@ fn put(
     // lines being whatever this drawing made it; one that has gone is
     // selected no longer, and nor is a component that has.
     ui.set_selected_link(picked_index(editor.document(), home, held, picked));
-    let physics =
+    let physical =
         match picked {
-            Some(Picked::Physics(name))
+            Some(Picked::Physical(name))
                 if editor.document().simulator.as_ref().is_some_and(
                     |sim| sim.world.components.contains_key(name),
                 ) =>
@@ -2670,7 +2674,7 @@ fn put(
             }
             _ => "",
         };
-    ui.set_selected_physics(physics.into());
+    ui.set_selected_physical(physical.into());
     ui.set_undo_depth(editor.undo_depth() as i32);
     ui.set_autosave(editor.autosave());
     ui.set_redo_depth(editor.journal().redoable() as i32);
@@ -2702,7 +2706,7 @@ fn edge_of(home: &Home) -> i32 {
 }
 
 /// Where a page's working panes begin on the whole sheet, whose nought is
-/// the Physics pane's left edge: past the Physics pane, and past the edge on
+/// the Physical pane's left edge: past the Physical pane, and past the edge on
 /// a subdiagram's page.
 ///
 /// # Arguments
@@ -2714,7 +2718,7 @@ fn edge_of(home: &Home) -> i32 {
 ///
 /// The working panes' left edge, in pixels.
 fn sheet_left(dividers: Dividers, home: &Home) -> i32 {
-    dividers.physics + edge_of(home)
+    dividers.physical + edge_of(home)
 }
 
 /// Where what is inside a page begins and ends: see
@@ -3186,18 +3190,18 @@ fn drag_list_divider(
     tall: f32,
 ) {
     let lists = views.borrow().lists.clone();
-    let physics = views.borrow().physics_list.clone();
+    let physical = views.borrow().physical_list.clone();
     let was = lists.get();
-    let now = list_shares_after(was, physics.get(), which, dy, tall);
+    let now = list_shares_after(was, physical.get(), which, dy, tall);
     if now == was {
         // It did not move, or it was already against what stops it: nothing
         // to redraw, and nothing to write.
         return;
     }
     lists.set(now);
-    // The payload list takes what the other three leave, so the physics list
+    // The payload list takes what the other three leave, so the physical list
     // gives way where the two below it have taken its room.
-    physics.set(settings::list_shares(now.0, now.1, physics.get()).2);
+    physical.set(settings::list_shares(now.0, now.1, physical.get()).2);
 
     remember(&views.borrow());
     views.borrow().refresh(&editor.borrow());
@@ -3218,14 +3222,14 @@ fn remember(views: &Views) {
         vehicle_percent,
         list_gateway_percent,
         list_vehicle_percent,
-        physics_percent: pane::physics_percent(dividers.physics),
-        list_physics_percent: views.physics_list.get(),
+        physical_percent: pane::physical_percent(dividers.physical),
+        list_physical_percent: views.physical_list.get(),
         autosave: views.autosave.get(),
     });
 }
 
-/// Moves the line between the Physics pane and the payloads where a
-/// gesture dragged it: the Physics pane grows as the line goes right, it
+/// Moves the line between the Physical pane and the payloads where a
+/// gesture dragged it: the Physical pane grows as the line goes right, it
 /// being the pane to the line's left.
 ///
 /// Its width snapped to the grid and kept inside [`settings::LEAST`] to
@@ -3235,31 +3239,31 @@ fn remember(views: &Views) {
 /// # Arguments
 ///
 /// * `editor` - The session, for redrawing.
-/// * `views`  - The windows, which hold the Physics pane's width.
+/// * `views`  - The windows, which hold the Physical pane's width.
 /// * `dx`     - How far the line moved, in pixels, rightward positive.
-fn drag_physics_divider(
+fn drag_physical_divider(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     dx: f32,
 ) {
     let dividers = views.borrow().divider.clone();
     let was = dividers.get();
-    let now = pane::physics_width(pane::physics_percent(pane::grid_ceil(
-        was.physics + dx.round() as i32,
+    let now = pane::physical_width(pane::physical_percent(pane::grid_ceil(
+        was.physical + dx.round() as i32,
     )));
-    if now == was.physics {
+    if now == was.physical {
         return;
     }
     dividers.set(Dividers {
-        physics: now,
+        physical: now,
         ..was
     });
     remember(&views.borrow());
     views.borrow().refresh(&editor.borrow());
 }
 
-/// Moves the line under the physics list where a gesture dragged it: the
-/// physics list grows by what the payload list below it gives up.
+/// Moves the line under the physical list where a gesture dragged it: the
+/// physical list grows by what the payload list below it gives up.
 ///
 /// # Arguments
 ///
@@ -3267,7 +3271,7 @@ fn drag_physics_divider(
 /// * `views`  - The windows, which hold the lists' shares.
 /// * `dy`     - How far the line moved, in pixels, downward positive.
 /// * `tall`   - How tall the whole column is, in pixels.
-fn drag_physics_list_divider(
+fn drag_physical_list_divider(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     dy: f32,
@@ -3277,9 +3281,9 @@ fn drag_physics_list_divider(
         return;
     }
     let (gateway, vehicle) = views.borrow().lists.get();
-    let cell = views.borrow().physics_list.clone();
+    let cell = views.borrow().physical_list.clone();
     let was = cell.get();
-    let now = settings::physics_list_share(
+    let now = settings::physical_list_share(
         was + (dy / tall * 100.0).round() as i32,
         gateway,
         vehicle,
@@ -3294,8 +3298,8 @@ fn drag_physics_list_divider(
 
 /// Works out what the two shares become when a line is dragged this far.
 ///
-/// `was` is the gateway list's share and the vehicle list's, and `physics` the
-/// physics list's at the top, the payload list taking what is left; `which`
+/// `was` is the gateway list's share and the vehicle list's, and `physical` the
+/// physical list's at the top, the payload list taking what is left; `which`
 /// is the list above the line that moved -- the
 /// payload list for the upper line, the vehicle list for the lower one, the
 /// lists running payloads, vehicle, gateway down the column; `dy` is how far it
@@ -3311,7 +3315,7 @@ fn drag_physics_list_divider(
 ///
 /// * `(gateway, vehicle)` - The gateway list's and the vehicle list's
 ///                          shares of the column now, in per cent.
-/// * `physics`            - The physics list's share, which neither line
+/// * `physical`            - The physical list's share, which neither line
 ///                          moves but which the payload list's room is
 ///                          what is left after.
 /// * `which`              - The list above the line that moved:
@@ -3327,7 +3331,7 @@ fn drag_physics_list_divider(
 /// The gateway list's and the vehicle list's new shares, in per cent.
 fn list_shares_after(
     (gateway, vehicle): (i32, i32),
-    physics: i32,
+    physical: i32,
     which: Pane,
     dy: f32,
     tall: f32,
@@ -3342,7 +3346,7 @@ fn list_shares_after(
     // Each line moves only the boundary between its own two neighbours, so
     // the step is held to what both of them can give: the third list is not
     // touched however far the line goes.
-    let payload = 100 - gateway - vehicle - physics;
+    let payload = 100 - gateway - vehicle - physical;
     let least = settings::LEAST;
     let asked = match which {
         // The upper line takes from the vehicle list and gives to the payload
@@ -3359,7 +3363,7 @@ fn list_shares_after(
         }
     };
     let (gateway, vehicle, _) =
-        settings::list_shares(asked.0, asked.1, physics);
+        settings::list_shares(asked.0, asked.1, physical);
     (gateway, vehicle)
 }
 
@@ -4984,7 +4988,7 @@ fn replace_session(
             let _ = window.hide();
             going.push(Box::new(window));
         }
-        for window in [views.sim_groups.take(), views.physics.take()]
+        for window in [views.sim_groups.take(), views.physical.take()]
             .into_iter()
             .flatten()
         {
@@ -5019,7 +5023,7 @@ fn replace_session(
         views.faulted.borrow_mut().clear();
         views.showing.borrow_mut().clear();
         views.showing_sim_group.borrow_mut().clear();
-        views.showing_physics.borrow_mut().clear();
+        views.showing_physical.borrow_mut().clear();
     }
     slint::Timer::single_shot(std::time::Duration::ZERO, move || {
         drop(going);
@@ -6621,10 +6625,10 @@ fn lines_of(
         .collect()
 }
 
-/// The simulator file's physics, drawn: its components as nodes in the
-/// Physics pane, its connections and each simulated payload's `connects` as
+/// The simulator file's physical model, drawn: its components as nodes in the
+/// Physical pane, its connections and each simulated payload's `connects` as
 /// links, in the coordinates of the whole canvas, whose nought is the
-/// Physics pane's left edge. Nothing for a session with no simulator file.
+/// Physical pane's left edge. Nothing for a session with no simulator file.
 ///
 /// A component the reader would refuse is drawn faulty, by what
 /// [`crate::sim::World::problems`] says, which is the reader's own checking:
@@ -6634,14 +6638,14 @@ fn lines_of(
 /// # Arguments
 ///
 /// * `document` - The configuration drawn, its simulator file with it.
-/// * `dividers` - Where the panes are, the Physics pane's width included.
+/// * `dividers` - Where the panes are, the Physical pane's width included.
 /// * `home`     - The page the lines to payloads are drawn on: `None` for
 ///                the top.
 ///
 /// # Returns
 ///
-/// The physics nodes, and the physics links.
-fn physics_views_of(
+/// The physical nodes, and the physical links.
+fn physical_views_of(
     document: &Document,
     dividers: Dividers,
     home: &Home,
@@ -6659,11 +6663,11 @@ fn physics_views_of(
     // This page's components only: each is drawn on the page it was placed
     // on, and a connection or join to one on another page is drawn nowhere,
     // as one to a component the world has not.
-    let components: Vec<tcs_diagram::physics::Component> = world
+    let components: Vec<tcs_diagram::physical::Component> = world
         .components
         .iter()
         .filter(|(name, _)| world.on_page(name, home.as_deref()))
-        .map(|(name, component)| tcs_diagram::physics::Component {
+        .map(|(name, component)| tcs_diagram::physical::Component {
             name,
             kind: &component.kind,
             faulty: faulty(name),
@@ -6703,18 +6707,18 @@ fn physics_views_of(
             }
         }
     }
-    let joins: Vec<tcs_diagram::physics::Join> = said
+    let joins: Vec<tcs_diagram::physical::Join> = said
         .iter()
-        .map(|(payload, terminal)| tcs_diagram::physics::Join {
+        .map(|(payload, terminal)| tcs_diagram::physical::Join {
             payload,
             terminal,
         })
         .collect();
     // Drawn from where the working panes begin on the whole sheet, the
-    // Physics pane being just left of them, inside a subdiagram's edge as on
+    // Physical pane being just left of them, inside a subdiagram's edge as on
     // the top page.
     let sheet = on_sheet(document, home, dividers);
-    let (nodes, links) = tcs_diagram::physics::looks(
+    let (nodes, links) = tcs_diagram::physical::looks(
         &components,
         &connections,
         &joins,
@@ -6731,11 +6735,11 @@ fn physics_views_of(
     )
 }
 
-/// Adds a physics component of this type, under a name nothing has, with
+/// Adds a physical component of this type, under a name nothing has, with
 /// nothing stated, and opens its window, so that its figures are the next
 /// thing typed.
 ///
-/// What clicking an entry of the physics list and carrying one out to the
+/// What clicking an entry of the physical list and carrying one out to the
 /// sheet both do, once. Nothing, in a session with no simulator file.
 ///
 /// # Arguments
@@ -6745,9 +6749,9 @@ fn physics_views_of(
 /// * `kind`   - The component's type.
 /// * `home`   - The page it was placed from, which is the one it is drawn on:
 ///              `None` for the top.
-/// * `at`     - Where it goes, on the grid and in the Physics pane; `None`
+/// * `at`     - Where it goes, on the grid and in the Physical pane; `None`
 ///              leaves it to be laid out with the others.
-fn add_physics(
+fn add_physical(
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     kind: &str,
@@ -6765,18 +6769,18 @@ fn add_physics(
         // component removed, for undo, would otherwise be taken by a new one
         // given its name.
         let mut edits = vec![
-            Edit::AddPhysics {
+            Edit::AddPhysical {
                 name: name.clone(),
                 kind: kind.to_string(),
             },
-            Edit::PagePhysics {
+            Edit::PagePhysical {
                 component: name.clone(),
                 was: world.pages.get(&name).cloned(),
                 now: home.clone(),
             },
         ];
         if let Some(at) = at {
-            edits.push(Edit::MovePhysics {
+            edits.push(Edit::MovePhysical {
                 component: name.clone(),
                 was: None,
                 now: Some(at),
@@ -6787,23 +6791,23 @@ fn add_physics(
         editor.edit(Edit::Group { edits });
         name
     };
-    take_physics_draft(views);
-    *views.borrow().showing_physics.borrow_mut() = name;
-    show_physics(editor, views);
+    take_physical_draft(views);
+    *views.borrow().showing_physical.borrow_mut() = name;
+    show_physical(editor, views);
     views.borrow().refresh(&editor.borrow());
 }
 
-/// Takes what was typed into the physics window and not yet taken, for the
+/// Takes what was typed into the physical window and not yet taken, for the
 /// component it shows, before it is made to show another: the window is one,
 /// reused, and a value typed for one component is that one's.
 ///
 /// # Arguments
 ///
-/// * `views` - The windows, which keep the physics window once it is made.
-fn take_physics_draft(views: &Rc<RefCell<Views>>) {
+/// * `views` - The windows, which keep the physical window once it is made.
+fn take_physical_draft(views: &Rc<RefCell<Views>>) {
     let window = views
         .borrow()
-        .physics
+        .physical
         .as_ref()
         .and_then(|window| window.as_weak().upgrade());
     if let Some(window) = window {
@@ -6829,11 +6833,11 @@ fn take_when_closed(window: &SimWindow) {
     });
 }
 
-/// Wires what the main window does with physics: placing a component from
-/// the physics list, editing and deleting one on the canvas, and moving the
-/// Physics pane's line and the physics list's.
+/// Wires what the main window does with physical: placing a component from
+/// the physical list, editing and deleting one on the canvas, and moving the
+/// Physical pane's line and the physical list's.
 ///
-/// Every page's window has the Physics pane, a subdiagram's too: the world
+/// Every page's window has the Physical pane, a subdiagram's too: the world
 /// is one, the simulator file's, and each page joins its own payloads to it.
 ///
 /// # Arguments
@@ -6842,88 +6846,88 @@ fn take_when_closed(window: &SimWindow) {
 /// * `editor` - The one editor every window edits.
 /// * `views`  - The windows, redrawn after each edit.
 /// * `home`   - The page the window shows: `None` for the top.
-fn wire_physics(
+fn wire_physical(
     window: &MainWindow,
     editor: &Rc<RefCell<Editor>>,
     views: &Rc<RefCell<Views>>,
     home: &Home,
 ) {
     {
-        // Clicked in the physics list: laid out with the others. See
-        // add_physics.
+        // Clicked in the physical list: laid out with the others. See
+        // add_physical.
         let editor = editor.clone();
         let views = views.clone();
         let home = home.clone();
-        window.on_place_physics(move |kind| {
-            add_physics(&editor, &views, &kind, &home, None);
+        window.on_place_physical(move |kind| {
+            add_physical(&editor, &views, &kind, &home, None);
         });
     }
     {
         // Carried out of the list and let go: where it was let go, on the
-        // grid and inside the Physics pane, as a component dragged there
+        // grid and inside the Physical pane, as a component dragged there
         // would be. A component's place is kept from where the working
         // panes begin, which is left of nought, and the sheet's point is
         // made one.
         let editor = editor.clone();
         let views = views.clone();
         let home = home.clone();
-        window.on_drop_physics(move |kind, x, y| {
+        window.on_drop_physical(move |kind, x, y| {
             let dividers = views.borrow().divider.get();
-            let at = tcs_diagram::physics::confine(
+            let at = tcs_diagram::physical::confine(
                 snap((
                     x.round() as i32 - sheet_left(dividers, &home),
                     y.round() as i32,
                 )),
                 dividers,
             );
-            add_physics(&editor, &views, &kind, &home, Some(at));
+            add_physical(&editor, &views, &kind, &home, Some(at));
         });
     }
     {
         let editor = editor.clone();
         let views = views.clone();
-        window.on_physics_edit(move |name| {
-            take_physics_draft(&views);
-            *views.borrow().showing_physics.borrow_mut() = name.to_string();
-            show_physics(&editor, &views);
+        window.on_physical_edit(move |name| {
+            take_physical_draft(&views);
+            *views.borrow().showing_physical.borrow_mut() = name.to_string();
+            show_physical(&editor, &views);
         });
     }
     {
         let editor = editor.clone();
         let views = views.clone();
-        window.on_physics_delete(move |name| {
-            remove_physics(&editor, &name);
+        window.on_physical_delete(move |name| {
+            remove_physical(&editor, &name);
             views.borrow().refresh(&editor.borrow());
         });
     }
     {
         let editor = editor.clone();
         let views = views.clone();
-        window.on_physics_divider_moved(move |dx: f32| {
-            drag_physics_divider(&editor, &views, dx);
+        window.on_physical_divider_moved(move |dx: f32| {
+            drag_physical_divider(&editor, &views, dx);
         });
     }
     {
         let editor = editor.clone();
         let views = views.clone();
-        window.on_physics_list_divider_moved(move |dy: f32, tall: f32| {
-            drag_physics_list_divider(&editor, &views, dy, tall);
+        window.on_physical_list_divider_moved(move |dy: f32, tall: f32| {
+            drag_physical_list_divider(&editor, &views, dy, tall);
         });
     }
     {
         // A component dragged: put where it was let go of, on the grid and
-        // inside the Physics pane, as a node is. A drag that ends where it
+        // inside the Physical pane, as a node is. A drag that ends where it
         // started records nothing; a press that did not move never gets
         // here, the markup offering its menu instead.
         let editor = editor.clone();
         let views = views.clone();
         let home = home.clone();
-        window.on_physics_moved(move |name, dx, dy| {
+        window.on_physical_moved(move |name, dx, dy| {
             let dividers = views.borrow().divider.get();
             {
                 let mut editor = editor.borrow_mut();
                 let Some((was, drawn)) =
-                    physics_places(&editor, dividers, &home)
+                    physical_places(&editor, dividers, &home)
                         .into_iter()
                         .find(|(component, ..)| name == component.as_str())
                         .map(|(_, _, place)| place.at)
@@ -6938,7 +6942,7 @@ fn wire_physics(
                 else {
                     return;
                 };
-                let now = tcs_diagram::physics::confine(
+                let now = tcs_diagram::physical::confine(
                     snap((
                         drawn.0 + dx.round() as i32,
                         drawn.1 + dy.round() as i32,
@@ -6946,7 +6950,7 @@ fn wire_physics(
                     dividers,
                 );
                 if now != drawn {
-                    editor.edit(Edit::MovePhysics {
+                    editor.edit(Edit::MovePhysical {
                         component: name.to_string(),
                         was,
                         now: Some(now),
@@ -6961,21 +6965,21 @@ fn wire_physics(
     // way while it is in hand, and what it can be made into, while that is
     // being asked. The same three clicks as a configuration's node: see
     // `offered`.
-    let drawing: Rc<RefCell<Option<PhysicsEnd>>> = Rc::new(RefCell::new(None));
+    let drawing: Rc<RefCell<Option<PhysicalEnd>>> = Rc::new(RefCell::new(None));
     let asking: Rc<RefCell<Vec<Offer>>> = Rc::new(RefCell::new(Vec::new()));
     {
         let drawing = drawing.clone();
         let asking = asking.clone();
         let weak = window.as_weak();
-        window.on_physics_link_started(move |name, terminal| {
+        window.on_physical_link_started(move |name, terminal| {
             let output = terminal.as_str() == "moc-out";
             if let Some(window) = weak.upgrade() {
                 window.set_join_offers(ModelRc::default());
-                window.set_join_hint(physics_in_hand(&name, output).into());
-                window.set_joining("physics".into());
+                window.set_join_hint(physical_in_hand(&name, output).into());
+                window.set_joining("physical".into());
             }
             asking.borrow_mut().clear();
-            *drawing.borrow_mut() = Some(PhysicsEnd {
+            *drawing.borrow_mut() = Some(PhysicalEnd {
                 component: name.to_string(),
                 output,
             });
@@ -6984,13 +6988,13 @@ fn wire_physics(
     {
         // The line follows the hand, from the terminal pressed, as a line
         // drawn from a node's does. Drawn on the configuration's canvas,
-        // which starts at the Physics pane's right edge.
+        // which starts at the Physical pane's right edge.
         let editor = editor.clone();
         let views = views.clone();
         let drawing = drawing.clone();
         let weak = window.as_weak();
         let home = home.clone();
-        window.on_physics_link_moved(move |x, y| {
+        window.on_physical_link_moved(move |x, y| {
             let Some(window) = weak.upgrade() else {
                 return;
             };
@@ -7001,13 +7005,14 @@ fn wire_physics(
                 .as_ref()
                 .and_then(|end| {
                     let (_, _, place) =
-                        physics_places(&editor.borrow(), dividers, &home)
+                        physical_places(&editor.borrow(), dividers, &home)
                             .into_iter()
                             .find(|(name, ..)| *name == end.component)?;
-                    let (tx, ty) = physics::terminal_at(place.size, end.output);
+                    let (tx, ty) =
+                        physical::terminal_at(place.size, end.output);
                     let anchor = (
-                        (place.at.0 + tx) as f32 + physics::TERMINAL_RIGHT,
-                        (place.at.1 + ty) as f32 + physics::TERMINAL_MIDDLE,
+                        (place.at.0 + tx) as f32 + physical::TERMINAL_RIGHT,
+                        (place.at.1 + ty) as f32 + physical::TERMINAL_MIDDLE,
                     );
                     Some(tcs_diagram::route::drawing(anchor, (x - shift, y)))
                 })
@@ -7028,7 +7033,7 @@ fn wire_physics(
         let asking = asking.clone();
         let weak = window.as_weak();
         let home = home.clone();
-        window.on_physics_link_clicked(move |x, y| {
+        window.on_physical_link_clicked(move |x, y| {
             let Some(window) = weak.upgrade() else {
                 return;
             };
@@ -7040,7 +7045,7 @@ fn wire_physics(
             };
             let dividers = views.borrow().divider.get();
             let meant =
-                physics_joins(&editor.borrow(), dividers, &home, &end, (x, y));
+                physical_joins(&editor.borrow(), dividers, &home, &end, (x, y));
             let Some(meant) = meant else {
                 stop_joining(&window, &drawing);
                 views.borrow().refresh(&editor.borrow());
@@ -7050,13 +7055,13 @@ fn wire_physics(
                 window.set_join_hint(
                     format!(
                         "Nothing there can join this line. {}",
-                        physics_in_hand(&end.component, end.output)
+                        physical_in_hand(&end.component, end.output)
                     )
                     .into(),
                 );
                 return;
             }
-            let offers = physics_offers(&editor.borrow(), &meant);
+            let offers = physical_offers(&editor.borrow(), &meant);
             window.set_join_heading("Join which?".into());
             window.set_join_offers(offers_model(&offers));
             *asking.borrow_mut() = offers;
@@ -7070,7 +7075,7 @@ fn wire_physics(
         let drawing = drawing.clone();
         let asking = asking.clone();
         let weak = window.as_weak();
-        window.on_physics_chosen(move |chosen| {
+        window.on_physical_chosen(move |chosen| {
             let offers = std::mem::take(&mut *asking.borrow_mut());
             if let Some(window) = weak.upgrade() {
                 stop_joining(&window, &drawing);
@@ -7090,7 +7095,7 @@ fn wire_physics(
         let editor = editor.clone();
         let views = views.clone();
         let weak = window.as_weak();
-        window.on_physics_link_stopped(move || {
+        window.on_physical_link_stopped(move || {
             asking.borrow_mut().clear();
             if let Some(window) = weak.upgrade() {
                 stop_joining(&window, &drawing);
@@ -7100,7 +7105,7 @@ fn wire_physics(
     }
 }
 
-/// What the window says while a line from a physics component is in hand.
+/// What the window says while a line from a physical component is in hand.
 ///
 /// # Arguments
 ///
@@ -7110,7 +7115,7 @@ fn wire_physics(
 /// # Returns
 ///
 /// The words.
-fn physics_in_hand(component: &str, output: bool) -> String {
+fn physical_in_hand(component: &str, output: bool) -> String {
     let way = if output { "output" } else { "input" };
     format!(
         "A line from {component}'s {way} is in hand: click a component or a \
@@ -7118,17 +7123,17 @@ fn physics_in_hand(component: &str, output: bool) -> String {
     )
 }
 
-/// One end of a line being drawn from a physics component: the component,
+/// One end of a line being drawn from a physical component: the component,
 /// and whether it was drawn from its output rather than its input.
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct PhysicsEnd {
+struct PhysicalEnd {
     component: String,
     output: bool,
 }
 
-/// One thing a line drawn from a physics component can mean.
+/// One thing a line drawn from a physical component can mean.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum PhysicsJoin {
+enum PhysicalJoin {
     /// A connection, from an output to an input, as the file writes them:
     /// `heater_1.heat` and `zone.heat`.
     Connection { from: String, to: String },
@@ -7137,7 +7142,7 @@ enum PhysicsJoin {
     Payload { payload: String, terminal: String },
 }
 
-impl PhysicsJoin {
+impl PhysicalJoin {
     /// How it is offered, where a line could mean more than one thing:
     /// what is joined to what, in the words a file uses.
     ///
@@ -7146,16 +7151,16 @@ impl PhysicsJoin {
     /// The words.
     fn said(&self) -> String {
         match self {
-            PhysicsJoin::Connection { from, to } => format!("{from} to {to}"),
-            PhysicsJoin::Payload { payload, terminal } => {
+            PhysicalJoin::Connection { from, to } => format!("{from} to {to}"),
+            PhysicalJoin::Payload { payload, terminal } => {
                 format!("{payload} with {terminal}")
             }
         }
     }
 }
 
-/// Where each physics component is drawn, by name, with its type, in the
-/// order the Physics pane draws them: the one layout, which the drawing and
+/// Where each physical component is drawn, by name, with its type, in the
+/// order the Physical pane draws them: the one layout, which the drawing and
 /// a drag both take.
 ///
 /// # Arguments
@@ -7168,16 +7173,16 @@ impl PhysicsJoin {
 /// # Returns
 ///
 /// Each component's name, type and place; nothing without a simulator file.
-fn physics_places(
+fn physical_places(
     editor: &Editor,
     dividers: Dividers,
     home: &Home,
-) -> Vec<(String, String, tcs_diagram::physics::Place)> {
+) -> Vec<(String, String, tcs_diagram::physical::Place)> {
     let Some(simulator) = &editor.document().simulator else {
         return Vec::new();
     };
     let world = &simulator.world;
-    let here: Vec<(&String, &crate::sim::PhysicsComponent)> = world
+    let here: Vec<(&String, &crate::sim::PhysicalComponent)> = world
         .components
         .iter()
         .filter(|(name, _)| world.on_page(name, home.as_deref()))
@@ -7187,18 +7192,18 @@ fn physics_places(
         .map(|(name, _)| world.placed.get(*name).copied())
         .collect();
     here.into_iter()
-        .zip(physics::layout(&placed, dividers))
+        .zip(physical::layout(&placed, dividers))
         .map(|((name, component), place)| {
             (name.clone(), component.kind.clone(), place)
         })
         .collect()
 }
 
-/// Everything a line in hand from a physics component, clicked down at a
+/// Everything a line in hand from a physical component, clicked down at a
 /// point, can mean.
 ///
 /// Over another component, each pair of terminals the two can be connected by,
-/// the way the line was drawn: `tcsprotocol::node::physics::connectable`
+/// the way the line was drawn: `tcsprotocol::node::physical::connectable`
 /// says which. Over a payload on the top page, or the box of a subdiagram,
 /// which is all of a subdiagram the top page shows, each payload there and each
 /// terminal of the component, the way the line was drawn, its simulated payload
@@ -7213,24 +7218,24 @@ fn physics_places(
 /// * `home`     - The page clicked on: `None` for the top.
 /// * `end`      - The component the line was drawn from, and which way.
 /// * `at`       - Where it was let go of, in the coordinates of the whole
-///                canvas, whose nought is the Physics pane's left edge.
+///                canvas, whose nought is the Physical pane's left edge.
 ///
 /// # Returns
 ///
 /// Each thing it can mean, in the order the types list their terminals, and
 /// whether it is made already; `None` over bare sheet, where there is
 /// nothing to ask about.
-fn physics_joins(
+fn physical_joins(
     editor: &Editor,
     dividers: Dividers,
     home: &Home,
-    end: &PhysicsEnd,
+    end: &PhysicalEnd,
     at: (f32, f32),
-) -> Option<Vec<(PhysicsJoin, bool)>> {
+) -> Option<Vec<(PhysicalJoin, bool)>> {
     let (x, y) = at;
     let document = editor.document();
     let simulator = document.simulator.as_ref()?;
-    let places = physics_places(editor, dividers, home);
+    let places = physical_places(editor, dividers, home);
     let Some(kind) = places
         .iter()
         .find(|(name, ..)| *name == end.component)
@@ -7257,7 +7262,7 @@ fn physics_joins(
             (other, &end.component, their_kind, &kind)
         };
         return Some(
-            tcsprotocol::node::physics::connectable(outputs_of, inputs_of)
+            tcsprotocol::node::physical::connectable(outputs_of, inputs_of)
                 .into_iter()
                 .map(|(output, input)| {
                     let (from, to) =
@@ -7266,7 +7271,7 @@ fn physics_joins(
                         .world
                         .connections
                         .contains(&(from.clone(), to.clone()));
-                    (PhysicsJoin::Connection { from, to }, made)
+                    (PhysicalJoin::Connection { from, to }, made)
                 })
                 .collect(),
         );
@@ -7276,14 +7281,14 @@ fn physics_joins(
     // coordinates; and the payloads it is, or on the top page holds.
     let left = sheet_left(dividers, home) as f32;
     let under = node_under(document, home, (x - left, y))?;
-    let Some(terminals) = tcsprotocol::node::physics::terminals_of(&kind)
+    let Some(terminals) = tcsprotocol::node::physical::terminals_of(&kind)
     else {
         return Some(Vec::new());
     };
     let way = if end.output {
-        tcsprotocol::node::physics::terminal::Direction::Out
+        tcsprotocol::node::physical::terminal::Direction::Out
     } else {
-        tcsprotocol::node::physics::terminal::Direction::In
+        tcsprotocol::node::physical::terminal::Direction::In
     };
     let mut meant = Vec::new();
     for node in &document.nodes {
@@ -7313,7 +7318,7 @@ fn physics_joins(
             {
                 let made = joined.contains(&named.as_str());
                 meant.push((
-                    PhysicsJoin::Payload {
+                    PhysicalJoin::Payload {
                         payload: payload.clone(),
                         terminal: named,
                     },
@@ -7326,7 +7331,7 @@ fn physics_joins(
 }
 
 /// What a line drawn from a payload's terminal can mean, clicked down on a
-/// physics component: each terminal of the component the payload's
+/// physical component: each terminal of the component the payload's
 /// simulation may be joined to, as a line drawn the other way would offer.
 ///
 /// Which way the terminal faces settles which of the component's terminals:
@@ -7343,7 +7348,7 @@ fn physics_joins(
 /// * `home`     - The page clicked on: `None` for the top.
 /// * `from`     - The terminal the line was drawn from.
 /// * `at`       - Where it was clicked down, in the configuration's own
-///                coordinates, the Physics pane's being negative.
+///                coordinates, the Physical pane's being negative.
 ///
 /// # Returns
 ///
@@ -7356,7 +7361,7 @@ fn payload_joins(
     home: &Home,
     from: &Drawing,
     at: (f32, f32),
-) -> Option<(String, Vec<(PhysicsJoin, bool)>)> {
+) -> Option<(String, Vec<(PhysicalJoin, bool)>)> {
     let (x, y) = at;
     let document = editor.document();
     let simulator = document.simulator.as_ref()?;
@@ -7364,7 +7369,7 @@ fn payload_joins(
     if pane::pane_of(&node.node_type) != Pane::Payloads {
         return None;
     }
-    let (component, kind) = physics_places(editor, dividers, home)
+    let (component, kind) = physical_places(editor, dividers, home)
         .into_iter()
         .find(|(_, _, place)| {
             let (left, top) = (place.at.0 as f32, place.at.1 as f32);
@@ -7375,9 +7380,9 @@ fn payload_joins(
         })
         .map(|(name, kind, _)| (name, kind))?;
     let way = if from.terminal.starts_with("moc-") {
-        tcsprotocol::node::physics::terminal::Direction::In
+        tcsprotocol::node::physical::terminal::Direction::In
     } else {
-        tcsprotocol::node::physics::terminal::Direction::Out
+        tcsprotocol::node::physical::terminal::Direction::Out
     };
     let payload = crate::sim::Simulator::key_of(&node.name);
     let said = simulator
@@ -7389,7 +7394,7 @@ fn payload_joins(
     let joined: Vec<&str> =
         tcsprotocol::sim_config::terminals_of(said).collect();
     let watches = watches_lines(&node.node_type);
-    let meant = tcsprotocol::node::physics::terminals_of(&kind)
+    let meant = tcsprotocol::node::physical::terminals_of(&kind)
         .unwrap_or_default()
         .iter()
         .filter(|terminal| {
@@ -7400,7 +7405,7 @@ fn payload_joins(
             let named = format!("{component}.{}", terminal.name);
             let made = joined.contains(&named.as_str());
             (
-                PhysicsJoin::Payload {
+                PhysicalJoin::Payload {
                     payload: payload.clone(),
                     terminal: named,
                 },
@@ -7411,7 +7416,7 @@ fn payload_joins(
     Some((component, meant))
 }
 
-/// What the menu offers for each thing a physics line can mean: its edit,
+/// What the menu offers for each thing a physical line can mean: its edit,
 /// or, for one made already, the reason it cannot be chosen.
 ///
 /// # Arguments
@@ -7422,13 +7427,13 @@ fn payload_joins(
 /// # Returns
 ///
 /// The offers, in the same order.
-fn physics_offers(
+fn physical_offers(
     editor: &Editor,
-    meant: &[(PhysicsJoin, bool)],
+    meant: &[(PhysicalJoin, bool)],
 ) -> Vec<Offer> {
     meant
         .iter()
-        .map(|(join, made)| match physics_edit(editor, join) {
+        .map(|(join, made)| match physical_edit(editor, join) {
             Some(edit) if !made => Offer {
                 said: join.said(),
                 edit: Some(edit),
@@ -7473,15 +7478,15 @@ fn watches_lines(node_type: &str) -> bool {
 /// # Returns
 ///
 /// The edit; `None` without a simulator file.
-fn physics_edit(editor: &Editor, join: &PhysicsJoin) -> Option<Edit> {
+fn physical_edit(editor: &Editor, join: &PhysicalJoin) -> Option<Edit> {
     let document = editor.document();
     let simulator = document.simulator.as_ref()?;
     match join {
-        PhysicsJoin::Connection { from, to } => Some(Edit::AddConnection {
+        PhysicalJoin::Connection { from, to } => Some(Edit::AddConnection {
             from: from.clone(),
             to: to.clone(),
         }),
-        PhysicsJoin::Payload { payload, terminal } => {
+        PhysicalJoin::Payload { payload, terminal } => {
             let was = simulator
                 .payloads
                 .get(payload)
@@ -7509,18 +7514,18 @@ fn physics_edit(editor: &Editor, join: &PhysicsJoin) -> Option<Edit> {
     }
 }
 
-/// Removes a physics component, with the connections that join it, in one
+/// Removes a physical component, with the connections that join it, in one
 /// edit that carries both, so that one undo puts them back.
 ///
 /// # Arguments
 ///
 /// * `editor` - The session.
 /// * `name`   - The component.
-fn remove_physics(editor: &Rc<RefCell<Editor>>, name: &str) {
+fn remove_physical(editor: &Rc<RefCell<Editor>>, name: &str) {
     let mut editor = editor.borrow_mut();
     let Some(edit) = editor.document().simulator.as_ref().and_then(|s| {
         let component = s.world.components.get(name)?;
-        Some(Edit::RemovePhysics {
+        Some(Edit::RemovePhysical {
             name: name.to_string(),
             kind: component.kind.clone(),
             settings: component
@@ -7537,8 +7542,8 @@ fn remove_physics(editor: &Rc<RefCell<Editor>>, name: &str) {
     editor.edit(edit);
 }
 
-/// Shows the physics components' window, on the component
-/// `Views::showing_physics` names, making it if there is not one.
+/// Shows the physical components' window, on the component
+/// `Views::showing_physical` names, making it if there is not one.
 ///
 /// The simulator groups' window, pointed at the world's components: a
 /// component is a set of settings with a name, as a group is. Its type's
@@ -7551,19 +7556,21 @@ fn remove_physics(editor: &Rc<RefCell<Editor>>, name: &str) {
 /// * `editor` - The session whose simulator file's world is shown and
 ///              edited.
 /// * `views`  - The windows, which keep the window once it is made.
-fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
-    if views.borrow().physics.is_none() {
+fn show_physical(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
+    if views.borrow().physical.is_none() {
         let window = match SimWindow::new() {
             Ok(window) => {
                 session!(&window);
                 window
             }
             Err(e) => {
-                eprintln!("tcs-cfge: the physics window cannot be opened: {e}");
+                eprintln!(
+                    "tcs-cfge: the physical window cannot be opened: {e}"
+                );
                 return;
             }
         };
-        let showing = views.borrow().showing_physics.clone();
+        let showing = views.borrow().showing_physical.clone();
         {
             let editor = editor.clone();
             let views = views.clone();
@@ -7576,7 +7583,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
         {
             // A new name for the component shown, refused as a node's is
             // where another component or any node has it: see
-            // `Document::rename_physics_refused`. One edit, and the window
+            // `Document::rename_physical_refused`. One edit, and the window
             // goes on showing it under its new name.
             let editor = editor.clone();
             let views = views.clone();
@@ -7588,7 +7595,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 let refused = editor
                     .borrow()
                     .document()
-                    .rename_physics_refused(&was, &now);
+                    .rename_physical_refused(&was, &now);
                 if let Some(window) = weak.upgrade() {
                     window.set_name_trouble(
                         refused.clone().unwrap_or_default().into(),
@@ -7597,7 +7604,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                 if refused.is_some() || now == was {
                     return;
                 }
-                editor.borrow_mut().edit(Edit::RenamePhysics {
+                editor.borrow_mut().edit(Edit::RenamePhysical {
                     was,
                     now: now.clone(),
                 });
@@ -7627,7 +7634,7 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
                     if was == now {
                         return;
                     }
-                    editor.edit(Edit::SetPhysics {
+                    editor.edit(Edit::SetPhysical {
                         component,
                         setting,
                         was,
@@ -7638,35 +7645,35 @@ fn show_physics(editor: &Rc<RefCell<Editor>>, views: &Rc<RefCell<Views>>) {
             });
         }
         take_when_closed(&window);
-        views.borrow_mut().physics = Some(window);
+        views.borrow_mut().physical = Some(window);
     }
     let window = views
         .borrow()
-        .physics
+        .physical
         .as_ref()
         .map(|window| window.as_weak());
     if let Some(window) = window.and_then(|window| window.upgrade()) {
-        put_physics(
+        put_physical(
             &window,
             &editor.borrow(),
-            &views.borrow().showing_physics.borrow(),
+            &views.borrow().showing_physical.borrow(),
         );
         if let Err(e) = window.show() {
-            eprintln!("tcs-cfge: the physics window cannot be shown: {e}");
+            eprintln!("tcs-cfge: the physical window cannot be shown: {e}");
         }
         fit!(&window);
     }
 }
 
-/// Puts one physics component into the physics window.
+/// Puts one physical component into the physical window.
 ///
 /// # Arguments
 ///
-/// * `window`    - The physics window.
+/// * `window`    - The physical window.
 /// * `editor`    - The session whose simulator file's world is shown.
 /// * `component` - The component shown; one the world has not shows
 ///                 nothing chosen.
-fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
+fn put_physical(window: &SimWindow, editor: &Editor, component: &str) {
     let world = editor
         .document()
         .simulator
@@ -7676,12 +7683,12 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     let choices: Vec<slint::SharedString> =
         world.components.keys().map(|name| name.into()).collect();
     let chosen = world.components.get(component);
-    window.set_editing("Physics components".into());
+    window.set_editing("Physical components".into());
     window.set_about(
         "The simulator file's world: each component is a part of the \
          vehicle simulated alone, and a simulated payload is joined to one \
          of its terminals by its connects. Every figure is written with its \
-         unit. A component is placed from the physics list."
+         unit. A component is placed from the physical list."
             .into(),
     );
     window.set_can_add(false);
@@ -7689,7 +7696,7 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     window.set_choices(ModelRc::from(Rc::new(VecModel::from(choices))));
     window.set_chosen(chosen.map_or("", |_| component).into());
     let fields: Vec<&'static str> = chosen
-        .and_then(|c| tcsprotocol::node::physics::settings_of(&c.kind))
+        .and_then(|c| tcsprotocol::node::physical::settings_of(&c.kind))
         .map(|settings| settings.to_vec())
         .unwrap_or_default();
     let empty = BTreeMap::new();
@@ -7714,16 +7721,16 @@ fn put_physics(window: &SimWindow, editor: &Editor, component: &str) {
     fit!(window);
 }
 
-/// The physics list: every type of physics component, under its family's
+/// The physical list: every type of physical component, under its family's
 /// heading, in alphabetical order within it.
 ///
 /// # Returns
 ///
 /// The entries, each drawn as a component of that type is drawn on the
 /// canvas, named after its type.
-fn physics_palette() -> ModelRc<PaletteEntry> {
+fn physical_palette() -> ModelRc<PaletteEntry> {
     let mut entries: Vec<PaletteEntry> = Vec::new();
-    for (family, kinds) in PHYSICS_FAMILIES {
+    for (family, kinds) in PHYSICAL_FAMILIES {
         entries.push(PaletteEntry {
             heading: (*family).into(),
             node: view_of("", "", None, (0, 0), None, false, None),
@@ -7733,15 +7740,15 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
         let mut kinds: Vec<&str> = kinds.to_vec();
         kinds.sort_unstable();
         for kind in kinds {
-            let look = tcs_diagram::physics::node_look(
-                &tcs_diagram::physics::Component {
+            let look = tcs_diagram::physical::node_look(
+                &tcs_diagram::physical::Component {
                     name: kind,
                     kind,
                     faulty: false,
                     placed: None,
                 },
                 (8, 2),
-                tcs_diagram::physics::SIZE,
+                tcs_diagram::physical::SIZE,
             );
             entries.push(PaletteEntry {
                 heading: "".into(),
@@ -7754,10 +7761,10 @@ fn physics_palette() -> ModelRc<PaletteEntry> {
     ModelRc::from(Rc::new(VecModel::from(entries)))
 }
 
-/// The physics component types by family, as the physics list heads them: every
-/// one of `tcsprotocol::node::physics::TYPES` once, which a test holds it
-/// to.
-const PHYSICS_FAMILIES: &[(&str, &[&str])] = &[
+/// The physical component types by family, as the physical list heads them:
+/// every one of `tcsprotocol::node::physical::TYPES` once, which a test holds
+/// it to.
+const PHYSICAL_FAMILIES: &[(&str, &[&str])] = &[
     ("Thermal", &["heater", "thermal_mass"]),
     ("Power", &["battery", "bus", "load", "solar_array", "sun"]),
     ("Motion", &["body", "engine", "joystick_3_4", "lander"]),
@@ -8559,7 +8566,7 @@ fn anchored(
 /// * `home`     - The page: none for the top page, which has no edge.
 /// * `dividers` - Where the panes are, which says where the edge is.
 /// * `(x, y)`   - The point, in the working panes' own coordinates, which
-///                are left of the Physics pane in the left margin.
+///                are left of the Physical pane in the left margin.
 ///
 /// # Returns
 ///
@@ -9651,13 +9658,13 @@ fn line_under(
 /// What a pointer resting on the sheet is told: the tip of the line under
 /// it, found as a click finds a line. Every line of the page, the edge's as
 /// well, a line to a node on another page being one somebody may well ask
-/// about; and the physics lines, which are drawn under them.
+/// about; and the physical lines, which are drawn under them.
 ///
 /// # Arguments
 ///
 /// * `window` - The window, whose lines are asked.
 /// * `at`     - The point, in the working panes' coordinates.
-/// * `page_x` - The point's x across the whole sheet, for physics lines.
+/// * `page_x` - The point's x across the whole sheet, for physical lines.
 ///
 /// # Returns
 ///
@@ -9673,7 +9680,7 @@ fn tip_at(
             .map(|line| line.tip)
     };
     tip(window.get_links(), at)
-        .or_else(|| tip(window.get_physics_links(), (page_x, at.1)))
+        .or_else(|| tip(window.get_physical_links(), (page_x, at.1)))
         .unwrap_or_default()
 }
 
@@ -9688,10 +9695,10 @@ fn tip_at(
 /// # Returns
 ///
 /// The smallest box round them, in the whole sheet's coordinates, the
-/// working panes' shifted past the margin and the Physics pane as the markup
+/// working panes' shifted past the margin and the Physical pane as the markup
 /// draws them; a width of nought for nothing.
 fn extent_of(window: &MainWindow, selection: bool) -> Extent {
-    let left = window.get_physics_width() + window.get_edge_width();
+    let left = window.get_physical_width() + window.get_edge_width();
     let node_box = |node: &NodeView, shift: f32| {
         (
             node.x + shift,
@@ -9701,7 +9708,7 @@ fn extent_of(window: &MainWindow, selection: bool) -> Extent {
         )
     };
     let selected = window.get_selected();
-    let physics = window.get_selected_physics();
+    let physical = window.get_selected_physical();
     let mut boxes: Vec<(f32, f32, f32, f32)> = window
         .get_nodes()
         .iter()
@@ -9709,9 +9716,9 @@ fn extent_of(window: &MainWindow, selection: bool) -> Extent {
         .map(|node| node_box(&node, left))
         .chain(
             window
-                .get_physics_nodes()
+                .get_physical_nodes()
                 .iter()
-                .filter(|node| !selection || node.name == physics)
+                .filter(|node| !selection || node.name == physical)
                 .map(|node| node_box(&node, 0.0)),
         )
         .collect();
@@ -9783,7 +9790,7 @@ fn show_page(
 /// The smallest box round them, in the whole sheet's coordinates; a width
 /// of nought for nothing.
 fn drawing_extent(window: &MainWindow) -> Extent {
-    let left = window.get_physics_width() + window.get_edge_width();
+    let left = window.get_physical_width() + window.get_edge_width();
     let nodes = extent_of(window, false);
     let mut boxes: Vec<(f32, f32, f32, f32)> = window
         .get_links()
@@ -9863,21 +9870,21 @@ fn family_hue(pane: Pane) -> f64 {
         Pane::Vehicle => 118.0,
         Pane::Payloads => 200.0,
         // Okabe and Ito's reddish purple.
-        Pane::Physics => 326.0,
+        Pane::Physical => 326.0,
     }
 }
 
-/// The physics list offers every type of physics component the reader
+/// The physical list offers every type of physical component the reader
 /// knows, once each.
 #[cfg(test)]
 #[test]
-fn the_physics_list_offers_every_type_once() {
-    let mut offered: Vec<&str> = PHYSICS_FAMILIES
+fn the_physical_list_offers_every_type_once() {
+    let mut offered: Vec<&str> = PHYSICAL_FAMILIES
         .iter()
         .flat_map(|(_, kinds)| kinds.iter().copied())
         .collect();
     offered.sort_unstable();
-    let mut known: Vec<&str> = tcsprotocol::node::physics::TYPES.to_vec();
+    let mut known: Vec<&str> = tcsprotocol::node::physical::TYPES.to_vec();
     known.sort_unstable();
     assert_eq!(offered, known);
 }
@@ -9932,9 +9939,9 @@ mod tests {
         dividers_for(settings::DEFAULT_GATEWAY, settings::DEFAULT_VEHICLE)
     }
 
-    /// The physics list's share the list tests take, which neither line
+    /// The physical list's share the list tests take, which neither line
     /// between the other lists moves.
-    const PHYSICS: i32 = settings::DEFAULT_LIST_PHYSICS;
+    const PHYSICAL: i32 = settings::DEFAULT_LIST_PHYSICAL;
 
     /// And how the selection column is divided, until somebody drags a line.
     ///
@@ -10177,7 +10184,7 @@ mod tests {
                 Pane::Payloads,
                 100 - settings::DEFAULT_LIST_GATEWAY
                     - settings::DEFAULT_LIST_VEHICLE
-                    - settings::DEFAULT_LIST_PHYSICS,
+                    - settings::DEFAULT_LIST_PHYSICAL,
             ),
         ] {
             let rows = rows_of(pane);
@@ -10202,16 +10209,16 @@ mod tests {
             );
         }
 
-        // And the physics list, whose rows are physics components, under a
+        // And the physical list, whose rows are physical components, under a
         // family's heading, as the others' are.
         let shrink = 0.75;
         assert!(markup.contains("property <float> shrink: 0.75;"));
         let wanted =
-            ABOVE_THE_FIRST + tcs_diagram::physics::SIZE.1 as f32 * shrink;
-        let got = tall * settings::DEFAULT_LIST_PHYSICS as f32 / 100.0;
+            ABOVE_THE_FIRST + tcs_diagram::physical::SIZE.1 as f32 * shrink;
+        let got = tall * settings::DEFAULT_LIST_PHYSICAL as f32 / 100.0;
         assert!(
             got >= wanted,
-            "the physics list opens {got:.0} pixels tall and its first node \
+            "the physical list opens {got:.0} pixels tall and its first node \
              wants {wanted:.0}"
         );
     }
@@ -10430,12 +10437,12 @@ mod tests {
     fn a_narrow_window_draws_the_sheet_smaller_to_show_every_pane() {
         i_slint_backend_testing::init_no_event_loop();
         let window = MainWindow::new().expect("a window");
-        let physics = pane::physics_width(settings::DEFAULT_PHYSICS);
-        window.set_physics_width(physics as f32);
+        let physical = pane::physical_width(settings::DEFAULT_PHYSICAL);
+        window.set_physical_width(physical as f32);
         window.set_working_width(WORKING_WIDTH as f32);
         window.set_working_height(pane::WORKING_HEIGHT as f32);
         window.show().expect("the window shows");
-        let sheet = (physics + WORKING_WIDTH) as f32;
+        let sheet = (physical + WORKING_WIDTH) as f32;
 
         window
             .window()
@@ -10463,7 +10470,7 @@ mod tests {
     }
 
     /// A pointer resting on a line is told that line's tip -- a working
-    /// pane's line before a physics line under it, a physics line where it
+    /// pane's line before a physical line under it, a physical line where it
     /// is alone -- and nothing off every line.
     #[test]
     fn a_resting_pointer_is_told_the_tip_of_the_line_under_it() {
@@ -10481,7 +10488,7 @@ mod tests {
             "a \u{2192} b",
             &[(0.0, 50.0), (200.0, 50.0)],
         )]));
-        window.set_physics_links(model(vec![line(
+        window.set_physical_links(model(vec![line(
             "zone.heater_1",
             &[(100.0, 0.0), (100.0, 300.0)],
         )]));
@@ -10509,12 +10516,12 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(extent_of(&window, false).width, 0.0, "an empty sheet");
-        window.set_physics_width(200.0);
+        window.set_physical_width(200.0);
         window.set_nodes(model(vec![
             node("a", 10.0, 20.0),
             node("b", 300.0, 400.0),
         ]));
-        window.set_physics_nodes(model(vec![node("zone", 5.0, 600.0)]));
+        window.set_physical_nodes(model(vec![node("zone", 5.0, 600.0)]));
         let all = extent_of(&window, false);
         assert_eq!(
             (all.x, all.y, all.width, all.height),
@@ -10648,8 +10655,8 @@ mod tests {
             (Pane::Vehicle, 4000.0),
         ] {
             let (gateway, vehicle) =
-                list_shares_after(lists(), PHYSICS, which, dy, 800.0);
-            let payload = 100 - gateway - vehicle - PHYSICS;
+                list_shares_after(lists(), PHYSICAL, which, dy, 800.0);
+            let payload = 100 - gateway - vehicle - PHYSICAL;
             for (name, share) in [
                 ("gateway", gateway),
                 ("vehicle", vehicle),
@@ -10669,13 +10676,13 @@ mod tests {
         // what it takes from the vehicle list.
         let (was_gateway, was_vehicle) = lists();
         let (gateway, vehicle) =
-            list_shares_after(lists(), PHYSICS, Pane::Payloads, 80.0, 800.0);
+            list_shares_after(lists(), PHYSICAL, Pane::Payloads, 80.0, 800.0);
         assert_eq!((gateway, vehicle), (was_gateway, was_vehicle - 10));
 
         // And the lower line takes from the gateway list and gives to the
         // vehicle's, leaving the payload list alone.
         let (gateway, vehicle) =
-            list_shares_after(lists(), PHYSICS, Pane::Vehicle, 80.0, 800.0);
+            list_shares_after(lists(), PHYSICAL, Pane::Vehicle, 80.0, 800.0);
         assert_eq!((gateway, vehicle), (was_gateway - 10, was_vehicle + 10));
         assert_eq!(
             100 - gateway - vehicle,
@@ -10687,7 +10694,7 @@ mod tests {
         // redrawn and no settings file is written: a line nudged by a pixel on
         // a tall column is not a preference.
         assert_eq!(
-            list_shares_after(lists(), PHYSICS, Pane::Payloads, 2.0, 800.0),
+            list_shares_after(lists(), PHYSICAL, Pane::Payloads, 2.0, 800.0),
             lists()
         );
     }
@@ -10790,7 +10797,7 @@ mod tests {
         assert_eq!(kind_of("has no nodes in it"), Some(Kind::Other));
     }
 
-    /// A line from a physics component means what its terminals and the
+    /// A line from a physical component means what its terminals and the
     /// thing clicked allow: from a heater's output to a zone, its heat into
     /// the zone's; to a GPIO payload watching lines, only its heating, which
     /// is added after the decisions the payload names already; to a sensor,
@@ -10798,13 +10805,13 @@ mod tests {
     /// itself, or to a heater, nothing. A join already made is offered marked
     /// as made, and bare sheet is nothing to ask about at all.
     #[test]
-    fn a_line_from_a_physics_component_means_what_its_terminals_allow() {
+    fn a_line_from_a_physical_component_means_what_its_terminals_allow() {
         let where_ = tempfile::tempdir().expect("a directory");
         let path = where_.path().join("vehicle.ytcs");
         let sim = where_.path().join("vehicle-sim.yaml");
         std::fs::write(
             &sim,
-            "world:\n  ambient_temp: \"283.15 K\"\n  physics:\n    \
+            "world:\n  ambient_temp: \"283.15 K\"\n  physical:\n    \
              components:\n      - type heater:\n          \
              - component: heater_1\n          - component: heater_2\n      \
              - type thermal_mass:\n          - component: zone\n",
@@ -10836,27 +10843,27 @@ mod tests {
         });
 
         let dividers = dividers();
-        let shift = dividers.physics as f32;
+        let shift = dividers.physical as f32;
         let middle_of = |name: &str| {
-            let (_, _, place) = physics_places(&editor, dividers, &None)
+            let (_, _, place) = physical_places(&editor, dividers, &None)
                 .into_iter()
                 .find(|(component, ..)| component == name)
                 .expect("drawn");
             (
-                (place.at.0 + dividers.physics) as f32 + 20.0,
+                (place.at.0 + dividers.physical) as f32 + 20.0,
                 place.at.1 as f32 + 20.0,
             )
         };
         let over =
             |at: (i32, i32)| (at.0 as f32 + shift + 40.0, at.1 as f32 + 20.0);
-        let from = |component: &str, output: bool| PhysicsEnd {
+        let from = |component: &str, output: bool| PhysicalEnd {
             component: component.into(),
             output,
         };
-        let joins = |end: PhysicsEnd, at| {
-            physics_joins(&editor, dividers, &None, &end, at).expect("a shape")
+        let joins = |end: PhysicalEnd, at| {
+            physical_joins(&editor, dividers, &None, &end, at).expect("a shape")
         };
-        let joined = |payload: &str, terminal: &str| PhysicsJoin::Payload {
+        let joined = |payload: &str, terminal: &str| PhysicalJoin::Payload {
             payload: payload.into(),
             terminal: terminal.into(),
         };
@@ -10865,7 +10872,7 @@ mod tests {
             joins(from("heater_1", true), middle_of("zone")),
             [
                 (
-                    PhysicsJoin::Connection {
+                    PhysicalJoin::Connection {
                         from: "heater_1.heat".into(),
                         to: "zone.heat".into(),
                     },
@@ -10874,14 +10881,14 @@ mod tests {
                 // And whether it is heating, into one of the zone's own
                 // heaters' switches, a decision for a decision.
                 (
-                    PhysicsJoin::Connection {
+                    PhysicalJoin::Connection {
                         from: "heater_1.heating".into(),
                         to: "zone.heater_1".into(),
                     },
                     false
                 ),
                 (
-                    PhysicsJoin::Connection {
+                    PhysicalJoin::Connection {
                         from: "heater_1.heating".into(),
                         to: "zone.heater_2".into(),
                     },
@@ -10895,7 +10902,7 @@ mod tests {
         let pulled = joins(from("heater_1", true), over((34, 34)));
         assert_eq!(pulled, [(joined("lines-in", "heater_1.heating"), false)]);
         assert_eq!(
-            physics_edit(&editor, &pulled[0].0),
+            physical_edit(&editor, &pulled[0].0),
             Some(Edit::SetSimPayload {
                 payload: "lines-in".into(),
                 setting: "connects".into(),
@@ -10918,7 +10925,7 @@ mod tests {
             "heat, current and heating, asked about"
         );
         assert_eq!(
-            physics_joins(
+            physical_joins(
                 &editor,
                 dividers,
                 &None,
@@ -10934,7 +10941,7 @@ mod tests {
         // there -- the zone's own heaters among them -- and what a watched
         // line reports is a decision the component gives.
         let on = |name: &str| {
-            let (_, _, place) = physics_places(&editor, dividers, &None)
+            let (_, _, place) = physical_places(&editor, dividers, &None)
                 .into_iter()
                 .find(|(component, ..)| component == name)
                 .expect("drawn");
@@ -12061,12 +12068,12 @@ mod tests {
     }
 
     /// On a subdiagram's page the left margin, its terminals and the lines
-    /// that cross it are left of the Physics pane, which is inside the page
+    /// that cross it are left of the Physical pane, which is inside the page
     /// beside the payloads it joins; the right margin is past the gateway.
     #[test]
-    fn a_pages_edge_is_outside_its_physics_pane() {
+    fn a_pages_edge_is_outside_its_physical_pane() {
         let dividers = dividers();
-        let physics_left = -dividers.physics as f32;
+        let physical_left = -dividers.physical as f32;
         let left: Vec<EdgeView> = edge_views(dividers)
             .into_iter()
             .filter(|edge| edge.x < 0.0)
@@ -12074,8 +12081,8 @@ mod tests {
         assert_eq!(left.len(), 2, "world-in and moc-out are on the left");
         for edge in &left {
             assert!(
-                edge.x + style::TERMINAL.0 as f32 <= physics_left,
-                "{} is in the left margin, past the Physics pane",
+                edge.x + style::TERMINAL.0 as f32 <= physical_left,
+                "{} is in the left margin, past the Physical pane",
                 edge.terminal
             );
             // And found there by a click.
@@ -12087,10 +12094,10 @@ mod tests {
             );
         }
         // A line from outside is drawn to the margin's inner side, which is
-        // the Physics pane's left edge.
+        // the Physical pane's left edge.
         let (at, _) =
             style::edge_attachment("world-in", inside_f(dividers)).unwrap();
-        assert_eq!(at.0, physics_left);
+        assert_eq!(at.0, physical_left);
     }
 
     /// A type the build does not know is drawn, marked, and not crashed on.
@@ -13123,7 +13130,7 @@ mod tests {
     }
 
     /// A subdiagram opens in a window that is the main window drawing its
-    /// page: its nodes and no others, its edge, the Physics pane and its
+    /// page: its nodes and no others, its edge, the Physical pane and its
     /// list, and the counts on the bar -- the same window on every page, so
     /// that what one page can do every page can. Asked twice, it is the same
     /// window.
@@ -13163,10 +13170,10 @@ mod tests {
             .collect();
         assert_eq!(names, ["temp1"]);
         assert!(page.get_edge_width() > 0.0, "no edge to join outside at");
-        assert!(page.get_physics_width() > 0.0, "no Physics pane");
+        assert!(page.get_physical_width() > 0.0, "no Physical pane");
         assert!(
-            page.get_physics_palette().row_count() > 0,
-            "no physics list"
+            page.get_physical_palette().row_count() > 0,
+            "no physical list"
         );
         assert!(
             page.get_gateway_palette().row_count() > 0
@@ -14762,7 +14769,7 @@ mod tests {
         the_list_of_concerns_follows_every_change();
         an_emptied_field_takes_the_attribute_off();
         a_type_carried_out_of_its_list_goes_where_it_is_let_go();
-        a_physics_type_carried_out_goes_where_it_is_let_go();
+        a_physical_type_carried_out_goes_where_it_is_let_go();
         a_typed_value_is_taken_when_it_is_done();
         a_component_placed_on_a_page_is_drawn_only_there();
         every_field_of_a_node_is_in_view_and_its_name_clears();
@@ -15789,7 +15796,7 @@ mod tests {
         window.hide().expect("the window hides");
     }
 
-    /// A physics component placed from a subdiagram's page is drawn on that
+    /// A physical component placed from a subdiagram's page is drawn on that
     /// page and not on the top page; and its window names it in a field, with
     /// nothing to choose another by.
     fn a_component_placed_on_a_page_is_drawn_only_there() {
@@ -15808,11 +15815,11 @@ mod tests {
         furnish!(&ui, descriptions());
         let views = views_for(&ui);
         let page: Home = Some("zone".to_string());
-        wire_physics(&ui, &editor, &views, &page);
+        wire_physical(&ui, &editor, &views, &page);
 
-        ui.invoke_place_physics("thermal_mass".into());
+        ui.invoke_place_physical("thermal_mass".into());
         let drawn = |home: &Home| {
-            physics_views_of(editor.borrow().document(), dividers(), home)
+            physical_views_of(editor.borrow().document(), dividers(), home)
                 .0
                 .len()
         };
@@ -15826,7 +15833,7 @@ mod tests {
 
         let window = views
             .borrow()
-            .physics
+            .physical
             .as_ref()
             .and_then(|window| window.as_weak().upgrade())
             .expect("its window");
@@ -16073,9 +16080,9 @@ mod tests {
         ui.hide().expect("the window hides");
     }
 
-    /// A physics type carried out of its list goes where it was let go, on
-    /// the grid and inside the Physics pane, and is one edit.
-    fn a_physics_type_carried_out_goes_where_it_is_let_go() {
+    /// A physical type carried out of its list goes where it was let go, on
+    /// the grid and inside the Physical pane, and is one edit.
+    fn a_physical_type_carried_out_goes_where_it_is_let_go() {
         use std::rc::Rc;
 
         let where_ = tempfile::tempdir().expect("a directory");
@@ -16089,10 +16096,10 @@ mod tests {
         let ui = MainWindow::new().expect("a window");
         furnish!(&ui, descriptions());
         let views = views_for(&ui);
-        wire_physics(&ui, &editor, &views, &None);
+        wire_physical(&ui, &editor, &views, &None);
 
         let into = (40, 300);
-        ui.invoke_drop_physics(
+        ui.invoke_drop_physical(
             "thermal_mass".into(),
             into.0 as f32,
             into.1 as f32,
@@ -16113,10 +16120,10 @@ mod tests {
             .expect("the component has a place");
         assert_eq!(
             world.placed.get(&name).copied(),
-            // Kept from where the working panes begin, which the Physics
+            // Kept from where the working panes begin, which the Physical
             // pane is left of: the sheet's point less its width.
-            Some(tcs_diagram::physics::confine(
-                snap((into.0 - dividers().physics, into.1)),
+            Some(tcs_diagram::physical::confine(
+                snap((into.0 - dividers().physical, into.1)),
                 dividers()
             )),
             "{name} is where it was let go"
@@ -16265,10 +16272,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -16680,10 +16687,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -16832,10 +16839,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -16995,10 +17002,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -17089,10 +17096,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -17236,10 +17243,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -17387,10 +17394,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -17516,10 +17523,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -17728,10 +17735,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -18074,10 +18081,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -18229,10 +18236,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -18337,10 +18344,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -18509,10 +18516,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -18596,10 +18603,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -18757,10 +18764,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -19043,10 +19050,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -19140,10 +19147,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),
@@ -19280,10 +19287,10 @@ mod tests {
             faulted: Rc::new(RefCell::new(Default::default())),
             sim_groups: None,
             showing_sim_group: Rc::new(RefCell::new(String::new())),
-            physics: None,
-            showing_physics: Rc::new(RefCell::new(String::new())),
-            physics_list: Rc::new(std::cell::Cell::new(
-                settings::DEFAULT_LIST_PHYSICS,
+            physical: None,
+            showing_physical: Rc::new(RefCell::new(String::new())),
+            physical_list: Rc::new(std::cell::Cell::new(
+                settings::DEFAULT_LIST_PHYSICAL,
             )),
             autosave: Rc::new(std::cell::Cell::new(settings::DEFAULT_AUTOSAVE)),
             showing: Rc::new(RefCell::new(String::new())),

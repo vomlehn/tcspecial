@@ -303,43 +303,53 @@ Requirement
     terminal, and two of the three are on a different kind of bus from the
     third.
 
-The Physics Model
------------------
+The Physical Model
+------------------
 Every other simulated payload makes its bytes up. A buffer filled from a
 random number generator exercises a link and nothing at all of a control loop:
 three sensors sending noise never agree, so the vote over them produces
 nothing anybody can check, and a thermostat downstream of it cannot be watched
 holding a band.
 
-A physics model is what makes them agree. It is the vehicle's physical parts --
+A physical model is what makes them agree. It is the vehicle's physical parts --
 a zone, the heaters that warm it -- each simulated alone and joined to the
 others, and the simulated payloads are joined to it: the sensors report the
 zone's temperature, each in its own encoding, and the heaters' simulated
 payloads switch the heaters -- so what the vehicle reads is a consequence of
 what the vehicle drove, and the whole loop can be watched closing.
 
+The models the examples ship are small, each only what its example needs, but
+nothing in the layer limits a model to that. A component is simulated alone and
+reaches the others only through its terminals, so a model grows by adding
+components and connections, and a new kind of part by adding a component type.
+In the end it can be the entire vehicle: its power, its heat, its mass and its
+motion together, so that a fault in one part shows wherever it would aboard.
+The requirements below hold for a model of any size.
+
 Requirement
-    The model is in the simulator file, under ``world: physics:``, beside the
+    The model is in the simulator file, under ``world: physical:``, beside the
     simulated payloads joined to it, so that one file says the whole of what the
     simulator simulates and a simulated payload's ``connects`` names a terminal
     the same file says is there. The world also states ``ambient_temp``, the one
     temperature every thermal mass's surroundings are about, required where
     there is a zone. The world is YAML only: a simulator file written in XML has
-    none, and one with a ``world`` or a ``physics`` element is refused.
+    none, and one with a ``world`` or a ``physical`` element is refused.
 
 Requirement
     The shapes a model had before are refused, each told where it goes: a
     simulator file naming a model in a file of its own,
     ``physics: zone-physics.yaml``; such a file given as a simulator file;
-    a ``physics`` section at the top of a simulator file; a zone stating
-    its own ``environment``, which is the world's ``ambient_temp`` now; and
-    a simulator file that still declares masses itself.
+    a ``physics`` or ``physical`` section at the top of a simulator file;
+    the world's model under ``physics``, its name until 2026-11-23, which
+    is told to call it ``physical``; a zone stating its own
+    ``environment``, which is the world's ``ambient_temp`` now; and a
+    simulator file that still declares masses itself.
 
 Requirement
     The model is the components it is made of, grouped by type as a
     configuration's nodes are, and a list of connections between them, as a
     configuration has links: ``components`` and ``connections``, under
-    ``physics``. Each entry of ``components`` is ``type`` and a type, ``- type
+    ``physical``. Each entry of ``components`` is ``type`` and a type, ``- type
     heater:``, holding the components of that type, each named by ``component``.
     The types are ``heater``, ``thermal_mass``, ``sun``, ``solar_array``,
     ``load``, ``bus``, ``battery``, ``engine``, ``body``, ``lander`` and
@@ -347,8 +357,8 @@ Requirement
     other is refused; a ``thermal_zone``, which is what a ``thermal_mass`` was
     called before, is told the name it has now. A type is written once, with a
     component under it. Each type's settings, terminals and rules are stated
-    once, in ``tcsprotocol::node::physics``; its arithmetic is the
-    simulator's, in ``tcs_sim::physics``.
+    once, in ``tcsprotocol::node::physical``; its arithmetic is the
+    simulator's, in ``tcs_sim::physical``.
 
 Requirement
     A ``thermal_mass`` has two heaters of its own, ``heater_1`` and
@@ -433,7 +443,7 @@ Requirement
 
 Requirement
     A simulated payload joined to records -- a lander's ``sky``, its stars,
-    made where its pane's are, in ``physics::sky``, so that a ground station
+    made where its pane's are, in ``physical::sky``, so that a ground station
     drawing what it is sent shows the pane's sky -- sends a few whole records
     a packet, round and round, every packet interval: none is split between
     packets, so a packet lost costs only its own. While the input that
@@ -704,7 +714,7 @@ first look, and the hand that takes it later is where it is rated from.
 Propellant is counted as the change of velocity it buys: fuel flows as
 ``|Fx| + |Fy|``, so by the rocket equation the mass falls as ``exp(-D/ve)``,
 ``D`` being the integral of ``|ax| + |ay|``, and what was used is ``ve
-ln(m0/m1)``. The least is a lower bound, worked out under physics more
+ln(m0/m1)``. The least is a lower bound, worked out under physical more
 generous than the lander's so that no rating can pass 100 %: thrust along X
 is instant; thrust along Y is no more than full thrust over the mass the
 visitor's lander had at touchdown, which the best flight, burning no more,
@@ -997,7 +1007,7 @@ no dummy device is needed. Shortened:
 
    world:
      ambient_temp: "288.15 K"
-     physics:
+     physical:
        components:
          - type thermal_mass:
              - component: zone
@@ -1046,7 +1056,7 @@ Files`_.
 
 Several configurations can be simulated together, in one world: two
 tcspecials on one vehicle, each with its own configuration, whose payloads
-read one physics model. tcs-sim is then given every configuration, and one
+read one physical model. tcs-sim is then given every configuration, and one
 simulator file they share, named by ``--simulator=FILE`` or
 ``PAYLOAD_SIM_YAML``, since it is beside none of them:
 

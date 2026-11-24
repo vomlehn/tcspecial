@@ -1,5 +1,0 @@
-world:
-  physics:
-    components:
-      - type bus:
-          - name: a

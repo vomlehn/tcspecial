@@ -105,14 +105,14 @@ pub struct PayloadConfig {
     /// changed while the simulator runs -- a panel may retime a payload --
     /// and an atomic holds a number. They become lengths of time in one
     /// place, [`Pacing::read`], which is what the waiting is done with.
-    /// What this payload is to the physics model's world, where it is
+    /// What this payload is to the physical model's world, where it is
     /// joined to it.
     ///
     /// `None` for every payload that is not, which is every payload in every
     /// simulator file that names no model: such a payload sends bytes from
     /// a random number generator, which is what this simulator did for
     /// everything before there was a world to read.
-    pub attachment: Option<crate::node::physics::Attachment>,
+    pub attachment: Option<crate::node::physical::Attachment>,
     /// The thermostats this sensor reports to, where the simulator stands
     /// in for the vehicle's: every reading it sends goes to each as it
     /// leaves. None for every other payload, and for every payload of a run
@@ -391,7 +391,7 @@ impl SimulatedPayload {
     /// either way. For a part the vehicle drives -- a heater -- the button
     /// is its power instead: disabled, it stays off whatever it is sent, and
     /// enabled, it takes the latest it was sent at once. See
-    /// [`crate::node::physics::Power`].
+    /// [`crate::node::physical::Power`].
     ///
     /// # Arguments
     ///
@@ -404,7 +404,7 @@ impl SimulatedPayload {
     }
 
     /// Says what a part the vehicle drives is doing, in words for its
-    /// panel: see [`crate::node::physics::Attachment::driving_said`].
+    /// panel: see [`crate::node::physical::Attachment::driving_said`].
     ///
     /// # Returns
     ///
@@ -413,17 +413,17 @@ impl SimulatedPayload {
         self.config
             .attachment
             .as_ref()
-            .map(crate::node::physics::Attachment::driving_said)
+            .map(crate::node::physical::Attachment::driving_said)
             .unwrap_or_default()
     }
 
-    /// What this payload is to the physics model's world, if it is joined
+    /// What this payload is to the physical model's world, if it is joined
     /// to it: what its panel reads its packets by.
     ///
     /// # Returns
     ///
     /// The attachment, or `None` for a payload that is not joined.
-    pub fn attachment(&self) -> Option<&crate::node::physics::Attachment> {
+    pub fn attachment(&self) -> Option<&crate::node::physical::Attachment> {
         self.config.attachment.as_ref()
     }
 
@@ -508,7 +508,7 @@ impl SimulatedPayload {
     /// * `lines` - What the lines were driven to, as the one number they
     ///             are: 1 for a heater's on and 0 for its off.
     pub fn take_a_drive(&self, lines: u64) {
-        crate::node::physics::driven(
+        crate::node::physical::driven(
             &self.config.attachment,
             &self.config.name,
             &lines.to_be_bytes(),
@@ -772,7 +772,7 @@ pub(crate) fn a_packet_from<R: Rng>(
     // still means.
     if matches!(
         config.attachment,
-        Some(crate::node::physics::Attachment::Drives { .. })
+        Some(crate::node::physical::Attachment::Drives { .. })
     ) {
         return Produce::Nothing;
     }
@@ -788,8 +788,8 @@ pub(crate) fn a_packet_from<R: Rng>(
     }
 
     // A sensor joined to the world sends what its terminal is, in the
-    // encoding its own conversion reads back: see `crate::node::physics`. Every
-    // other payload sends bytes from the generator, which is what this
+    // encoding its own conversion reads back: see `crate::node::physical`.
+    // Every other payload sends bytes from the generator, which is what this
     // simulator did for everything before there was a world to read.
     //
     // The packet size is not consulted. What a reading of this sensor is, is
@@ -800,7 +800,7 @@ pub(crate) fn a_packet_from<R: Rng>(
     let mut packet: Vec<u8> = match config
         .attachment
         .as_ref()
-        .and_then(crate::node::physics::Attachment::reading)
+        .and_then(crate::node::physical::Attachment::reading)
     {
         // Records that are quenched, or none to send: nothing goes.
         Some(reading) if reading.is_empty() => return Produce::Nothing,

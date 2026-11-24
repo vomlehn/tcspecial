@@ -1,7 +1,7 @@
 """Tests of the lander example's ground station, lander_yamcs.py.
 
 None needs Yamcs, tcs-sim or a vehicle, or opens a window. The landscapes
-made are held to the lander's physics by tcs-verify, where it is built.
+made are held to the lander's physical model by tcs-verify, where it is built.
 """
 
 import math
@@ -61,7 +61,7 @@ class Landscape(unittest.TestCase):
 
     def test_the_run_file_is_one_tcs_verify_takes(self):
         """The run's simulator file, with each seed's landscape, is one the
-        lander's physics takes, with either configuration."""
+        lander's physical model takes, with either configuration."""
         verify = find_built("tcs-verify")
         if verify is None:
             self.skipTest("tcs-verify is not built")

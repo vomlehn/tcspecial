@@ -31,7 +31,7 @@ pub const DEFAULT_PACKET_BYTES: usize = 16;
 /// Finds how a reading of this payload is encoded, from the conversion it
 /// feeds.
 ///
-/// A simulated sensor joined to a terminal of the physics model has to send
+/// A simulated sensor joined to a terminal of the physical model has to send
 /// bytes the vehicle will read back as what the terminal says. How the part
 /// lays a number out is the sensor's own -- its `format`, or failing that its
 /// `world-out-type`'s own layout -- and the scale and the offset are on the

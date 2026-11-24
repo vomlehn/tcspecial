@@ -38,7 +38,7 @@ Verification tools
 ==================
 
 `The tcs-sim design <tcs-sim-design.html>`__
-    The payload simulator: its configuration files, the physics model,
+    The payload simulator: its configuration files, the physical model,
     fault injection, and the program.
 
 `The tcs-moc design <tcs-moc-design.html>`__

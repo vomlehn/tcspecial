@@ -170,7 +170,7 @@ pub fn run_gpio_node(
         watch_driven_lines(&config, &running, &stats, &lines);
         return;
     }
-    if let Some(world @ crate::node::physics::Attachment::Pulls { .. }) =
+    if let Some(world @ crate::node::physical::Attachment::Pulls { .. }) =
         &config.attachment
     {
         pull_to_the_world(&config, world, &running, &stats, &lines);
@@ -309,7 +309,7 @@ pub fn run_gpio_udp_node(
 
         let pacing = Pacing::read(&config);
         let now = match &config.attachment {
-            Some(world @ crate::node::physics::Attachment::Pulls { .. }) => {
+            Some(world @ crate::node::physical::Attachment::Pulls { .. }) => {
                 if pacing.sending && world.levels(&mut levels) {
                     Some(
                         levels.iter().enumerate().fold(0u64, |bits, (n, l)| {
@@ -384,8 +384,8 @@ fn took_a_drive(
             }
         };
     // The lines as the one number they are, which is what the world is
-    // driven with: see `physics::driven`.
-    crate::node::physics::driven(
+    // driven with: see `physical::driven`.
+    crate::node::physical::driven(
         &config.attachment,
         &config.name,
         &now.to_be_bytes(),
@@ -417,7 +417,7 @@ fn took_a_drive(
 /// * `lines`   - The chip's lines, from [`lines_of`], in the node's order.
 fn pull_to_the_world(
     config: &PayloadConfig,
-    world: &crate::node::physics::Attachment,
+    world: &crate::node::physical::Attachment,
     running: &AtomicBool,
     stats: &tcsos::sync::Mutex<PayloadStats>,
     lines: &[SimulatedLine],
@@ -473,7 +473,7 @@ fn pull_to_the_world(
 /// Disabled -- its panel's button off -- the part is unpowered: a move is
 /// counted, as every simulated payload counts what arrives, and kept as the
 /// latest decision, and the part stays off until it is enabled. See
-/// [`crate::node::physics::Power`].
+/// [`crate::node::physical::Power`].
 ///
 /// # Arguments
 ///
@@ -512,7 +512,7 @@ fn watch_driven_lines(
                 .enumerate()
                 .filter(|(_, &v)| v == b'1')
                 .fold(0u64, |bits, (n, _)| bits | 1 << n);
-            crate::node::physics::driven(
+            crate::node::physical::driven(
                 &config.attachment,
                 &config.name,
                 &bits.to_be_bytes(),

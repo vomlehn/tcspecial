@@ -291,7 +291,7 @@ In ``tcs-sim``
 --------------
 The module, ``tcs-sim/src/node/payload/<type>/mod.rs``, holds a function
 ``run_<type>_node``, which plays the device: it answers as the device would,
-from the simulator file's settings and, for a sensor joined to the physics
+from the simulator file's settings and, for a sensor joined to the physical
 model, from the world. There is no trait. ``tcs-sim/src/payload.rs`` runs it
 from ``run_kind``, by a ``PayloadProtocol`` variant, and
 ``tcs-sim/src/endpoint.rs`` maps the node's endpoint and ``sim_address`` to

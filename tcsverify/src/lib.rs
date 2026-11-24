@@ -1130,7 +1130,7 @@ fn check_graph_simulator(
             );
         }
         if alone.is_empty() && named_well {
-            if let Err(problem) = sim.physics() {
+            if let Err(problem) = sim.physical() {
                 report.add(
                     path,
                     found.line_of(&problem.about()),
@@ -1173,7 +1173,7 @@ fn sensors_read_as_they_report(
         return;
     };
     use tcsprotocol::graph::simulated::{driving_of, reading_of};
-    use tcsprotocol::node::physics::terminal::Kind;
+    use tcsprotocol::node::physical::terminal::Kind;
     use tcsprotocol::sim_config::Attached;
     for (dh, settled) in handlers.iter().zip(&resolved) {
         let name = &dh.name.0;
@@ -1293,7 +1293,7 @@ mod tests {
 
     /// Copies the thermostat example's two spellings and its simulator file
     /// to a directory of their own, with the common file they include and
-    /// the physics model in a directory beside it, as in `examples`, and
+    /// the physical model in a directory beside it, as in `examples`, and
     /// with `change` made to the XML of both.
     ///
     /// # Arguments
@@ -1386,12 +1386,12 @@ mod tests {
         assert!(verify(&yaml, None, Limits::EVERYTHING).findings.is_empty());
     }
 
-    /// What is wrong with the physics model is reported at its lines, every
+    /// What is wrong with the physical model is reported at its lines, every
     /// component's, and a simulated payload joined to an output its readings
     /// are not converted from is reported at its entry, whatever else is wrong
     /// with the model's joins.
     #[test]
-    fn the_physics_model_is_reported_at_its_own_lines() {
+    fn the_physical_model_is_reported_at_its_own_lines() {
         let (_dir, _, yaml, sim) = thermostat_pair(|xml| xml);
         let model = sim.clone();
         let edit = |path: &Path, from: &str, to: &str| {

@@ -395,7 +395,7 @@ heater switches gpio-out-tmass1 and gpio-out-tmass2. Arrow 1: the
 sensors send readings to tcspecial over UDP at each payload's
 sim_address. Arrow 2: tcspecial's thermostat sends the switches on
 or off. Inside tcs-sim the switches drive the zone's heater inputs
-in the physics model's world, and the sensors read the zone's
+in the physical model's world, and the sensors read the zone's
 temperature. Arrow 3: the person at tcs-sim's window enables and
 disables payloads and changes their sizes and intervals.</object>
 <p class="caption">Where tcs-sim sits, in the thermostat example. tcspecial reaches each
@@ -582,16 +582,23 @@ segment_interval       how long between the segments of one packet,
 segment_size           bytes in one segment; defaults to the whole packet,
                        whose size the tcspecial configuration gives
 </pre>
-<p><strong>The physics model</strong></p>
+<p><strong>The physical model</strong></p>
 <p>Every simulated payload above sends bytes from a random number generator,
 which exercises a link and no control loop at all: three sensors sending noise
 never agree, so a vote over them says nothing and a thermostat downstream of
 it cannot be seen working.</p>
-<p>A physics model gives them something to agree about. It is the vehicle's
+<p>A physical model gives them something to agree about. It is the vehicle's
 physical parts -- a zone, the heaters that warm it -- each simulated alone and
 joined to the others. Join the sensors to what they measure and the heaters'
 switches to the heaters, and what the vehicle reads becomes a consequence of
 what the vehicle drove.</p>
+<p>The examples' models are small -- a zone and its heaters, a power bus through
+an orbit, a lander's engine and the body it brakes -- because each models only
+what its example needs. The physical layer is not limited to that. Every
+component is simulated alone and joined to the others through its terminals,
+so components can be added until the model is the entire vehicle: its power,
+its heat, its mass and its motion, each payload's readings a consequence of
+all the rest, and a fault in one part seen where it shows up in another.</p>
 <p>The model is in the simulator file's <tt class="docutils literal">world</tt> section, beside the simulated
 payloads joined to it, so that one file says the whole of what tcs-sim simulates
 and a payload's <tt class="docutils literal">connects</tt> names a terminal the same file says is there. Two
@@ -603,7 +610,7 @@ world                  in the simulator file. Optional
   ambient_temp         the temperature every thermal mass's surroundings
                        are about: &quot;288.15 K&quot;. Required where there is a
                        thermal_mass
-  physics
+  physical
     components         the components, grouped by type
     connections        how they are joined, each from an output to an
                        input
@@ -620,10 +627,12 @@ their components' names, and the outputs an input sums are added in the order
 of theirs. The shapes a model had before are refused, each told where it goes
 now: a simulator file still naming a model in a file of its own,
 <tt class="docutils literal">physics: <span class="pre">zone-physics.yaml</span></tt>; such a file given as a simulator file; a
-<tt class="docutils literal">physics</tt> section at the top of a simulator file, not under <tt class="docutils literal">world</tt>; a
-zone stating its own <tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt>;
-a component with <tt class="docutils literal">name:</tt> and <tt class="docutils literal">type:</tt> of its own; and a simulator file
-still declaring masses itself.</p>
+<tt class="docutils literal">physics</tt> or <tt class="docutils literal">physical</tt> section at the top of a simulator file, not under
+<tt class="docutils literal">world</tt>; the world's model written as <tt class="docutils literal">physics</tt>, which is what it was
+called until 2026-11-23, told to call it <tt class="docutils literal">physical</tt>; a zone stating its own
+<tt class="docutils literal">environment</tt>, which is the world's <tt class="docutils literal">ambient_temp</tt>; a component with
+<tt class="docutils literal">name:</tt> and <tt class="docutils literal">type:</tt> of its own; and a simulator file still declaring masses
+itself.</p>
 <p>Where tcs-cfge drew each component is kept last in the simulator file, in a
 <tt class="docutils literal"><span class="pre">tcs-cfge</span></tt> section of its own, as a configuration keeps its nodes' places:</p>
 <pre class="code yaml literal-block">
@@ -634,13 +643,13 @@ still declaring masses itself.</p>
     </span><span class="name tag">thermostat-common</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="punctuation indicator">[</span><span class="name variable">zone</span><span class="punctuation indicator">]</span>
 </pre>
 <p>tcs-sim ignores it. A component it does not name is laid out down tcs-cfge's
-Physics pane by name, so the section is never needed, and it is written as
+Physical pane by name, so the section is never needed, and it is written as
 components are moved there. Each component is drawn on the page it was placed
 from: one placed on a subdiagram's page is listed under that subdiagram's name
 in <tt class="docutils literal">pages</tt>, and one listed nowhere is drawn on the top page. A component
-is placed from the physics list
+is placed from the physical list
 as a node is from its own list: click its type, and it is put down the
-pane where the others are, or drag the type onto the Physics pane, and it
+pane where the others are, or drag the type onto the Physical pane, and it
 is put where it is let go. In tcs-cfge a component is moved, edited, deleted
 and joined as a node is: drag it, right click it for Edit and Delete, and
 draw a line from its output or input terminal to another component, for a
@@ -909,7 +918,7 @@ moment rather than for its next turn, and again every packet interval. A
 payload joined to records -- a lander's <tt class="docutils literal">sky</tt> -- sends four whole records
 a packet, never one split between two, every packet interval, round and
 round, and nothing while they are quenched: a lander's sky's records are each
-16 bytes, laid out as tcsprotocol's <tt class="docutils literal"><span class="pre">node::physics::lander</span></tt> says. A
+16 bytes, laid out as tcsprotocol's <tt class="docutils literal"><span class="pre">node::physical::lander</span></tt> says. A
 payload joined to an input drives it with what the vehicle sends: a whole
 number -- a set of lines, or a thermostat's decision as the <tt class="docutils literal">u8</tt> a switch
 takes, a thermal mass's heater being on where it is not nought -- or a value,
@@ -947,7 +956,7 @@ drives them.</p>
 <pre class="code yaml literal-block">
 <span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;283.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">         </span><span class="comment single"># ten kelvin below the setpoint</span><span class="whitespace">
-  </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">physical</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type heater</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">heater_1</span><span class="whitespace">
@@ -1161,7 +1170,7 @@ with no effect, because a typo is otherwise indistinguishable from a payload
 meant to be left out.</p>
 <p>Several configurations can share one simulator file, and so one world: two
 tcspecials on one vehicle, say, each flying its own configuration and both
-reading one physics model. tcs-sim is then given every configuration and
+reading one physical model. tcs-sim is then given every configuration and
 the file, which is beside none of them, so it is named, with
 <tt class="docutils literal"><span class="pre">--simulator=FILE</span></tt> or <tt class="docutils literal">PAYLOAD_SIM_YAML</tt>:</p>
 <pre class="code console literal-block">
@@ -1205,7 +1214,7 @@ example shares with thermostat-yamcs, its world shortened here:</p>
 
 </span><span class="name tag">world</span><span class="punctuation">:</span><span class="whitespace">
   </span><span class="name tag">ambient_temp</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal string">&quot;288.15</span><span class="name variable"> </span><span class="literal string">K&quot;</span><span class="whitespace">
-  </span><span class="name tag">physics</span><span class="punctuation">:</span><span class="whitespace">
+  </span><span class="name tag">physical</span><span class="punctuation">:</span><span class="whitespace">
     </span><span class="name tag">components</span><span class="punctuation">:</span><span class="whitespace">
       </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">type thermal_mass</span><span class="punctuation">:</span><span class="whitespace">
           </span><span class="punctuation indicator">-</span><span class="whitespace"> </span><span class="name tag">component</span><span class="punctuation">:</span><span class="whitespace"> </span><span class="literal scalar plain">zone</span><span class="whitespace">
@@ -1292,7 +1301,7 @@ under <a class="reference external" href="tcspecial.html#seeing-what-was-read">S
 <dt><tt class="docutils literal">Sent</tt></dt>
 <dd>When the last packet went, and the first few bytes of it. A part the
 vehicle drives sends nothing, and this line says what it is doing instead,
-in words, naming the heater it switches in the physics model: <tt class="docutils literal">heating</tt>
+in words, naming the heater it switches in the physical model: <tt class="docutils literal">heating</tt>
 or <tt class="docutils literal">off</tt>, and <tt class="docutils literal">disabled, so off</tt> while its panel has it disabled --
 see <a class="reference external" href="tcspecial.html#starting-and-stopping-a-payload">Starting and stopping a payload</a>. A switch joined to a
 <tt class="docutils literal">heater</tt> component's <tt class="docutils literal">on</tt> is named by the component, as in

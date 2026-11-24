@@ -38,7 +38,7 @@ use tcsos::sync::Mutex;
 
 use tcsprotocol::node::vehicle::compute::{ThermostatParams, ToValueParams};
 
-use crate::node::physics::{driven, Attachment};
+use crate::node::physical::{driven, Attachment};
 
 /// What the heaters should be doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -234,11 +234,11 @@ fn median(temperatures: impl Iterator<Item = f64>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::node::physics::tests::zone_world;
-    use crate::node::physics::{encode, world::World};
+    use crate::node::physical::tests::zone_world;
+    use crate::node::physical::{encode, world::World};
     use tcsos::sync::Arc;
     use tcsos::time::Instant;
-    use tcsprotocol::node::physics::Place;
+    use tcsprotocol::node::physical::Place;
     use tcsprotocol::node::vehicle::compute::Format;
 
     /// The thermostat example's sensor's encoding.
@@ -274,7 +274,7 @@ mod tests {
                 world: world.clone(),
                 place: place("heater_1.on"),
                 unit: None,
-                power: Arc::new(crate::node::physics::Power::new(true, true)),
+                power: Arc::new(crate::node::physical::Power::new(true, true)),
             },
         )];
         let params = ThermostatParams {

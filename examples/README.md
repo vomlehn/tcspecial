@@ -37,7 +37,7 @@ they have in common from a directory of its own, which is not an example:
 which both configurations include; `thermostat-common` holds
 `thermostat.ytcs` and `thermostat.xtcs`, the vehicle both thermostat
 configurations include, and `thermostat-sim.yaml`, the simulator file,
-physics model and all, which each thermostat example's `-sim.yaml` is a
+physical model and all, which each thermostat example's `-sim.yaml` is a
 link to, so that each is found beside its configuration by name. Each
 configuration includes its common file as a subdiagram called
 `thermostat-common`, at its path from its own directory,
@@ -540,8 +540,8 @@ with it aboard and on the ground.
 |---|---|
 | `thermostat` | Three temperature sensors on a thermal mass, two on I2C and one on SPI, converted to kelvin, voted on, and fed to a thermostat that drives two heaters, every one simulated by tcs-sim, so that it runs on any desk. The setpoint is commanded from the ground, and tcs-moc plots the temperatures and the heaters. |
 | `thermostat-yamcs` | The thermostat, with Yamcs as its ground station, over CCSDS packets: the zone's temperature and the three readings arrive in Yamcs as temperatures in kelvin, and the thermostat's decision as on or off, each a parameter the configuration types, and a Python 3 program shows them. |
-| `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a thermostat. tcs-sim simulates every payload, joined to a physics model of a sun, a solar array, loads, a bus and a battery. |
-| `descent` | A lander's terminal descent: a radar altimeter's altitude flown down by a Python 3 guidance program throttling the engine, a Doppler velocimeter, and a touchdown switch that speaks the moment the lander is down. tcs-sim simulates every payload, joined to a physics model of an engine and the body it brakes. |
+| `battery` | A power bus through an orbit: a power monitor asked over a serial line, a shunt, the battery's charge counted by a Python 3 program, and the science load shed in eclipse by a thermostat. tcs-sim simulates every payload, joined to a physical model of a sun, a solar array, loads, a bus and a battery. |
+| `descent` | A lander's terminal descent: a radar altimeter's altitude flown down by a Python 3 guidance program throttling the engine, a Doppler velocimeter, and a touchdown switch that speaks the moment the lander is down. tcs-sim simulates every payload, joined to a physical model of an engine and the body it brakes. |
 | `simple-app` | A payload that is a program rather than a device: an `app_pl` node sending a line of text one word per packet, and a ground station that prints the line. Two programs of its own beside the configuration: the payload in Python 3, the ground station in Rust. |
 
 ### thermostat
@@ -572,7 +572,7 @@ example needs no dummy device, no sudo and no hardware. Flown, the buses and
 the chip are opened. The buses themselves are flown against simulated devices
 by `make simulated-devices-test`, with `tests/manual/thermostat.ytcs`.
 
-tcs-sim joins the simulated payloads to the vehicle's physics model, in the
+tcs-sim joins the simulated payloads to the vehicle's physical model, in the
 world section of `thermostat-sim.yaml`, a link to
 `thermostat-common/thermostat-sim.yaml`, which thermostat-yamcs's simulator
 file is a link to too: a zone with two heaters of its own, four watts each,
@@ -662,7 +662,7 @@ as ping-yamcs is the ping example with it. The vehicle is the thermostat's
 -- the same conversions, vote, thermostat, heaters, GPIO lines and log,
 from the file both include, `thermostat-common/thermostat.ytcs`, with the same
 three sensors, and the same simulator file,
-`thermostat-common/thermostat-sim.yaml`, physics model and all, each
+`thermostat-common/thermostat-sim.yaml`, physical model and all, each
 example's being a link to it; the two cannot run at once, their heaters
 being the same lines of one GPIO chip -- and what differs is
 the configuration's gateway, `yamcs`, so every packet to and from the
@@ -748,7 +748,7 @@ Languages:
 Its configuration, printed by tcs-cfge: [`battery.pdf`](battery/battery.pdf).
 
 A spacecraft's power bus through an orbit: the example of a payload that is
-asked, of a computation that is a program, and of physics with events in it.
+asked, of a computation that is a program, and of physical with events in it.
 
 `monitor`, a power monitor on a serial line at `/tmp/tcs-battery-monitor`, is
 asked for the bus voltage twice a second -- its `trigger` is `"V?\r"` -- and
@@ -761,7 +761,7 @@ sets itself full whenever the current falls to nought. `shedding`, a
 thermostat around 0.4, sheds the science instrument below three tenths by
 driving `science`, port 5302, and restores it above half.
 
-tcs-sim simulates all three, joined to the vehicle's physics model, in
+tcs-sim simulates all three, joined to the vehicle's physical model, in
 the world section of `battery-sim.yaml`: a sun, a solar array, two loads, a bus and a battery,
 each a part simulated alone and joined under `connections`. The orbit is six
 minutes and the battery small, so that a run sees, in one orbit, the battery
@@ -802,7 +802,7 @@ four bytes of a value, which tcs-sim's engine reads as the ratio it is.
 `doppler`, port 5402, sends the velocity for the ground, and `touchdown`,
 port 5403, a switch on a landing leg, says `1` when the lander is down.
 
-tcs-sim simulates all four, joined to the vehicle's physics model, in
+tcs-sim simulates all four, joined to the vehicle's physical model, in
 the world section of `descent-sim.yaml`: an engine and the body it brakes, five hundred metres
 up and falling at twenty metres a second. The body falls by the rocket
 equation, and the moment it reaches the ground is found ahead of time and met

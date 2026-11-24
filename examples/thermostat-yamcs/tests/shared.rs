@@ -2,14 +2,14 @@
 //!
 //! What the two share is shared by reference. The vehicle and its payloads
 //! are `examples/thermostat-common/thermostat.ytcs` and its XML, which both
-//! configurations include. The simulator file, physics model and all, is
+//! configurations include. The simulator file, physical model and all, is
 //! `examples/thermostat-common/thermostat-sim.yaml`: each example's is a link
 //! to it, so that each is found beside its configuration by name, as every
 //! simulator file is. This holds the links to that file.
 //!
 //! The manual's fixture, `tests/manual/thermostat-sim.yaml`, is the same
 //! vehicle with its payloads on buses, so its simulated payloads differ; its
-//! physics is a copy of the shared file's, and is held to it.
+//! physical is a copy of the shared file's, and is held to it.
 
 use std::path::{Path, PathBuf};
 
@@ -70,7 +70,7 @@ fn simulated_by(path: &Path) -> Value {
 /// the same ambient temperature, components, figures and connections,
 /// however each file writes them.
 #[test]
-fn the_manuals_fixture_has_the_same_physics() {
+fn the_manuals_fixture_has_the_same_physical() {
     let shared =
         simulated_by(&examples().join("thermostat-common/thermostat-sim.yaml"));
     let manual =

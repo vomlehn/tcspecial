@@ -623,7 +623,7 @@ readouts stand at what it hit with while the pause counts down:</p>
 </div>
 <p>The pictures here and the ground station's below are made by <tt class="docutils literal">make
 <span class="pre">screenshots-lander</span></tt> from each window's own code, drawn in memory, with
-the lander example's lander flown against its own physics.</p>
+the lander example's lander flown against its own physical model.</p>
 <p>The pad has a flashing light on top of each of its end marks in
 tcs-sim's window, the lander's own view. The ground's window draws the pad
 without them, so that nothing flashing there draws the eye from what has
@@ -676,7 +676,7 @@ first. Nothing on the ground turns that off.</p>
 <div class="section" id="the-sky-sent-down">
 <h2><a class="toc-backref" href="#toc-entry-16">The sky, sent down</a></h2>
 <p>The ground's sky is tcs-sim's, sent down rather than worked out again:
-the one place the stars are made is tcs-sim's <tt class="docutils literal"><span class="pre">physics::sky</span></tt>, which its
+the one place the stars are made is tcs-sim's <tt class="docutils literal"><span class="pre">physical::sky</span></tt>, which its
 pane draws and its lander sends. The lander's <tt class="docutils literal">sky</tt> output is records, a
 kind of terminal of its own, one for each star. lander-a's simulated
 payload <tt class="docutils literal">sky</tt> sends them four to a packet, every 50 ms, round and round,
@@ -734,7 +734,7 @@ it was rated, so a rating comes once however often it arrives.</p>
 <li><strong>One world for two tcspecials.</strong> tcs-sim takes more than one
 configuration, and one simulator file whose payloads say which
 configuration each belongs to, with one world and one window for both.</li>
-<li><strong>Physics.</strong> In <tt class="docutils literal">tcsprotocol</tt> for the format and in tcs-sim for the
+<li><strong>Physical.</strong> In <tt class="docutils literal">tcsprotocol</tt> for the format and in tcs-sim for the
 simulation, as <tt class="docutils literal">body</tt> and <tt class="docutils literal">engine</tt> are:<ul>
 <li><tt class="docutils literal">lander</tt>, the craft and the ground it lands on in one component,
 since a component sees only what is held at its inputs and the ground
@@ -786,7 +786,7 @@ file, and so that the container has the example.</li>
 the lander's <tt class="docutils literal">restart</tt> input, and Disable and Enable Autorestart,
 <tt class="docutils literal">autorestart</tt> on <tt class="docutils literal"><span class="pre">lander-a</span></tt>, joined to its <tt class="docutils literal">autorestart</tt> input,
 each commanded from the MOC's window through its vehicle's gateway;</li>
-<li>the sky, made once in tcs-sim's <tt class="docutils literal"><span class="pre">physics::sky</span></tt>, drawn by its pane
+<li>the sky, made once in tcs-sim's <tt class="docutils literal"><span class="pre">physical::sky</span></tt>, drawn by its pane
 and sent down as the lander's <tt class="docutils literal">sky</tt> records through <tt class="docutils literal"><span class="pre">lander-a</span></tt>,
 and quenched through <tt class="docutils literal"><span class="pre">lander-a</span></tt>'s <tt class="docutils literal">gateway_sky</tt>, as in &quot;The sky,
 sent down&quot;;</li>

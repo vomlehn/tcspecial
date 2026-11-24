@@ -1,7 +1,0 @@
-world:
-  physics:
-    components:
-      - name: zone
-        type: thermal_mass
-        time_constant: "50 s"
-        capacity: "20 J/K"

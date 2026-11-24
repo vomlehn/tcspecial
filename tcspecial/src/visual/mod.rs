@@ -3,9 +3,9 @@
 //! The graph is drawn as tcs-cfge draws the configuration -- the three working
 //! panes, every node where the editor would put it, every link along the
 //! route the editor gives it, all of it from `tcs-diagram` -- with the
-//! simulator file's physics in the Physics pane to their left, as the editor
-//! draws it too. One window a page, as the editor has: the top file's, and
-//! one for each subdiagram it includes, with its edge. A link is lit
+//! simulator file's physical model in the Physical pane to their left, as the
+//! editor draws it too. One window a page, as the editor has: the top file's,
+//! and one for each subdiagram it includes, with its edge. A link is lit
 //! while data crosses it: a line three times as wide and a shade lighter is
 //! drawn under it, for [`LINE_BLINK`] after each datum is sent. The ordinary
 //! line stays on top, so the drawing is the editor's whether anything is
@@ -210,7 +210,7 @@ pub fn run(
     let settings = tcs_diagram::settings::read().settings;
     let mut dividers =
         pane::dividers_for(settings.gateway_percent, settings.vehicle_percent);
-    dividers.physics = pane::physics_width(settings.physics_percent);
+    dividers.physical = pane::physical_width(settings.physical_percent);
     let pages = Pages::of(&graph, dividers);
 
     // The top page first, then each subdiagram in the order the files are
@@ -636,7 +636,7 @@ fn draw(
     } else {
         0
     };
-    draw_physics(window, path, &sheet, dividers, page, edge);
+    draw_physical(window, path, &sheet, dividers, page, edge);
 
     // The lines drawn on this page, and which line of the configuration
     // each is, so the window can light it.
@@ -694,13 +694,13 @@ fn draw(
     Shown { links, rows }
 }
 
-/// Puts the simulator file's physics in the window's Physics pane.
+/// Puts the simulator file's physical model in the window's Physical pane.
 ///
 /// The simulator file is the one tcs-sim and tcs-moc would read for this
 /// configuration -- the one `PAYLOAD_SIM_YAML` names, and otherwise the one
 /// named for it beside it -- read here for the drawing and for nothing else:
 /// the vehicle never reads it, and what it flies is not changed by it. With
-/// none, the Physics pane is drawn empty. With one that cannot be read, the
+/// none, the Physical pane is drawn empty. With one that cannot be read, the
 /// pane is drawn empty and why is said: the window is to watch a vehicle by,
 /// and a simulator file tcs-sim would refuse is tcs-sim's to refuse.
 ///
@@ -710,11 +710,11 @@ fn draw(
 /// * `path`     - The configuration file.
 /// * `sheet`    - The configuration's nodes, where they are drawn, which the
 ///                simulated payloads' links go to.
-/// * `dividers` - Where the panes are, the Physics pane's width included.
+/// * `dividers` - Where the panes are, the Physical pane's width included.
 /// * `page`     - The page drawn, whose components are drawn: a
 ///                subdiagram's name, or `None` for the top.
-/// * `edge`     - How wide the page's edge is, left of the Physics pane.
-fn draw_physics(
+/// * `edge`     - How wide the page's edge is, left of the Physical pane.
+fn draw_physical(
     window: &ui::VisualWindow,
     path: &str,
     sheet: &[OnSheet],
@@ -722,8 +722,8 @@ fn draw_physics(
     page: Option<&str>,
     edge: i32,
 ) {
-    window.set_physics_width(dividers.physics as f32);
-    window.set_physics_ground(colour(&ground_of(style::Ground::Physics)));
+    window.set_physical_width(dividers.physical as f32);
+    window.set_physical_ground(colour(&ground_of(style::Ground::Physical)));
 
     let sim = tcsos::env::var("PAYLOAD_SIM_YAML")
         .ok()
@@ -736,20 +736,20 @@ fn draw_physics(
         Ok(file) => file,
         Err(why) => {
             eprintln!(
-                "tcspecial --visual: the Physics pane is drawn empty, as \
+                "tcspecial --visual: the Physical pane is drawn empty, as \
                  {sim} cannot be read: {why}"
             );
             return;
         }
     };
-    let drawn = tcs_diagram::physics::of_simulator(&file, page);
+    let drawn = tcs_diagram::physical::of_simulator(&file, page);
     // Drawn from where the working panes begin, past the edge and the
-    // Physics pane.
-    let (nodes, links) = drawn.looks(sheet, dividers, dividers.physics + edge);
-    window.set_physics_nodes(ModelRc::new(VecModel::from(
+    // Physical pane.
+    let (nodes, links) = drawn.looks(sheet, dividers, dividers.physical + edge);
+    window.set_physical_nodes(ModelRc::new(VecModel::from(
         nodes.into_iter().map(node_view).collect::<Vec<_>>(),
     )));
-    window.set_physics_links(ModelRc::new(VecModel::from(
+    window.set_physical_links(ModelRc::new(VecModel::from(
         links.into_iter().map(link_view).collect::<Vec<_>>(),
     )));
 }

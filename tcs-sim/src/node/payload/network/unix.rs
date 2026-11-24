@@ -276,7 +276,7 @@ pub fn run_unix_dgram_node(
         || config
             .attachment
             .as_ref()
-            .is_some_and(crate::node::physics::Attachment::drives)
+            .is_some_and(crate::node::physical::Attachment::drives)
     {
         run_driven_unix_dgram_node(config, running, stats, &handler);
         return;
@@ -478,8 +478,8 @@ fn run_driven_unix_dgram_node(
             // holds the stats lock across the world's own. Where the panel has
             // the device disabled, what arrives is counted, as every simulated
             // payload counts it, and kept as the latest, and the part stays
-            // off: see `crate::node::physics::Power`.
-            crate::node::physics::driven(
+            // off: see `crate::node::physical::Power`.
+            crate::node::physical::driven(
                 &config.attachment,
                 &config.name,
                 &buf[..n],
@@ -736,8 +736,8 @@ mod tests {
     /// to land and the zone would never have warmed.
     #[test]
     fn a_driven_datagram_device_waits_where_the_vehicle_sends() {
-        use crate::node::physics::tests::zone_world;
-        use crate::node::physics::Attachment;
+        use crate::node::physical::tests::zone_world;
+        use crate::node::physical::Attachment;
 
         let path = a_path("driven");
         tcsos::fs::remove_file(&path).ok();
@@ -755,7 +755,7 @@ mod tests {
                 world: world.clone(),
                 place: place("heater_1.on"),
                 unit: None,
-                power: Arc::new(crate::node::physics::Power::new(true, true)),
+                power: Arc::new(crate::node::physical::Power::new(true, true)),
             }),
             thermostats: Vec::new(),
             name: "heaters_1".to_string(),

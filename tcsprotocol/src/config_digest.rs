@@ -221,7 +221,7 @@ pub fn digest_of_graph(graph: &crate::graph::Graph) -> TcsResult<ConfigDigest> {
 /// configuration's is.
 ///
 /// What it is for is a harness telling whether a simulator already running
-/// read the file the harness did, and the file, its physics model with it,
+/// read the file the harness did, and the file, its physical model with it,
 /// is what that simulator acts on. So the digest is of the file as read, in
 /// one order, rather than of its bytes: a comment added, or the payloads or
 /// the components written in another order, is the same simulator file,
@@ -252,7 +252,7 @@ pub fn digest_of_simulator_file<P: AsRef<Path>>(
 /// The `tcs-sim` section; the groups of settings, by name, each with every
 /// setting it states; the simulated payloads, by name, each with its type,
 /// the group it names and every setting it states; and the world, as read:
-/// its ambient temperature, and its physics model's components by name,
+/// its ambient temperature, and its physical model's components by name,
 /// each with its type and figures, and its connections in the order of what
 /// they join. Not in it: the description,
 /// which changes nothing tcs-sim does. Every list is in one order whatever order the file
@@ -311,11 +311,11 @@ pub fn interpretation_of_simulator(
         })
         .collect();
     let world = file.world.as_ref().map(|world| {
-        let mut components: Vec<&crate::node::physics::Component> =
-            world.physics.components.iter().collect();
+        let mut components: Vec<&crate::node::physical::Component> =
+            world.physical.components.iter().collect();
         components.sort_by(|a, b| a.name().cmp(b.name()));
         let mut connections: Vec<(&str, &str)> = world
-            .physics
+            .physical
             .connections
             .iter()
             .map(|c| (c.from.as_str(), c.to.as_str()))
@@ -323,7 +323,7 @@ pub fn interpretation_of_simulator(
         connections.sort_unstable();
         json!({
             "ambient_temp": world.ambient_temp,
-            "physics": {
+            "physical": {
                 "components": components,
                 "connections": connections
                     .into_iter()
@@ -963,7 +963,7 @@ mod tests {
     #[test]
     fn a_simulator_file_in_another_order_digests_alike() {
         let dir = tempfile::tempdir().expect("a directory");
-        let model = "world:\n  ambient_temp: \"1 K\"\n  physics:\n    \
+        let model = "world:\n  ambient_temp: \"1 K\"\n  physical:\n    \
                      components:\n      - type heater:\n          \
                      - component: h1\n            power: \"1 W\"\n            \
                      voltage: \"1 V\"\n          - component: h2\n            \

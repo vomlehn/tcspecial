@@ -36,7 +36,7 @@ use slint::platform::software_renderer::{
 use slint::platform::{Platform, WindowAdapter, WindowEvent};
 use slint::{ComponentHandle, LogicalSize, Model, ModelRc, VecModel};
 use tcs_verify::startup::Startup;
-use tcsprotocol::node::physics::lander::Resolved;
+use tcsprotocol::node::physical::lander::Resolved;
 use tcsprotocol::simulate::Mode;
 use tcsprotocol::Timestamp;
 
@@ -662,7 +662,7 @@ impl Pane {
 }
 
 /// Makes every picture of the lander's pane the lander design shows, from
-/// the lander example as it is shipped, flown against its own physics.
+/// the lander example as it is shipped, flown against its own physical model.
 #[test]
 #[ignore = "makes the lander's screenshots: make screenshots-lander"]
 fn lander_screenshots() {

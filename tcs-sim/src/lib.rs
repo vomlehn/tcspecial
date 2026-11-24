@@ -53,9 +53,9 @@ use tcsprotocol::{
 
 use std::collections::BTreeMap;
 
-use crate::node::physics;
-use crate::node::physics::sensor::Sensor;
-use crate::node::physics::Attachment;
+use crate::node::physical;
+use crate::node::physical::sensor::Sensor;
+use crate::node::physical::Attachment;
 use crate::node::vehicle::thermostat::Thermostat;
 
 mod endpoint;
@@ -80,7 +80,7 @@ use endpoint::{endpoint_description, payload_config_attached};
 use payload::{PayloadConfig, PayloadStats, SimulatedPayload};
 use tcs_verify::startup::Startup;
 use tcsprotocol::graph::Graph;
-use tcsprotocol::node::physics::Resolution;
+use tcsprotocol::node::physical::Resolution;
 use tcsprotocol::ready::SetUpFor;
 use tcsprotocol::simulate::{
     counted, disagreement, judge, refusals, Host, Judged, Mode, Verdict,
@@ -386,7 +386,7 @@ fn update_row(
 /// thermostats the simulator plays, none or several.
 type Attachments = (BTreeMap<String, Attachment>, Vec<Arc<Thermostat>>);
 
-/// Makes the world of the simulator file's physics model, works out
+/// Makes the world of the simulator file's physical model, works out
 /// what each simulated payload is to it, by payload name, and makes the
 /// thermostats the simulator plays, if the file names any.
 ///
@@ -426,10 +426,10 @@ fn joined_to_the_world(
     sims: &[ResolvedSim],
     dh_configs: &[DHConfig],
 ) -> Result<Attachments, String> {
-    use tcsprotocol::node::physics::terminal::Kind;
+    use tcsprotocol::node::physical::terminal::Kind;
     use tcsprotocol::sim_config::Attached;
 
-    let model = sim_file.physics().map_err(|e| e.to_string())?;
+    let model = sim_file.physical().map_err(|e| e.to_string())?;
     let simulating = sim_file
         .tcs_sim
         .as_ref()
@@ -438,7 +438,7 @@ fn joined_to_the_world(
     let Some(model) = model else {
         if let Some(name) = simulating.first() {
             return Err(format!(
-                "thermostat: {name} is to be simulated, and no physics \
+                "thermostat: {name} is to be simulated, and no physical \
                  model is written for it to read or warm"
             ));
         }
@@ -449,7 +449,7 @@ fn joined_to_the_world(
     // graph's conversions nothing says which bytes stand for a reading.
     let Some(first) = graphs.first().copied() else {
         return Err(
-            "the simulator file has a physics model, and no graph was read: a \
+            "the simulator file has a physical model, and no graph was read: a \
                     simulated sensor sends the bytes a to_kelvin or to_value \
                     node reads back as what it reports, and without a graph \
                     there is no such node"
@@ -464,7 +464,7 @@ fn joined_to_the_world(
         None => {
             let seed: u64 = rand::random();
             eprintln!(
-                "the physics model's noise starts from seed {seed}: state \
+                "the physical model's noise starts from seed {seed}: state \
                  seed: {seed} in the tcs-sim section to have it again"
             );
             seed
@@ -473,15 +473,15 @@ fn joined_to_the_world(
 
     // Keeping pace with the wall clock, which the vehicle at the other end
     // of every link runs on, from the first question a running payload
-    // asks it: see `physics::clock`.
-    let world = Arc::new(physics::world::World::new(
+    // asks it: see `physical::clock`.
+    let world = Arc::new(physical::world::World::new(
         &model,
-        physics::clock::Clock::starting_when_asked(1.0),
+        physical::clock::Clock::starting_when_asked(1.0),
         seed,
     ));
-    // Each terminal is one the model has: `physics` refused a payload
+    // Each terminal is one the model has: `physical` refused a payload
     // naming another before this was reached.
-    let place = |at: &tcsprotocol::node::physics::terminal::At| {
+    let place = |at: &tcsprotocol::node::physical::terminal::At| {
         model.find(at).map(|(place, _)| place)
     };
 
@@ -557,7 +557,7 @@ fn joined_to_the_world(
                     world: world.clone(),
                     place,
                     unit,
-                    power: Arc::new(physics::Power::new(false, heater)),
+                    power: Arc::new(physical::Power::new(false, heater)),
                 }
             }
         };
@@ -3270,7 +3270,7 @@ mod tests {
         );
     }
 
-    /// What a run of the thermostat example's physics did: see
+    /// What a run of the thermostat example's physical did: see
     /// [`run_the_thermostat_example`].
     #[derive(Debug, Default)]
     struct ThermostatRun {
@@ -3297,7 +3297,7 @@ mod tests {
         warmest: f64,
     }
 
-    /// Runs the thermostat example's physics with no window and no vehicle:
+    /// Runs the thermostat example's physical with no window and no vehicle:
     /// its world, its three sensors with their errors, the median of their
     /// readings, and its thermostat deciding on it once a second,
     /// as the payload group is read, sending each change to both heaters.
@@ -3419,7 +3419,7 @@ mod tests {
                 .map(|(_, heater, _)| {
                     matches!(
                         heater.driving(),
-                        Some(node::physics::Driving::At(on)) if on > 0.5
+                        Some(node::physical::Driving::At(on)) if on > 0.5
                     )
                 })
                 .collect();

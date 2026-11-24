@@ -12,4 +12,4 @@
 //! Either way what it reads is what the simulator file joins it to: its
 //! `connects` names the thermal mass's `temperature`, and each reading is
 //! that temperature in the encoding the sensor's own conversion reads back.
-//! See [`crate::node::physics`].
+//! See [`crate::node::physical`].

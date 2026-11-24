@@ -14,7 +14,7 @@ import { Colors } from "../../tcs-ui/ui/colors.slint";
 import { Fonts } from "../../tcs-ui/ui/fonts.slint";
 import {
     Session, NodeView, LinkView, NodeShape, LinkLine, SheetGround,
-    PhysicsGround, Terminal, Type
+    PhysicalGround, Terminal, Type
 } from "../../tcs-diagram/ui/diagram.slint";
 
 // Exported so that the Rust can say this session changes nothing, which is
@@ -51,15 +51,15 @@ export component VisualWindow inherits Window {
     in property <color> vehicle-ground;
     in property <color> gateway-ground;
 
-    // The Physics pane, left of the sheet: the simulator file's components
+    // The Physical pane, left of the sheet: the simulator file's components
     // and the links between them and to the payloads, in the coordinates of
-    // the whole canvas, the Physics pane's left edge at nought. Empty, and
+    // the whole canvas, the Physical pane's left edge at nought. Empty, and
     // the pane with them, where tcspecial found no simulator file. See
-    // tcs_diagram::physics.
-    in property <length> physics-width;
-    in property <color> physics-ground;
-    in property <[NodeView]> physics-nodes;
-    in property <[LinkView]> physics-links;
+    // tcs_diagram::physical.
+    in property <length> physical-width;
+    in property <color> physical-ground;
+    in property <[NodeView]> physical-nodes;
+    in property <[LinkView]> physical-links;
 
     // A subdiagram's edge: the margin either side of what is inside its
     // page, and the edge's terminals, where a line from another file arrives
@@ -67,10 +67,10 @@ export component VisualWindow inherits Window {
     // tcs_diagram::style::edge_box.
     in property <length> edge-width: 0px;
     in property <[EdgeView]> edge-terminals: [];
-    // Where the working panes begin: past the left margin and the Physics
+    // Where the working panes begin: past the left margin and the Physical
     // pane.
-    property <length> left: root.physics-width + root.edge-width;
-    property <length> sheet-width: root.physics-width + 2 * root.edge-width
+    property <length> left: root.physical-width + root.edge-width;
+    property <length> sheet-width: root.physical-width + 2 * root.edge-width
         + root.working-width;
 
     // Said in the title as well as in the manual, because a window that looks
@@ -96,19 +96,19 @@ export component VisualWindow inherits Window {
 
             // Right of the left margin, against the payloads it joins, as
             // tcs-cfge draws it.
-            PhysicsGround {
+            PhysicalGround {
                 x: root.edge-width;
                 y: 0;
-                physics-width: root.physics-width;
-                physics-ground: root.physics-ground;
+                physical-width: root.physical-width;
+                physical-ground: root.physical-ground;
             }
-            // The physics links under everything, as a configuration's are
+            // The physical links under everything, as a configuration's are
             // under its nodes: the sheet beside them is transparent.
-            for l in physics-links: LinkLine {
+            for l in physical-links: LinkLine {
                 link: l;
             }
 
-            // The configuration's sheet, right of the Physics pane, in the
+            // The configuration's sheet, right of the Physical pane, in the
             // coordinates its file holds.
             Rectangle {
                 x: root.left;
@@ -149,14 +149,14 @@ export component VisualWindow inherits Window {
             }
             }
 
-            // The line between the Physics pane and the payloads.
+            // The line between the Physical pane and the payloads.
             Rectangle {
                 x: root.left;
                 width: 1px;
                 height: 100%;
                 background: #cbcdd1;
             }
-            for n in physics-nodes: NodeShape {
+            for n in physical-nodes: NodeShape {
                 node: n;
             }
 

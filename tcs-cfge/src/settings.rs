@@ -68,19 +68,19 @@ pub fn save(settings: Settings) {
     };
     let (gateway_percent, vehicle_percent) =
         shares(settings.gateway_percent, settings.vehicle_percent);
-    let (list_gateway_percent, list_vehicle_percent, list_physics_percent) =
+    let (list_gateway_percent, list_vehicle_percent, list_physical_percent) =
         list_shares(
             settings.list_gateway_percent,
             settings.list_vehicle_percent,
-            settings.list_physics_percent,
+            settings.list_physical_percent,
         );
     let kept = Settings {
         gateway_percent,
         vehicle_percent,
         list_gateway_percent,
         list_vehicle_percent,
-        physics_percent: settings.physics_percent.clamp(LEAST, MOST),
-        list_physics_percent,
+        physical_percent: settings.physical_percent.clamp(LEAST, MOST),
+        list_physical_percent,
         autosave: settings.autosave,
     };
     if let Err(why) =

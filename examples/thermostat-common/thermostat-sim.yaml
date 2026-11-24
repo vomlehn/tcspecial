@@ -9,7 +9,7 @@ tcs-sim:
 world:
   ambient_temp: "288.15 K"
 
-  physics:
+  physical:
     components:
       - type thermal_mass:
           - component: zone

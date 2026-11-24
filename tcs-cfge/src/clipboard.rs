@@ -284,7 +284,7 @@ pub fn removal(
     (!edits.is_empty()).then_some(Edit::Group { edits })
 }
 
-/// A name for a pasted node that no node and no physics component has, nor
+/// A name for a pasted node that no node and no physical component has, nor
 /// any node pasted with it.
 ///
 /// The name itself where it is free; otherwise its stem -- the name without
@@ -673,7 +673,7 @@ mod tests {
     }
 
     /// A pasted node's name is free of every node in every file and of the
-    /// physics components, and of the nodes pasted with it.
+    /// physical components, and of the nodes pasted with it.
     #[test]
     fn a_pasted_name_is_free_everywhere() {
         let mut document = chain(&None);

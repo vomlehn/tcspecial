@@ -212,16 +212,16 @@ pub enum Edit {
         name: String,
         settings: Vec<(String, String)>,
     },
-    /// A physics component placed in the simulator file's world, of a type,
+    /// A physical component placed in the simulator file's world, of a type,
     /// with nothing stated yet. Undone by removing it.
-    AddPhysics { name: String, kind: String },
-    /// A physics component removed, with what it stated, the connections
+    AddPhysical { name: String, kind: String },
+    /// A physical component removed, with what it stated, the connections
     /// that joined it and the simulated payloads joined to it, so that undo
     /// puts back the component that was there and not an empty one of the
     /// same name: removing a component removes its connections and takes it
     /// out of every simulated payload's `connects`, which would name nothing
     /// otherwise, as removing a node removes its links.
-    RemovePhysics {
+    RemovePhysical {
         name: String,
         kind: String,
         settings: Vec<(String, String)>,
@@ -231,8 +231,8 @@ pub enum Edit {
         #[serde(default)]
         joins: Vec<(String, String)>,
     },
-    /// A physics component put back as it was.
-    RestorePhysics {
+    /// A physical component put back as it was.
+    RestorePhysical {
         name: String,
         kind: String,
         settings: Vec<(String, String)>,
@@ -240,40 +240,40 @@ pub enum Edit {
         #[serde(default)]
         joins: Vec<(String, String)>,
     },
-    /// A setting of one physics component was set.
-    SetPhysics {
+    /// A setting of one physical component was set.
+    SetPhysical {
         component: String,
         setting: String,
         was: Option<String>,
         now: Option<String>,
     },
-    /// A physics component was moved in the Physics pane, as a node is.
+    /// A physical component was moved in the Physical pane, as a node is.
     /// `was` is `None` for one the simulator file had not placed, which undo
     /// gives back to the layout by name.
-    MovePhysics {
+    MovePhysical {
         component: String,
         was: Option<(i32, i32)>,
         now: Option<(i32, i32)>,
     },
-    /// A physics component was put on a page: a subdiagram's, by its name,
+    /// A physical component was put on a page: a subdiagram's, by its name,
     /// or `None` for the top page. Made with the component, on the page it
     /// was placed from.
-    PagePhysics {
+    PagePhysical {
         component: String,
         was: Option<String>,
         now: Option<String>,
     },
-    /// A connection was made between two physics components, from an
+    /// A connection was made between two physical components, from an
     /// output to an input, as the file writes them: `heater_1.heat` and
     /// `zone.heat`. Undone by taking it away.
     AddConnection { from: String, to: String },
     /// A connection was taken away. Undone by making it again.
     RemoveConnection { from: String, to: String },
-    /// A physics component was renamed, and with it every connection, every
+    /// A physical component was renamed, and with it every connection, every
     /// simulated payload's and group's `connects` and its place in the
-    /// Physics pane: each says the component by name. Undone by renaming it
+    /// Physical pane: each says the component by name. Undone by renaming it
     /// back.
-    RenamePhysics { was: String, now: String },
+    RenamePhysical { was: String, now: String },
     /// A node was moved on the canvas. Not a change to the configuration --
     /// the vehicle does not care where the box is -- but it is in the history
     /// because a person who drags a node expects undo to put it back.
@@ -608,53 +608,53 @@ impl Edit {
                 name: name.clone(),
                 settings: settings.clone(),
             },
-            Edit::AddPhysics { name, kind } => Edit::RemovePhysics {
+            Edit::AddPhysical { name, kind } => Edit::RemovePhysical {
                 name: name.clone(),
                 kind: kind.clone(),
                 settings: Vec::new(),
                 connections: Vec::new(),
                 joins: Vec::new(),
             },
-            Edit::RemovePhysics {
+            Edit::RemovePhysical {
                 name,
                 kind,
                 settings,
                 connections,
                 joins,
-            } => Edit::RestorePhysics {
+            } => Edit::RestorePhysical {
                 name: name.clone(),
                 kind: kind.clone(),
                 settings: settings.clone(),
                 connections: connections.clone(),
                 joins: joins.clone(),
             },
-            Edit::RestorePhysics {
+            Edit::RestorePhysical {
                 name,
                 kind,
                 settings,
                 connections,
                 joins,
-            } => Edit::RemovePhysics {
+            } => Edit::RemovePhysical {
                 name: name.clone(),
                 kind: kind.clone(),
                 settings: settings.clone(),
                 connections: connections.clone(),
                 joins: joins.clone(),
             },
-            Edit::MovePhysics {
+            Edit::MovePhysical {
                 component,
                 was,
                 now,
-            } => Edit::MovePhysics {
+            } => Edit::MovePhysical {
                 component: component.clone(),
                 was: *now,
                 now: *was,
             },
-            Edit::PagePhysics {
+            Edit::PagePhysical {
                 component,
                 was,
                 now,
-            } => Edit::PagePhysics {
+            } => Edit::PagePhysical {
                 component: component.clone(),
                 was: now.clone(),
                 now: was.clone(),
@@ -667,16 +667,16 @@ impl Edit {
                 from: from.clone(),
                 to: to.clone(),
             },
-            Edit::RenamePhysics { was, now } => Edit::RenamePhysics {
+            Edit::RenamePhysical { was, now } => Edit::RenamePhysical {
                 was: now.clone(),
                 now: was.clone(),
             },
-            Edit::SetPhysics {
+            Edit::SetPhysical {
                 component,
                 setting,
                 was,
                 now,
-            } => Edit::SetPhysics {
+            } => Edit::SetPhysical {
                 component: component.clone(),
                 setting: setting.clone(),
                 was: now.clone(),
@@ -836,22 +836,22 @@ impl Edit {
             Edit::RestoreSimGroup { name, .. } => {
                 format!("put back simulator group \"{name}\"")
             }
-            Edit::AddPhysics { name, kind } => {
+            Edit::AddPhysical { name, kind } => {
                 format!("add {kind} \"{name}\"")
             }
-            Edit::RemovePhysics { name, .. } => {
-                format!("remove physics \"{name}\"")
+            Edit::RemovePhysical { name, .. } => {
+                format!("remove physical \"{name}\"")
             }
-            Edit::RestorePhysics { name, .. } => {
-                format!("put back physics \"{name}\"")
+            Edit::RestorePhysical { name, .. } => {
+                format!("put back physical \"{name}\"")
             }
-            Edit::SetPhysics {
+            Edit::SetPhysical {
                 component, setting, ..
             } => format!("set {setting} of \"{component}\""),
-            Edit::MovePhysics { component, .. } => {
+            Edit::MovePhysical { component, .. } => {
                 format!("move \"{component}\"")
             }
-            Edit::PagePhysics { component, now, .. } => match now {
+            Edit::PagePhysical { component, now, .. } => match now {
                 Some(page) => format!("put \"{component}\" on {page}"),
                 None => format!("put \"{component}\" on the top page"),
             },
@@ -861,7 +861,7 @@ impl Edit {
             Edit::RemoveConnection { from, to } => {
                 format!("take away the join of {from} to {to}")
             }
-            Edit::RenamePhysics { was, now } => {
+            Edit::RenamePhysical { was, now } => {
                 format!("rename \"{was}\" to \"{now}\"")
             }
             Edit::AddGroup { name, .. } => format!("add group \"{name}\""),

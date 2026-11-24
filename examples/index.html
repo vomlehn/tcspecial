@@ -334,7 +334,7 @@ that <code>ping</code> and <code>ping-yamcs</code> both show, and
 both configurations include; <code>thermostat-common</code> holds
 <code>thermostat.ytcs</code> and <code>thermostat.xtcs</code>, the
 vehicle both thermostat configurations include, and
-<code>thermostat-sim.yaml</code>, the simulator file, physics model and
+<code>thermostat-sim.yaml</code>, the simulator file, physical model and
 all, which each thermostat example’s <code>-sim.yaml</code> is a link
 to, so that each is found beside its configuration by name. Each
 configuration includes its common file as a subdiagram called
@@ -1000,15 +1000,15 @@ them.</td>
 <td>A power bus through an orbit: a power monitor asked over a serial
 line, a shunt, the battery’s charge counted by a Python 3 program, and
 the science load shed in eclipse by a thermostat. tcs-sim simulates
-every payload, joined to a physics model of a sun, a solar array, loads,
-a bus and a battery.</td>
+every payload, joined to a physical model of a sun, a solar array,
+loads, a bus and a battery.</td>
 </tr>
 <tr>
 <td><code>descent</code></td>
 <td>A lander’s terminal descent: a radar altimeter’s altitude flown down
 by a Python 3 guidance program throttling the engine, a Doppler
 velocimeter, and a touchdown switch that speaks the moment the lander is
-down. tcs-sim simulates every payload, joined to a physics model of an
+down. tcs-sim simulates every payload, joined to a physical model of an
 engine and the body it brakes.</td>
 </tr>
 <tr>
@@ -1053,7 +1053,7 @@ example needs no dummy device, no sudo and no hardware. Flown, the buses
 and the chip are opened. The buses themselves are flown against
 simulated devices by <code>make simulated-devices-test</code>, with
 <code>tests/manual/thermostat.ytcs</code>.</p>
-<p>tcs-sim joins the simulated payloads to the vehicle’s physics model,
+<p>tcs-sim joins the simulated payloads to the vehicle’s physical model,
 in the world section of <code>thermostat-sim.yaml</code>, a link to
 <code>thermostat-common/thermostat-sim.yaml</code>, which
 thermostat-yamcs’s simulator file is a link to too: a zone with two
@@ -1135,7 +1135,7 @@ is the thermostat’s – the same conversions, vote, thermostat, heaters,
 GPIO lines and log, from the file both include,
 <code>thermostat-common/thermostat.ytcs</code>, with the same three
 sensors, and the same simulator file,
-<code>thermostat-common/thermostat-sim.yaml</code>, physics model and
+<code>thermostat-common/thermostat-sim.yaml</code>, physical model and
 all, each example’s being a link to it; the two cannot run at once,
 their heaters being the same lines of one GPIO chip – and what differs
 is the configuration’s gateway, <code>yamcs</code>, so every packet to
@@ -1254,7 +1254,7 @@ Yamcs (Java)</li>
 <p>Its configuration, printed by tcs-cfge: <a
 href="battery/battery.pdf"><code>battery.pdf</code></a>.</p>
 <p>A spacecraft’s power bus through an orbit: the example of a payload
-that is asked, of a computation that is a program, and of physics with
+that is asked, of a computation that is a program, and of physical with
 events in it.</p>
 <p><code>monitor</code>, a power monitor on a serial line at
 <code>/tmp/tcs-battery-monitor</code>, is asked for the bus voltage
@@ -1269,7 +1269,7 @@ charge, a ratio, and sets itself full whenever the current falls to
 nought. <code>shedding</code>, a thermostat around 0.4, sheds the
 science instrument below three tenths by driving <code>science</code>,
 port 5302, and restores it above half.</p>
-<p>tcs-sim simulates all three, joined to the vehicle’s physics model,
+<p>tcs-sim simulates all three, joined to the vehicle’s physical model,
 in the world section of <code>battery-sim.yaml</code>: a sun, a solar
 array, two loads, a bus and a battery, each a part simulated alone and
 joined under <code>connections</code>. The orbit is six minutes and the
@@ -1306,8 +1306,8 @@ engine reads as the ratio it is. <code>doppler</code>, port 5402, sends
 the velocity for the ground, and <code>touchdown</code>, port 5403, a
 switch on a landing leg, says <code>1</code> when the lander is
 down.</p>
-<p>tcs-sim simulates all four, joined to the vehicle’s physics model, in
-the world section of <code>descent-sim.yaml</code>: an engine and the
+<p>tcs-sim simulates all four, joined to the vehicle’s physical model,
+in the world section of <code>descent-sim.yaml</code>: an engine and the
 body it brakes, five hundred metres up and falling at twenty metres a
 second. The body falls by the rocket equation, and the moment it reaches
 the ground is found ahead of time and met exactly; tcs-sim’s touchdown

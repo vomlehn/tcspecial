@@ -647,7 +647,7 @@ every arm for the type must be gated by its feature, or that build fails.</p>
 <h2><a class="toc-backref" href="#toc-entry-9">In <tt class="docutils literal"><span class="pre">tcs-sim</span></tt></a></h2>
 <p>The module, <tt class="docutils literal"><span class="pre">tcs-sim/src/node/payload/&lt;type&gt;/mod.rs</span></tt>, holds a function
 <tt class="docutils literal">run_&lt;type&gt;_node</tt>, which plays the device: it answers as the device would,
-from the simulator file's settings and, for a sensor joined to the physics
+from the simulator file's settings and, for a sensor joined to the physical
 model, from the world. There is no trait. <tt class="docutils literal"><span class="pre">tcs-sim/src/payload.rs</span></tt> runs it
 from <tt class="docutils literal">run_kind</tt>, by a <tt class="docutils literal">PayloadProtocol</tt> variant, and
 <tt class="docutils literal"><span class="pre">tcs-sim/src/endpoint.rs</span></tt> maps the node's endpoint and <tt class="docutils literal">sim_address</tt> to

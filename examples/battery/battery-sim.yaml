@@ -5,7 +5,7 @@
 # The two files are joined by name, and nothing here names a payload that
 # file does not have. Only the payloads named here are simulated.
 #
-# Each simulated payload is joined to the physics model: the power monitor
+# Each simulated payload is joined to the physical model: the power monitor
 # reports
 # the battery's voltage, which on a bus with no regulator is the bus's; the
 # shunt reports the current into the battery; and the science switch sheds
@@ -20,7 +20,7 @@ description: Simulator settings for the payloads of battery.ytcs
 tcs-sim:
   ready: "127.0.0.6:7910"
 
-# The physics of the battery example's vehicle: its power system, as the
+# The physical of the battery example's vehicle: its power system, as the
 # parts it is made of. The sun lights the solar array; the array supplies
 # the bus, the loads draw on it, and what is left over charges the battery,
 # or, in shadow, what the array cannot give the battery makes up. The
@@ -33,7 +33,7 @@ tcs-sim:
 # shunted, the eclipse, the science load shed and restored -- in the time
 # it takes to watch it.
 world:
-  physics:
+  physical:
     components:
       - type battery:
           # Eight lithium-ion cells in series, 24 V empty and 33.2 V full, of a

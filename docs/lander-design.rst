@@ -268,7 +268,7 @@ And Autoland's landing, three seconds into the pad wait, with its rating:
 
 The pictures here and the ground station's below are made by ``make
 screenshots-lander`` from each window's own code, drawn in memory, with
-the lander example's lander flown against its own physics.
+the lander example's lander flown against its own physical model.
 
 The pad has a flashing light on top of each of its end marks in
 tcs-sim's window, the lander's own view. The ground's window draws the pad
@@ -330,7 +330,7 @@ The sky, sent down
 ------------------
 
 The ground's sky is tcs-sim's, sent down rather than worked out again:
-the one place the stars are made is tcs-sim's ``physics::sky``, which its
+the one place the stars are made is tcs-sim's ``physical::sky``, which its
 pane draws and its lander sends. The lander's ``sky`` output is records, a
 kind of terminal of its own, one for each star. lander-a's simulated
 payload ``sky`` sends them four to a packet, every 50 ms, round and round,
@@ -390,7 +390,7 @@ In this order, each stage checked before the next:
 1. **One world for two tcspecials.** tcs-sim takes more than one
    configuration, and one simulator file whose payloads say which
    configuration each belongs to, with one world and one window for both.
-2. **Physics.** In ``tcsprotocol`` for the format and in tcs-sim for the
+2. **Physical.** In ``tcsprotocol`` for the format and in tcs-sim for the
    simulation, as ``body`` and ``engine`` are:
 
    * ``lander``, the craft and the ground it lands on in one component,
@@ -443,7 +443,7 @@ In this order, each stage checked before the next:
      the lander's ``restart`` input, and Disable and Enable Autorestart,
      ``autorestart`` on ``lander-a``, joined to its ``autorestart`` input,
      each commanded from the MOC's window through its vehicle's gateway;
-   * the sky, made once in tcs-sim's ``physics::sky``, drawn by its pane
+   * the sky, made once in tcs-sim's ``physical::sky``, drawn by its pane
      and sent down as the lander's ``sky`` records through ``lander-a``,
      and quenched through ``lander-a``'s ``gateway_sky``, as in "The sky,
      sent down";

@@ -809,7 +809,7 @@ mod tests {
     use crate::sim_config::SimConfigFile;
 
     /// The files of `tests/refused-sim`: simulator files, some with a
-    /// physics section in a shape it had before, or a wrong one.
+    /// physical section in a shape it had before, or a wrong one.
     ///
     /// # Returns
     ///
@@ -850,7 +850,7 @@ mod tests {
         }
     }
 
-    /// Every simulator file and physics model the manuals and the designs
+    /// Every simulator file and physical model the manuals and the designs
     /// show in YAML is in the shape they are read in.
     #[test]
     fn the_documents_simulator_files_and_models_read() {

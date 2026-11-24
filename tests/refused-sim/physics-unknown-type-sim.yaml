@@ -1,5 +1,0 @@
-world:
-  physics:
-    components:
-      - type boiler:
-          - component: zone

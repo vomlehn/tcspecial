@@ -24,19 +24,19 @@ use tcsos::sync::Arc;
 use tcsos::time::{Duration, Instant};
 
 use slint::ComponentHandle;
-use tcsprotocol::node::physics::lander::{Point, Resolved};
-use tcsprotocol::node::physics::{Place, Resolution};
+use tcsprotocol::node::physical::lander::{Point, Resolved};
+use tcsprotocol::node::physical::{Place, Resolution};
 use tcsprotocol::sim_config::SimConfigFile;
 
 use crate::landing_rating as rating;
-use crate::node::physics::lander::throttles;
-use crate::node::physics::sky::{ground_at, stars};
-use crate::node::physics::world::World;
+use crate::node::physical::lander::throttles;
+use crate::node::physical::sky::{ground_at, stars};
+use crate::node::physical::world::World;
 use crate::payload::PayloadConfig;
 use crate::{LanderProbe, LanderScene, MainWindow};
 
 /// The lander's terminals' places, in
-/// `tcsprotocol::node::physics::lander::TERMINALS`'s order: its throttles,
+/// `tcsprotocol::node::physical::lander::TERMINALS`'s order: its throttles,
 /// inputs, and its outputs.
 pub const THROTTLE_X: usize = 0;
 pub const THROTTLE_Y: usize = 1;
@@ -51,13 +51,13 @@ pub const ACCELERATION_X: usize = 9;
 pub const ACCELERATION_Y: usize = 10;
 /// The rating the lander is given, whether Autoland helped, and the count
 /// that takes them into its ratings: see
-/// `tcsprotocol::node::physics::lander`'s "Ratings".
+/// `tcsprotocol::node::physical::lander`'s "Ratings".
 const RATING: usize = 14;
 const RATING_AUTOLAND: usize = 15;
 const RATED: usize = 16;
 
 /// The joystick's inputs' places, in
-/// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
+/// `tcsprotocol::node::physical::joystick_3_4::TERMINALS`'s order.
 const SET_X: usize = 0;
 const SET_Y: usize = 1;
 
@@ -100,7 +100,7 @@ const REFRESH: Duration = Duration::from_millis(16);
 
 /// How wide the landscape is drawn, in logical pixels: `ui/lander.slint`'s
 /// scene, which a star's size in pixels is turned into metres by.
-const SCENE_WIDTH: f64 = tcsprotocol::node::physics::lander::SKY_WIDTH;
+const SCENE_WIDTH: f64 = tcsprotocol::node::physical::lander::SKY_WIDTH;
 
 /// The world's lander, and the joystick it is flown with if there is one.
 pub struct Scene {
@@ -133,7 +133,7 @@ pub fn scene(
     sim_file: &SimConfigFile,
     configs: &[PayloadConfig],
 ) -> Option<Scene> {
-    let model = sim_file.physics().ok().flatten()?;
+    let model = sim_file.physical().ok().flatten()?;
     let world = configs
         .iter()
         .find_map(|config| config.attachment.as_ref())?
@@ -2464,7 +2464,7 @@ pub(crate) mod tests {
         tcsos::fs::write(
             &path,
             format!(
-                "simulated_payloads: []\nworld:\n  physics:\n    \
+                "simulated_payloads: []\nworld:\n  physical:\n    \
                  components:\n      - type lander:\n          - \
                  component: lander\n            dry_mass: 6000 kg\n            \
                  fuel: 2000 kg\n            isp: 311 s\n            \
@@ -2483,10 +2483,10 @@ pub(crate) mod tests {
         )
         .expect("written");
         let sim_file = SimConfigFile::load(&path).expect("it reads");
-        let model = sim_file.physics().expect("it resolves").expect("a model");
+        let model = sim_file.physical().expect("it resolves").expect("a model");
         let world = World::new(
             &model,
-            crate::node::physics::clock::Clock::starting_when_asked(1.0),
+            crate::node::physical::clock::Clock::starting_when_asked(1.0),
             1,
         );
         let lander = model
@@ -2557,7 +2557,7 @@ pub(crate) mod tests {
         tcsos::fs::write(
             &path,
             format!(
-                "simulated_payloads: []\nworld:\n  physics:\n    \
+                "simulated_payloads: []\nworld:\n  physical:\n    \
                  components:\n      - type lander:\n          - \
                  component: lander\n            dry_mass: 6000 kg\n            \
                  fuel: 2000 kg\n            isp: 311 s\n            \
@@ -2576,10 +2576,10 @@ pub(crate) mod tests {
         )
         .expect("written");
         let sim_file = SimConfigFile::load(&path).expect("it reads");
-        let model = sim_file.physics().expect("it resolves").expect("a model");
+        let model = sim_file.physical().expect("it resolves").expect("a model");
         let world = World::new(
             &model,
-            crate::node::physics::clock::Clock::starting_when_asked(1.0),
+            crate::node::physical::clock::Clock::starting_when_asked(1.0),
             1,
         );
         let stick = model
@@ -2632,7 +2632,7 @@ pub(crate) mod tests {
         slint::platform::set_platform(Box::new(Headless(adapter.clone())))
             .expect("no other platform");
         let outline =
-            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+            tcsprotocol::node::physical::lander::lines_of("outline", OUTLINE)
                 .expect("the outline reads");
         // LANDER_ZOOM draws a display a tenth the size, for the lander's
         // figure to be seen.
@@ -2757,7 +2757,7 @@ pub(crate) mod tests {
         assert!(pad(&f).contains("M 470.00 540.00 L 470.00 528.00"));
     }
 
-    /// Flies a lander by the autopilot against its own physics, each
+    /// Flies a lander by the autopilot against its own physical model, each
     /// command held back a tenth of a second as the vehicles hold it back.
     ///
     /// # Arguments
@@ -2776,10 +2776,10 @@ pub(crate) mod tests {
         pad: usize,
         start: Point,
     ) -> Option<(bool, f64, f64, Resolved)> {
-        use crate::node::physics::component::Component;
-        use crate::node::physics::lander::Lander;
+        use crate::node::physical::component::Component;
+        use crate::node::physical::lander::Lander;
         let outline =
-            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+            tcsprotocol::node::physical::lander::lines_of("outline", OUTLINE)
                 .expect("the outline reads");
         let f = Resolved {
             dry_mass: 5500.0,
@@ -2800,7 +2800,7 @@ pub(crate) mod tests {
             pad_wait: Duration::from_secs(10),
         };
         let mut lander = Lander::new(f.clone());
-        let terminals = tcsprotocol::node::physics::lander::TERMINALS.len();
+        let terminals = tcsprotocol::node::physical::lander::TERMINALS.len();
         let mut pilot = Autopilot::default();
         let step = 0.05;
         // What the vehicles have yet to pass on: two steps' worth.
@@ -2901,7 +2901,7 @@ pub(crate) mod tests {
         };
         let touchdown = rating::mass_with(&f, left);
         let exhaust = f.isp.as_secs_f64()
-            * crate::node::physics::lander::STANDARD_GRAVITY;
+            * crate::node::physical::lander::STANDARD_GRAVITY;
         let used = exhaust * (from.mass / touchdown).ln();
         let least = rating::least(&f, &from, f.thrust_y / touchdown);
         assert!(least <= used, "the least, {least}, over the used, {used}");
@@ -3111,7 +3111,7 @@ pub(crate) mod tests {
     #[test]
     fn the_landers_lights_are_on_its_cabin() {
         let outline =
-            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+            tcsprotocol::node::physical::lander::lines_of("outline", OUTLINE)
                 .expect("the outline reads");
         let f = Resolved {
             width: 1000.0,
@@ -3200,9 +3200,9 @@ pub(crate) mod tests {
     /// body's left, a push left from its right.
     #[test]
     fn the_plumes_follow_the_thrust() {
-        use crate::node::physics::lander::LEAST_THROTTLE;
+        use crate::node::physical::lander::LEAST_THROTTLE;
         let outline =
-            tcsprotocol::node::physics::lander::lines_of("outline", OUTLINE)
+            tcsprotocol::node::physical::lander::lines_of("outline", OUTLINE)
                 .expect("the outline reads");
         let f = Resolved {
             dry_mass: 5500.0,

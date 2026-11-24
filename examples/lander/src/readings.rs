@@ -5,7 +5,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use tcsos::time::{Duration, Instant};
-use tcsprotocol::node::physics::lander::{StarRecord, STAR_RECORD};
+use tcsprotocol::node::physical::lander::{StarRecord, STAR_RECORD};
 use tcsprotocol::node::vehicle::compute::from_value;
 use tcsprotocol::unit::Unit;
 

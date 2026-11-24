@@ -67,7 +67,7 @@ computer:
 
 * **tcs-sim** imitates the vehicle's hardware, so that the flight software
   can be run and tested with no instruments at all. It can simulate the
-  physics too -- a room warming and cooling, a lander falling under the
+  physical too -- a room warming and cooling, a lander falling under the
   Moon's gravity -- so that what the software does has consequences.
 * **tcs-moc** is a ground station for testing: it shows what the vehicle
   sends down and sends it commands.
@@ -432,18 +432,18 @@ terminal
     to move that end there, and the node it was picked up from, or the Delete
     key, offers to take it out. A click of either button on a line selects
     it, and the Delete key then takes it out; a right click also opens its
-    menu, whose Delete does the same. A node or a physics component is
+    menu, whose Delete does the same. A node or a physical component is
     selected by a click the same way, and a right click on a node opens its
     menu, Edit and Delete; Delete asks before the node goes. A click anywhere
     else on the sheet selects nothing. A subdiagram's box offers the nodes its file
     exports at that terminal; inside the subdiagram, its page has an edge in
     a margin either side, labelled *outside*, the left one left of the
-    Physics pane, and clicking an edge terminal
+    Physical pane, and clicking an edge terminal
     and then a node, or a node's terminal and then the edge, offers to show
     that node outside there or to hide it, and a new line to each node
     outside that can take it -- which shows the node outside as well. A
     subdiagram is opened by **Open** in its box's menu, in a window like the
-    main one, with the same panes, lists, Physics pane and edits.
+    main one, with the same panes, lists, Physical pane and edits.
     A node with no terminal of that stream offers nothing, and a gateway link has none on its right at all: the payload data it receives arrives at the
     ``world-in`` in its upper left, and what it sends leaves by the
     ``moc-out`` in its lower left.
@@ -451,7 +451,7 @@ terminal
     A line's names are not written beside it in tcs-cfge. Resting the pointer
     on a line shows a tip: the node it leaves, the node it reaches and the
     input there where it names one, and under them whatever comment the
-    file has for it. A physics line's tip names the component's terminal,
+    file has for it. A physical line's tip names the component's terminal,
     which tells a line into a thermal mass's ``heat`` from one into its
     ``heater_1``, both entering the one box. The **View** menu zooms the
     sheet: **Zoom to the drawing** fits every node and component in the
@@ -667,7 +667,7 @@ the configuration
 
 the simulator configuration file
     How a simulated payload behaves: how often it produces a packet, how it
-    divides one into segments, and what in the physics model it is joined
+    divides one into segments, and what in the physical model it is joined
     to if it is. Read only by tcs-sim, which takes it from ``PAYLOAD_SIM_YAML``, and by
     tcs-moc, which shows it and acts on none of it. There is nothing in it
     about the payloads themselves.
@@ -2764,7 +2764,7 @@ the reason the vehicle sends -- ``no command binding says the ground may set
 The simulator file beside it, ``thermostat-sim.yaml``, is a link to
 ``examples/thermostat-common/thermostat-sim.yaml``, which thermostat-yamcs,
 the same vehicle with Yamcs as its ground station, links to too. Its world
-holds the vehicle's physics model: a zone with two heaters of its own.
+holds the vehicle's physical model: a zone with two heaters of its own.
 Each sensor reports the zone's temperature, from a place of its own on it, so
 that what the three report is one temperature rather than three streams of
 noise, which is what the model is for; tcs-sim switches each heater while the
@@ -2818,7 +2818,7 @@ Its configuration, printed by tcs-cfge:
 `battery.pdf <../examples/battery/battery.pdf>`__.
 
 A spacecraft's power system, and the example of a payload that is asked, of
-a computation that is a program, and of physics with events in it.
+a computation that is a program, and of physical with events in it.
 
 ``monitor`` is a power monitor on a serial line, ``/tmp/tcs-battery-monitor``.
 It answers only when asked: its ``trigger``, ``"V?\r"``, goes out every
@@ -2846,15 +2846,15 @@ once rather than at every reading near the edge. Every value and decision goes
 to the ground, on ports 5100 to 5102 and 5106, and the ground may set the
 setpoint through the command binding.
 
-The physics model, in the world of ``battery-sim.yaml``, is the power system as its parts:
-a ``sun``, a ``solar_array`` of seven amperes, two ``load`` components of two
-amperes each -- ``avionics``, never shed, and ``science`` -- a ``bus`` and a
-``battery``, joined under ``connections``. The orbit is six minutes, four
-tenths of it in shadow, and the battery a fifth of an ampere-hour, so that a
-run on a desk sees a whole orbit in the time it takes to watch: the battery
-charges at three amperes and fills, its current falling to nought; the eclipse
-comes and it discharges at four; the charge falls below three tenths and the
-science load is shed, halving the drain; and the sun returns, the battery
+The physical model, in the world of ``battery-sim.yaml``, is the power system as
+its parts: a ``sun``, a ``solar_array`` of seven amperes, two ``load``
+components of two amperes each -- ``avionics``, never shed, and ``science`` -- a
+``bus`` and a ``battery``, joined under ``connections``. The orbit is six
+minutes, four tenths of it in shadow, and the battery a fifth of an ampere-hour,
+so that a run on a desk sees a whole orbit in the time it takes to watch: the
+battery charges at three amperes and fills, its current falling to nought; the
+eclipse comes and it discharges at four; the charge falls below three tenths and
+the science load is shed, halving the drain; and the sun returns, the battery
 recovers, and the load comes back above half. Each change -- into shadow and
 out, full, empty -- is an event of the model's, foreseen and met at its
 moment: see **How the world moves** below.
@@ -2900,11 +2900,11 @@ Guidance does not take it: a process takes the one type its ``type-in``
 states, and guidance's is ``metre``. ``touchdown`` is a switch on a landing leg, sending ``1`` on
 the ground and ``0`` off it, straight to the ground.
 
-The physics model, in the world of ``descent-sim.yaml``, is an ``engine`` of four and a
-half kilonewtons with a hundred kilograms of fuel, and a ``body`` of a tonne
-and a half, five hundred metres up and falling at twenty metres a second in
-the Moon's gravity, the engine's force and the fuel it burns joined to it. The
-body falls by the rocket equation in closed form, and the moment it reaches
+The physical model, in the world of ``descent-sim.yaml``, is an ``engine`` of
+four and a half kilonewtons with a hundred kilograms of fuel, and a ``body`` of
+a tonne and a half, five hundred metres up and falling at twenty metres a second
+in the Moon's gravity, the engine's force and the fuel it burns joined to it.
+The body falls by the rocket equation in closed form, and the moment it reaches
 the ground -- which no closed form gives -- is found ahead of time and met
 exactly. tcs-sim's touchdown switch waits on the model for that moment
 rather than for its next turn to send, so the vehicle hears of the landing
@@ -3428,7 +3428,7 @@ Its configuration, printed by tcs-cfge:
 
 The thermostat example with Yamcs at the ground end, as ping-yamcs is the
 ping example with it. The vehicle is the thermostat's, and so is the
-simulator file, with the physics model tcs-sim joins its simulated payloads
+simulator file, with the physical model tcs-sim joins its simulated payloads
 to: each
 example's is a link to ``examples/thermostat-common/thermostat-sim.yaml``,
 so that each is found beside its configuration by name. The vehicle is
@@ -3648,7 +3648,7 @@ the ``heater``.
 The thermometer's readings go to ``zone_temp`` too, a ``to_kelvin`` compute
 node that makes each a temperature, and that goes to ``fsw`` as well: device
 id 4, ``127.0.0.17:9704``, channel ``0x3004``. In the simulator file the
-thermometer reports a zone of the physics model, in the encoding ``zone_temp``
+thermometer reports a zone of the physical model, in the encoding ``zone_temp``
 reads back, and tcs-sim's heater switches a heater warming it, so that what the
 flight computer sends the heater shows in the temperature it reads.
 
@@ -4638,7 +4638,7 @@ because the programs it starts inherit its environment: a variable naming
 tcs-moc's file would name theirs as well.
 
 tcs-sim alone takes several configuration files, for two tcspecials on one
-vehicle whose payloads read one physics model: it simulates all of them in
+vehicle whose payloads read one physical model: it simulates all of them in
 one world, from one simulator file they share. That file is beside none of
 them, so it is named, by ``--simulator=FILE`` or ``PAYLOAD_SIM_YAML``, and
 each payload it simulates is a payload of exactly one of the
@@ -5839,16 +5839,16 @@ programs, not for embedded systems.
 
 The window draws the configuration as tcs-cfge does -- the three working panes,
 every node where the editor puts it, every link along its route, and the
-simulator file's physics in the Physics pane to their left, the simulator file
-being the one tcs-sim would read for the configuration, ``PAYLOAD_SIM_YAML`` or
-the one beside it, read for the drawing and nothing else -- and lights
-a link each time data is sent over it: a wide line, a shade lighter than the
-link's own colour, appears under it and goes a quarter of a second later. A
-link carrying a reading every second blinks once a second.
+simulator file's physical model in the Physical pane to their left, the
+simulator file being the one tcs-sim would read for the configuration,
+``PAYLOAD_SIM_YAML`` or the one beside it, read for the drawing and nothing else
+-- and lights a link each time data is sent over it: a wide line, a shade
+lighter than the link's own colour, appears under it and goes a quarter of a
+second later. A link carrying a reading every second blinks once a second.
 
 A configuration that includes other files opens a window for each of them as
 well, at any depth, drawn as tcs-cfge draws that subdiagram's page, with its
-edge in the margins and its own physics; on the page of the file that
+edge in the margins and its own physical model; on the page of the file that
 includes it, each is a box, and a node inside it, however deep, is drawn at
 the box. A link blinks on every page it is drawn on.
 

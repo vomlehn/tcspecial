@@ -1,5 +1,5 @@
-//! The lander flown offline, against its own physics, a step at a time, and
-//! watched as tcs-sim's window watches it: no world, no clock and no
+//! The lander flown offline, against its own physical model, a step at a time,
+//! and watched as tcs-sim's window watches it: no world, no clock and no
 //! payload. For pictures of the windows that show the lander -- tcs-sim's
 //! pane, and the lander example's ground station, which draws it with
 //! tcs-sim's own drawing -- made from flights as they really go: see
@@ -14,8 +14,8 @@
 use std::collections::VecDeque;
 use std::path::Path;
 
-use tcsprotocol::node::physics::lander::{Resolved, TERMINALS};
-use tcsprotocol::node::physics::Resolution;
+use tcsprotocol::node::physical::lander::{Resolved, TERMINALS};
+use tcsprotocol::node::physical::Resolution;
 use tcsprotocol::sim_config::SimConfigFile;
 
 use crate::lander_view::{
@@ -23,8 +23,8 @@ use crate::lander_view::{
     THROTTLE_Y, Y,
 };
 use crate::landing_rating as rating;
-use crate::node::physics::component::Component;
-use crate::node::physics::lander::Lander;
+use crate::node::physical::component::Component;
+use crate::node::physical::lander::Lander;
 
 /// How long a step of a [`Flight`] is, in seconds.
 const STEP: f64 = 0.05;
@@ -40,7 +40,7 @@ const LOW: f64 = 150.0;
 /// [`flying`]: enough to land, but faster than Autoland would.
 const EASED: f64 = 0.8;
 
-/// A flight of a lander, flown against its own physics a step at a time,
+/// A flight of a lander, flown against its own physical model a step at a time,
 /// each command held back a tenth of a second as the vehicles hold it back,
 /// and watched as tcs-sim's window watches it.
 struct Flight {
@@ -200,7 +200,7 @@ pub fn figures(sim_path: &Path) -> Resolved {
     let sim_file = SimConfigFile::load(sim_path)
         .unwrap_or_else(|e| panic!("{}: {e}", sim_path.display()));
     let model = sim_file
-        .physics()
+        .physical()
         .expect("its world resolves")
         .expect("it has a world");
     model

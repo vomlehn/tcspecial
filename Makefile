@@ -1611,8 +1611,8 @@ screenshots-tcs-moc:
 # Make the lander design's screenshots, docs/shots/lander-*.png, again:
 # tcs-sim's lander pane and the lander example's Rust ground station's
 # window, each built by its own code and drawn in memory by Slint's software
-# renderer, the lander example's lander flown against its own physics (see
-# tcs-sim's lander_flight), so that no window opens and no world runs. Two
+# renderer, the lander example's lander flown against its own physical model
+# (see tcs-sim's lander_flight), so that no window opens and no world runs. Two
 # ignored tests, each run alone because Slint takes one platform per
 # process; never part of make test, make check or make html-check.
 .PHONY: screenshots-lander

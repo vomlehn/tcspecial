@@ -480,13 +480,13 @@ pseudo-terminals and loopback sim_addresses, as it would real ones.</object>
 <p class="caption">The same software, every connection made on one desktop.</p>
 </div>
 <p>None of it needs a vehicle. On one desktop, <strong>tcs-sim</strong> stands in for the
-payloads, on a physics model of the world they act on, and <strong>tcs-moc</strong> for
+payloads, on a physical model of the world they act on, and <strong>tcs-moc</strong> for
 the mission operations center, and between them runs the same tcspecial that
 flies. <tt class="docutils literal">make runmocy</tt> starts all three on one
 configuration, and every connection in the figure above is made on the
 desktop: commands, telemetry and beacons over sockets on the loopback
 interface, and the devices as pseudo-terminals and loopback addresses that
-tcs-sim answers on a physics model of the payloads. A configuration can be
+tcs-sim answers on a physical model of the payloads. A configuration can be
 developed, run and watched this way long before there is hardware to run it
 on, and parts of it moved to real devices one at a time.</p>
 <p>A configuration is written with <strong>tcs-cfge</strong>, which draws it as a diagram of
@@ -632,7 +632,7 @@ share.</dd>
 <h2><a class="toc-backref" href="#toc-entry-13">Verification tools</a></h2>
 <dl class="docutils">
 <dt><a class="reference external" href="tcs-sim-design.html">The tcs-sim design</a></dt>
-<dd>The payload simulator: its configuration files, the physics model,
+<dd>The payload simulator: its configuration files, the physical model,
 fault injection, and the program.</dd>
 <dt><a class="reference external" href="tcs-moc-design.html">The tcs-moc design</a></dt>
 <dd>The simulated operations center: its window, what it reads, and where

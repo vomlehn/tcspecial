@@ -1,0 +1,7 @@
+# The world's physical section by the name it had before, physics: it is
+# called physical now.
+world:
+  physics:
+    components:
+      - type bus:
+          - component: bus

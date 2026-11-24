@@ -380,10 +380,11 @@ on the host while it waits.</p>
 <span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="ex">remove</span> PACKAGE... <span class="co"># remove packages, configuration too</span></span>
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a><span class="ex">copy</span> DIR...       <span class="co"># copy checkouts in, without their builds</span></span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a><span class="ex">example</span> <span class="pp">[</span><span class="ss">NAME</span><span class="pp">]</span>    <span class="co"># run a tcspecial example, or list them</span></span>
-<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="bu">wait</span>              <span class="co"># wait until it stops</span></span>
-<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="ex">stop</span>              <span class="co"># stop it, keeping what was done in it</span></span>
-<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="ex">build</span>             <span class="co"># build its image; --no-cache from scratch</span></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="ex">destroy</span> <span class="pp">[--</span><span class="ss">image</span><span class="pp">]</span> <span class="co"># remove it, and with --image its image</span></span></code></pre></div>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a><span class="ex">halt</span>              <span class="co"># stop the TCS programs running in it</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a><span class="bu">wait</span>              <span class="co"># wait until it stops</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="ex">stop</span>              <span class="co"># stop it, keeping what was done in it</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="ex">build</span>             <span class="co"># build its image; --no-cache from scratch</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="ex">destroy</span> <span class="pp">[--</span><span class="ss">image</span><span class="pp">]</span> <span class="co"># remove it, and with --image its image</span></span></code></pre></div>
 <p>Each takes <code>--distro fedora</code> first for the Fedora
 container, kubuntu being the default:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container-copy</span> ..</span>
@@ -520,7 +521,15 @@ scripts named for them run it:</p>
 class="sourceCode sh"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">bin/tcs-container</span> [--distro kubuntu<span class="kw">|</span><span class="ex">fedora]</span> COMMAND <span class="pp">[</span><span class="ss">ARGUMENT...</span><span class="pp">]</span></span></code></pre></div>
 <p><code>TCS_CONTAINER_DISTRO</code> names the distribution too, when
 <code>--distro</code> does not, and <code>PODMAN</code> another program
-to run in Podman’s place. The container is
+to run in Podman’s place. Two more change the container
+<code>fresh</code> makes, for a demonstration whose programs, in
+containers on different machines, talk to one another, as
+tcs-developer’s <code>provisioning</code> sets one up:
+<code>TCS_CONTAINER_NETWORK=host</code> gives it the host’s own network,
+so that a program in it binds the host’s addresses and is reached at
+them, and <code>TCS_CONTAINER_MOUNT=DIR</code> shows it the host’s
+directory <code>DIR</code>, read-only, at
+<code>/mnt/tcs-provisioned</code>. The container is
 <code>tcs-test-&lt;distro&gt;</code>, made from the image
 <code>localhost/tcs-test-&lt;distro&gt;</code>, which <code>build</code>
 makes from <code>image/Containerfile.&lt;distro&gt;</code> with the user

@@ -41,13 +41,19 @@ pub struct Route {
     /// Whether what comes back to the socket it forwards from is passed
     /// back to whoever last sent: true for a link of commands and answers.
     pub both_ways: bool,
+    /// For a relay both ways, where the socket it forwards from is bound:
+    /// the ground's own address, which a vehicle takes commands only from,
+    /// and which a vehicle on another machine is reached from. `None` is
+    /// the loopback, any port, for a vehicle on this machine.
+    pub from: Option<SocketAddr>,
 }
 
 impl FromStr for Route {
     type Err = String;
 
     /// Reads a route as `tcs-relay` takes it: `LISTEN>FORWARD` one way, or
-    /// `LISTEN<>FORWARD` both ways, each address `host:port`.
+    /// `LISTEN<>FORWARD` both ways, each address `host:port`, the second
+    /// followed, for a relay both ways, by `@FROM`, where it forwards from.
     ///
     /// # Arguments
     ///
@@ -68,10 +74,22 @@ impl FromStr for Route {
                 (None, None) => {
                     return Err(format!(
                         "{text} is not a route: write LISTEN>FORWARD for one \
-                         way or LISTEN<>FORWARD for both, each host:port"
+                         way or LISTEN<>FORWARD[@FROM] for both, each \
+                         host:port"
                     ))
                 }
             };
+        let (forward, from) = match forward.split_once('@') {
+            Some((forward, from)) if both_ways => (forward, Some(from)),
+            Some(_) => {
+                return Err(format!(
+                    "{text}: only a route both ways says where it forwards \
+                     from, as LISTEN<>FORWARD@FROM; one way forwards from \
+                     where it listens"
+                ))
+            }
+            None => (forward, None),
+        };
         let address = |said: &str| {
             said.parse::<SocketAddr>().map_err(|e| {
                 format!("{text}: {said} is not an address, host:port: {e}")
@@ -81,6 +99,7 @@ impl FromStr for Route {
             listen: address(listen)?,
             forward: address(forward)?,
             both_ways,
+            from: from.map(address).transpose()?,
         })
     }
 }
@@ -178,7 +197,7 @@ impl Relays {
             if route.both_ways {
                 let far = near + 1;
                 let any = SocketAddr::from(([127, 0, 0, 1], 0));
-                sockets.push(bound(any)?);
+                sockets.push(bound(route.from.unwrap_or(any))?);
                 ways.push(Way::Ask {
                     far,
                     forward: route.forward,
@@ -335,8 +354,10 @@ const USAGE: &str = "\
 usage: tcs-relay [--delay=SECONDS] [--simulator=FILE] ROUTE...
 
   ROUTE              LISTEN>FORWARD, passing what arrives at LISTEN on to
-                     FORWARD, or LISTEN<>FORWARD, passing answers back too;
-                     each address host:port
+                     FORWARD, or LISTEN<>FORWARD, passing answers back too,
+                     forwarding from the loopback or, with @FROM after it,
+                     from FROM, the ground's own address; each address
+                     host:port
   --delay=SECONDS    hold each datagram this long first (default: 0)
   --simulator=FILE   the run's simulator file: its simulation mode, which
                      must not be none, the flight setting, for a delay or
@@ -441,9 +462,18 @@ mod tests {
         let both: Route = "127.0.0.1:3<>127.0.0.1:4".parse().expect("a route");
         assert!(both.both_ways);
         assert_eq!((both.listen.port(), both.forward.port()), (3, 4));
+        assert_eq!(both.from, None);
+        let from: Route = "127.0.0.1:3<>127.0.0.1:4@127.0.0.5:0"
+            .parse()
+            .expect("a route");
+        assert_eq!(from.from, Some("127.0.0.5:0".parse().expect("an address")));
         let said = "127.0.0.1:1".parse::<Route>().unwrap_err();
         assert!(said.contains("LISTEN>FORWARD"), "{said}");
         assert!("x>127.0.0.1:2".parse::<Route>().is_err());
+        let said = "127.0.0.1:1>127.0.0.1:2@127.0.0.5:0"
+            .parse::<Route>()
+            .unwrap_err();
+        assert!(said.contains("only a route both ways"), "{said}");
     }
 
     /// A datagram is passed on one way after the delay, and a two-way
@@ -458,11 +488,13 @@ mod tests {
                 listen: any,
                 forward: ground.local_addr().expect("bound"),
                 both_ways: false,
+                from: None,
             },
             Route {
                 listen: any,
                 forward: vehicle.local_addr().expect("bound"),
                 both_ways: true,
+                from: Some("127.0.0.5:0".parse().expect("an address")),
             },
         ];
         let delay = Duration::from_millis(200);
@@ -483,6 +515,9 @@ mod tests {
         ground.send_to(b"command", up).expect("sent");
         let (size, relay) = vehicle.recv_from(&mut room).expect("arrived");
         assert_eq!(&room[..size], b"command");
+        // From the ground's address the route named, which the vehicle
+        // takes commands from.
+        assert_eq!(relay.ip().to_string(), "127.0.0.5");
         vehicle.send_to(b"answer", relay).expect("sent");
         let (size, from) = ground.recv_from(&mut room).expect("answered");
         assert_eq!(&room[..size], b"answer");

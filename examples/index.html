@@ -1391,6 +1391,22 @@ is seen 1.3 s after that. Closing tcs-sim’s window, or the MOC’s, stops
 everything. Yamcs’s web interface is at <a href="http://localhost:19090"
 class="uri">http://localhost:19090</a>.</p>
 <pre><code>make run-lander</code></pre>
+<p>The two halves can run on two machines, the Moon’s and the MOC’s, as
+tcs-developer’s booth provisioning runs them: <code>--no-ground</code>
+on the Moon’s starts tcs-sim and the two tcspecials and nothing of the
+ground’s, until tcs-sim’s window closes, and
+<code>--no-vehicle --no-simulator</code> on the MOC’s the rest. Both are
+given the same <code>--seed</code>, so that both make one landscape, and
+the same <code>--configs DIR</code>, a directory laid out as
+<code>examples/</code> is, with <code>lander-a/</code>,
+<code>lander-b/</code> and <code>lander-common/</code>, whose
+configurations put the ground’s end of each link at the MOC machine’s
+address and the vehicle’s at the Moon machine’s. The relays then pass
+commands on from the ground’s address, the one the vehicles take them
+from.</p>
+<pre><code>python3 examples/lander/lander_yamcs.py --configs DIR --seed 7 --no-ground
+python3 examples/lander/lander_yamcs.py --configs DIR --seed 7 \
+    --no-vehicle --no-simulator</code></pre>
 <p><code>lander/</code> also builds a second ground station,
 <code>lander-station</code>, in Rust: the same station without Yamcs or
 Python, which is what runs the example in a web page (see the tcswebasm

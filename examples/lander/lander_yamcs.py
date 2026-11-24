@@ -49,6 +49,16 @@ fetched the first time and kept in ``~/.cache/tcspecial``.
 ``--no-vehicle``, ``--no-simulator`` and ``--no-yamcs`` leave the
 tcspecials, tcs-sim and Yamcs to somebody else. tcs-sim draws the lander's
 window, where the lander is flown, so it wants a display.
+
+The two halves can run on two machines, as tcs-developer's booth
+provisioning runs them: the Moon's, ``--no-ground``, tcs-sim and the two
+tcspecials and nothing of the ground's -- no Yamcs, no relays, no window --
+until tcs-sim's window closes; and the MOC's, ``--no-vehicle
+--no-simulator``, the rest. Each is given the same ``--seed``, so that both
+make the same landscape, and the same ``--configs``, a directory laid out as
+``examples/`` is -- ``lander-a/``, ``lander-b/`` and ``lander-common/`` --
+holding the configurations with the two machines' addresses, in place of
+the ones beside this program.
 """
 
 import argparse
@@ -271,6 +281,14 @@ def arguments(argv):
                              "memory into RAM")
     parser.add_argument("--no-simulator", action="store_true",
                         help="do not start tcs-sim")
+    parser.add_argument("--no-ground", action="store_true",
+                        help="start only tcs-sim and the tcspecials: no "
+                             "Yamcs, relays or window, as on a Moon "
+                             "machine; until tcs-sim's window closes")
+    parser.add_argument("--configs", metavar="DIR",
+                        help="read lander-a/, lander-b/ and lander-common/ "
+                             "from DIR rather than from beside this program "
+                             "(default: the examples it is among)")
     parser.add_argument("--no-yamcs", action="store_true",
                         help="do not start Yamcs or the relays; use ones "
                              "already running")
@@ -283,6 +301,12 @@ def arguments(argv):
         parser.error("--every is a number of seconds above nought")
     if options.delay < 0:
         parser.error("--delay is a number of seconds, nought or more")
+    if options.no_ground and options.no_vehicle and options.no_simulator:
+        parser.error("--no-ground with --no-vehicle and --no-simulator "
+                     "leaves nothing to run")
+    if options.no_ground and options.seconds is not None:
+        parser.error("--seconds prints what the ground hears, and "
+                     "--no-ground starts no ground: give one or the other")
     return options
 
 
@@ -515,15 +539,17 @@ class Craft:
 
     Args:
         instance: Its Yamcs instance's name, which is its configuration's.
+        examples: The directory its configuration's directory is in:
+                  examples/, or one laid out as it is.
 
     Raises:
         ValueError: Its configuration is wrong for this program.
         OSError: Its configuration cannot be read.
     """
 
-    def __init__(self, instance):
+    def __init__(self, instance, examples=HERE.parent):
         self.instance = instance
-        self.path = HERE.parent / instance / f"{instance}.ytcs"
+        self.path = examples / instance / f"{instance}.ytcs"
         self.config = configuration.load(self.path)
         if self.config.tcspecial.get("gateway") != "yamcs":
             raise ValueError(f"{self.path}: its gateway is not yamcs")
@@ -555,13 +581,15 @@ class Craft:
         return Path(said) if said else None
 
 
-def write_run(run_dir, seed):
+def write_run(run_dir, seed, shipped_sim=SHIPPED_SIM):
     """Writes the run's simulator file, with a landscape made from the
     seed.
 
     Args:
-        run_dir: Where it is written, made if it is not there.
-        seed:    The landscape's seed.
+        run_dir:     Where it is written, made if it is not there.
+        seed:        The landscape's seed.
+        shipped_sim: The simulator file it is written from: the one
+                     shipped, or the one in --configs.
 
     Returns:
         The file's path, and the :class:`Lander` it states.
@@ -576,13 +604,13 @@ def write_run(run_dir, seed):
     except ImportError:
         raise OSError("PyYAML is not installed, and lander_yamcs.py reads "
                       "the simulator file with it: pip install PyYAML")
-    shipped_text = SHIPPED_SIM.read_text()
+    shipped_text = shipped_sim.read_text()
     shipped = Lander(lander_settings(yaml.safe_load(shipped_text)))
     ground, pad = landscape(seed, shipped.width, shipped.height,
                             shipped.lander_width())
     text = run_sim_text(shipped_text, seed, ground, pad)
     run_dir.mkdir(parents=True, exist_ok=True)
-    path = run_dir / SHIPPED_SIM.name
+    path = run_dir / shipped_sim.name
     path.write_text(text)
     return path, Lander(lander_settings(yaml.safe_load(text)))
 
@@ -794,7 +822,7 @@ class Readings:
         self.changed = {}
         #: When each value last changed, in seconds since the epoch, which
         #: its node's panel says as a time of day.
-        self.arrived = {}
+        self.arrived_at = {}
         #: The last number sent up to each payload the ground commands, and
         #: when, in seconds since the epoch, by the payload's name.
         self.sent = {}
@@ -822,7 +850,7 @@ class Readings:
                         value = latest[parameter][0]
                         if self.values.get(node) != value:
                             self.changed[node] = now
-                            self.arrived[node] = time.time()
+                            self.arrived_at[node] = time.time()
                             if node == "sky" and self.sky is not None:
                                 fresh.append(value)
                             if node == "ratings":
@@ -880,7 +908,7 @@ class Readings:
         """
         with self._lock:
             sent = self.sent.get(node)
-            arrived = self.arrived.get(node)
+            arrived = self.arrived_at.get(node)
 
         def clock(when):
             """A moment as a panel says it.
@@ -1856,8 +1884,11 @@ def main(argv):
     if seed is None:
         seed = random.SystemRandom().randrange(2 ** 31)
     try:
-        crafts = [Craft(instance) for instance in VEHICLES]
-        sim_path, lander = write_run(run_dir, seed)
+        examples = (Path(options.configs).resolve() if options.configs
+                    else HERE.parent)
+        crafts = [Craft(instance, examples) for instance in VEHICLES]
+        sim_path, lander = write_run(
+            run_dir, seed, examples / "lander-common" / SHIPPED_SIM.name)
         # The delay on the link, and any bit errors the run's simulator
         # file asks for, are the ground's simulation, which the run's mode,
         # as the file states it, must allow.
@@ -1882,7 +1913,11 @@ def main(argv):
     first = Yamcs(options.yamcs, yamcs_dir, options.http_port, VEHICLES[0])
     yamcses = [first] + [first.instance_of(instance)
                          for instance in VEHICLES[1:]]
-    line = Relays(options.delay, sim_path, verbose=options.verbose)
+    # The ground's own address, which the vehicles take commands only from:
+    # the configuration's, the loopback on one machine and the MOC's on two.
+    ground = crafts[0].config.command_link().send.address
+    line = Relays(options.delay, sim_path, verbose=options.verbose,
+                  ground=ground)
     started = []
     simulator = None
 
@@ -1897,8 +1932,11 @@ def main(argv):
         return (simulator is not None
                 and simulator.process.poll() is not None)
 
+    # Yamcs and its relays are this program's to start and stop where it
+    # runs the ground, and was not told they run already.
+    own_yamcs = not options.no_yamcs and not options.no_ground
     try:
-        if not options.no_yamcs:
+        if own_yamcs:
             home = yamcs_home(options.yamcs)
             relays = write_yamcs(crafts, yamcs_dir, options.http_port, home)
             for listen, forward, both in relays:
@@ -1933,6 +1971,14 @@ def main(argv):
                     memlock=not options.no_memlock)
                 vehicle.start()
                 started.append(vehicle)
+        if options.no_ground:
+            # The Moon's half: nothing of the ground's, and the run lasts
+            # as long as the lander is flown, until tcs-sim's window
+            # closes -- or, with tcs-sim elsewhere, as long as the first
+            # tcspecial runs.
+            status("flying, with the ground elsewhere")
+            (simulator or started[0]).process.wait()
+            return 0
         for yamcs, craft in zip(yamcses, crafts):
             if not connect(yamcs, craft.digest, say=status):
                 print(f"lander_yamcs: {craft.instance} never answered "
@@ -1967,7 +2013,7 @@ def main(argv):
     finally:
         for child in reversed(started):
             child.stop()
-        if not options.no_yamcs:
+        if own_yamcs:
             first.stop()
             line.stop()
 

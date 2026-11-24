@@ -61,7 +61,10 @@ def relayed(links, shift=SHIFT):
 
     A link Yamcs only listens on -- telemetry, the beacon -- is moved
     ``shift`` above its port, and its relay listens on the port the vehicle
-    sends to and passes each datagram on to Yamcs. A link Yamcs sends on --
+    sends to and passes each datagram on to Yamcs. It listens on every
+    address the ground has, as the Yamcs link it stands in for does, which
+    a link that names only a port does: a vehicle on another machine sends
+    to the ground's own address, and not to its loopback. A link Yamcs sends on --
     commands, whose answers come back to the socket that sent them -- is
     pointed at a port ``shift`` above the vehicle's, where its relay
     listens, passing each command on to the vehicle and each answer back.
@@ -86,7 +89,7 @@ def relayed(links, shift=SHIFT):
             relays.append((("127.0.0.1", port + shift), vehicle, True))
         else:
             link["port"] = port + shift
-            relays.append((("127.0.0.1", port), ("127.0.0.1", port + shift),
+            relays.append((("0.0.0.0", port), ("127.0.0.1", port + shift),
                            False))
         moved.append(link)
     return moved, relays
@@ -131,10 +134,17 @@ class Relays:
                  the mode and the bit errors; ``None`` for none.
         program: The ``tcs-relay`` to run, or ``None`` for the build's.
         verbose: Whether to say on stderr that it stopped by itself.
+        ground:  The ground's own address, which each relay both ways
+                 passes commands on from, where the vehicle takes them
+                 only from it -- the configuration's ``tcs_cmd.send`` --
+                 and which reaches a vehicle on another machine; ``None``
+                 for the loopback, for a vehicle on this one.
     """
 
-    def __init__(self, delay, sim=None, program=None, verbose=False):
+    def __init__(self, delay, sim=None, program=None, verbose=False,
+                 ground=None):
         self.delay = delay
+        self.ground = ground
         self.sim = sim
         self.program = program
         self.verbose = verbose
@@ -159,8 +169,10 @@ class Relays:
             listen:  Where it listens, ``(host, port)``.
             forward: Where it passes each datagram on to.
         """
-        self.routes.append(f"{listen[0]}:{listen[1]}<>{forward[0]}:"
-                           f"{forward[1]}")
+        route = f"{listen[0]}:{listen[1]}<>{forward[0]}:{forward[1]}"
+        if self.ground is not None:
+            route += f"@{self.ground}:0"
+        self.routes.append(route)
 
     def args(self):
         """``tcs-relay``'s arguments for these relays.

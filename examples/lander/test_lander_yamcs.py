@@ -144,7 +144,7 @@ class Panels(unittest.TestCase):
         noon = calendar.timegm((2026, 11, 24, 12, 0, 0, 0, 0, 0))
         readings.values.update({"to_y": 450.0, "landed": "1",
                                 "crashed": "0"})
-        readings.arrived.update({"to_y": noon, "landed": noon,
+        readings.arrived_at.update({"to_y": noon, "landed": noon,
                                  "crashed": noon})
         self.assertEqual(readings.panel_line("to_y"),
                          "Last recv: 12:00:00: 450.00")
@@ -162,7 +162,8 @@ class Relays(unittest.TestCase):
 
     def test_each_link_is_moved_and_relayed(self):
         """A link Yamcs listens on is moved up, its relay on the vehicle's
-        port; one Yamcs sends on is pointed at its relay, which passes both
+        port, on every address, so that a vehicle on another machine is
+        heard; one Yamcs sends on is pointed at its relay, which passes both
         ways."""
         links = [{"name": "commands", "host": "127.0.0.1", "port": 19200},
                  {"name": "beacon", "port": 19510}]
@@ -172,7 +173,7 @@ class Relays(unittest.TestCase):
         self.assertEqual(links[0]["port"], 19200, "left as they were")
         self.assertEqual(relays, [
             (("127.0.0.1", 29200), ("127.0.0.1", 19200), True),
-            (("127.0.0.1", 19510), ("127.0.0.1", 29510), False)])
+            (("0.0.0.0", 19510), ("127.0.0.1", 29510), False)])
 
     def test_every_vehicle_link_is_relayed(self):
         """Every link of both vehicles' instances has a relay, and no two

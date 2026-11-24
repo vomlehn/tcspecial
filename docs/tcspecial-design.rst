@@ -11181,7 +11181,12 @@ Requirement
     ``tcs-relay`` stand between it and the vehicle: its links are moved off
     the vehicle's ports, and the relay listens there, holding each datagram
     for the delay and losing those the rate loses. The relay is in Rust; the
-    Python grounds only start it.
+    Python grounds only start it. What it takes from the vehicle it listens
+    for on every address the ground has, as the Yamcs link it stands in for
+    does; what it passes on to the vehicle, commands, it sends from the
+    ground's own address, ``tcs_cmd.send``'s, which a vehicle takes
+    commands only from, and which reaches a vehicle on another machine --
+    a route ``LISTEN<>FORWARD@FROM``, ``FROM`` that address.
 
 Requirement
     The section's ``seed`` is where the random numbers start: left out or

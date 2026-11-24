@@ -895,6 +895,23 @@ or the MOC's, stops everything. Yamcs's web interface is at
 make run-lander
 ```
 
+The two halves can run on two machines, the Moon's and the MOC's, as
+tcs-developer's booth provisioning runs them: `--no-ground` on the Moon's
+starts tcs-sim and the two tcspecials and nothing of the ground's, until
+tcs-sim's window closes, and `--no-vehicle --no-simulator` on the MOC's the
+rest. Both are given the same `--seed`, so that both make one landscape,
+and the same `--configs DIR`, a directory laid out as `examples/` is, with
+`lander-a/`, `lander-b/` and `lander-common/`, whose configurations put the
+ground's end of each link at the MOC machine's address and the vehicle's at
+the Moon machine's. The relays then pass commands on from the ground's
+address, the one the vehicles take them from.
+
+```
+python3 examples/lander/lander_yamcs.py --configs DIR --seed 7 --no-ground
+python3 examples/lander/lander_yamcs.py --configs DIR --seed 7 \
+    --no-vehicle --no-simulator
+```
+
 `lander/` also builds a second ground station, `lander-station`, in Rust:
 the same station without Yamcs or Python, which is what runs the example in
 a web page (see the tcswebasm repository). It makes the landscape the same

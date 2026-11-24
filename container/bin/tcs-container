@@ -28,6 +28,8 @@
 #   example [--hidden] [NAME [ARGUMENT...]]
 #                      run tcspecial's example NAME, or with no NAME list
 #                      them: see example() below
+#   halt               stop the TCS programs running in it, and the
+#                      examples' ground stations, leaving it running
 #   wait               wait until it stops
 #   stop               stop it, keeping what was done in it
 #   destroy [--image]  remove it, and with --image the image too
@@ -46,6 +48,15 @@
 # them. A display that has gone since, as after logging out and in again,
 # needs a fresh container.
 #
+# Two variables change the container fresh makes, for a demonstration in
+# which programs in containers on different machines talk to one another:
+# TCS_CONTAINER_NETWORK=host gives the container the host's own network, so
+# that a program in it binds the host's addresses and is reached at them,
+# where otherwise it has a network of Podman's own; and
+# TCS_CONTAINER_MOUNT names a directory of the host's, which the container
+# sees, read-only, at /mnt/tcs-provisioned. tcs-developer's provisioning
+# makes its containers so.
+#
 # It is in tcspecial's container/, whose make container-install and the
 # rest call it with the packages a project has built.
 
@@ -57,7 +68,7 @@ usage() {
 	echo "       build [--no-cache] | fresh | exists | up | start |"
 	echo "       shell [--root] [COMMAND...] | install FILE... |"
 	echo "       remove PACKAGE... | installed | copy DIR... |"
-	echo "       example [--hidden] [NAME [ARGUMENT...]] |"
+	echo "       example [--hidden] [NAME [ARGUMENT...]] | halt |"
 	echo "       wait | stop | destroy [--image]"
 }
 
@@ -109,6 +120,9 @@ build() {
 # Where the host's display is put in the container.
 DISPLAY_DIR=/mnt/tcs-display
 
+# Where the directory TCS_CONTAINER_MOUNT names is, in the container.
+MOUNT_DIR=/mnt/tcs-provisioned
+
 # How many processes and threads the container may have at once, 8 times
 # podman's default: a bound still, against a run that forks without end.
 PIDS_LIMIT=16384
@@ -154,6 +168,17 @@ fresh() {
 	# of the host's cores -- and a tcspecial that cannot start a node's
 	# thread stops. See PIDS_LIMIT.
 	set -- "$@" --pids-limit "$PIDS_LIMIT"
+	# The host's network, or a directory of the host's: see the top of
+	# this file.
+	if [ -n "${TCS_CONTAINER_NETWORK:-}" ]; then
+		set -- "$@" --network "$TCS_CONTAINER_NETWORK"
+	fi
+	if [ -n "${TCS_CONTAINER_MOUNT:-}" ]; then
+		[ -d "$TCS_CONTAINER_MOUNT" ] ||
+			die "TCS_CONTAINER_MOUNT names $TCS_CONTAINER_MOUNT," \
+			    "which is not a directory"
+		set -- "$@" -v "$TCS_CONTAINER_MOUNT:$MOUNT_DIR:ro"
+	fi
 	"$podman" run -d --name "$name" --hostname "$name" \
 		--systemd=always --userns=keep-id --user root "$@" "$image" \
 		> /dev/null
@@ -405,6 +430,21 @@ example() {
 	# A run stopped from outside, as when the terminal it was started in
 	# closed, leaves its programs running in the container, holding the
 	# examples' ports, so they are stopped first.
+	halt
+	# Hidden, the window goes to Xvfb's X display, so the desktop's
+	# Wayland one, which a Wayland client would take first, is not named.
+	wrap=
+	[ -z "$hidden" ] || wrap="env -u WAYLAND_DISPLAY xvfb-run -a"
+	# shellcheck disable=SC2086 # $wrap is words, or none
+	shell $wrap /opt/tcs/bin/tcsx --no-memlock "$@"
+}
+
+# Stops the TCS programs running in the container, and the examples'
+# ground stations, waiting for them to go. Stopping what started them from
+# outside -- the terminal, or podman exec's own process -- does not stop
+# them: they are the container's, not the client's.
+halt() {
+	exists && up || return 0
 	# shellcheck disable=SC2016 # expanded in the container, not here
 	shell bash -c '
 		programs="tcs-moc|tcs-sim|tcspecial|beacon|lorem_gateway"
@@ -416,12 +456,6 @@ example() {
 		timeout 5 pidwait -u "$(id -u)" -x "$programs"
 		[ $? -ne 124 ] || pkill -KILL -u "$(id -u)" -x "$programs"
 		true'
-	# Hidden, the window goes to Xvfb's X display, so the desktop's
-	# Wayland one, which a Wayland client would take first, is not named.
-	wrap=
-	[ -z "$hidden" ] || wrap="env -u WAYLAND_DISPLAY xvfb-run -a"
-	# shellcheck disable=SC2086 # $wrap is words, or none
-	shell $wrap /opt/tcs/bin/tcsx --no-memlock "$@"
 }
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -456,6 +490,7 @@ remove) remove "$@" ;;
 installed) installed ;;
 copy) copy "$@" ;;
 example) example "$@" ;;
+halt) halt ;;
 wait)
 	if exists; then
 		"$podman" wait "$name" > /dev/null

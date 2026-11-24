@@ -126,6 +126,7 @@ shell --root CMD  # a command as root
 remove PACKAGE... # remove packages, configuration too
 copy DIR...       # copy checkouts in, without their builds
 example [NAME]    # run a tcspecial example, or list them
+halt              # stop the TCS programs running in it
 wait              # wait until it stops
 stop              # stop it, keeping what was done in it
 build             # build its image; --no-cache from scratch
@@ -295,7 +296,13 @@ bin/tcs-container [--distro kubuntu|fedora] COMMAND [ARGUMENT...]
 ```
 
 `TCS_CONTAINER_DISTRO` names the distribution too, when `--distro` does
-not, and `PODMAN` another program to run in Podman's place. The container
+not, and `PODMAN` another program to run in Podman's place. Two more
+change the container `fresh` makes, for a demonstration whose programs, in
+containers on different machines, talk to one another, as tcs-developer's
+`provisioning` sets one up: `TCS_CONTAINER_NETWORK=host` gives it the
+host's own network, so that a program in it binds the host's addresses and
+is reached at them, and `TCS_CONTAINER_MOUNT=DIR` shows it the host's
+directory `DIR`, read-only, at `/mnt/tcs-provisioned`. The container
 is `tcs-test-<distro>`, made from the image `localhost/tcs-test-<distro>`,
 which `build` makes from `image/Containerfile.<distro>` with the user
 `tcs` given your uid and gid. `fresh` runs it with `--systemd=always` and

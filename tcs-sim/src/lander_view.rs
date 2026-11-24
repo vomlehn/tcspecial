@@ -49,6 +49,12 @@ pub const LANDED: usize = 7;
 pub const CRASHED: usize = 8;
 pub const ACCELERATION_X: usize = 9;
 pub const ACCELERATION_Y: usize = 10;
+/// The rating the lander is given, whether Autoland helped, and the count
+/// that takes them into its ratings: see
+/// `tcsprotocol::node::physics::lander`'s "Ratings".
+const RATING: usize = 14;
+const RATING_AUTOLAND: usize = 15;
+const RATED: usize = 16;
 
 /// The joystick's inputs' places, in
 /// `tcsprotocol::node::physics::joystick_3_4::TERMINALS`'s order.
@@ -709,6 +715,10 @@ pub struct Watch {
     /// The lander drawn once, at the middle of the display, for its
     /// figures, which a window's do not change.
     drawn: Option<Drawn>,
+    /// When it last landed, in the time `frame` is given as `simulated`,
+    /// while it stands on the pad: what the countdown to its start again
+    /// counts from.
+    landed_since: Option<f64>,
 }
 
 /// The lander's picture, drawn once at the middle of the display: the pane
@@ -770,6 +780,8 @@ struct Readouts {
     /// The X and Y position, velocity, acceleration and thrust, as
     /// written.
     values: [String; 8],
+    /// How the speeds stood against the touchdown limits, X and Y.
+    touchdown: (Touchdown, Touchdown),
 }
 
 /// The lander as last seen flying.
@@ -1773,6 +1785,7 @@ fn rate(
         );
         pane.set_rating_shown(1.0);
         fade.set(None);
+        give_rating(scene, share, landing.assisted, out[RATED]);
     }
     let lifted = states == (Stopped::Pad, Stopped::Flying);
     if (restarted || lifted)
@@ -1788,6 +1801,33 @@ fn rate(
             fade.set(None);
         }
     }
+}
+
+/// Gives the lander a landing's rating, as the window shows it, for its
+/// `ratings` to send down: drives `rating` and `rating_autoland`, then
+/// `rated` to the count after the one it holds, which takes them.
+///
+/// # Arguments
+///
+/// * `scene`    - The lander's world.
+/// * `share`    - The rating, a share of one.
+/// * `autoland` - Whether Autoland helped fly the landing.
+/// * `count`    - The count `rated` holds now.
+fn give_rating(scene: &Scene, share: f64, autoland: bool, count: f64) {
+    let now = Instant::now();
+    let drive = |terminal, value| {
+        scene.world.drive_by_hand(
+            Place {
+                component: scene.lander,
+                terminal,
+            },
+            value,
+            now,
+        );
+    };
+    drive(RATING, share);
+    drive(RATING_AUTOLAND, f64::from(u8::from(autoland)));
+    drive(RATED, count.rem_euclid(255.0) + 1.0);
 }
 
 /// How much of a fading rating is still drawn.
@@ -1990,12 +2030,86 @@ fn show(pane: &LanderScene<'_>, scene: &Scene, seconds: f64) {
     set_frame(pane, &frame);
 }
 
+/// How a speed toward a touchdown limit stands against it, for the pane to
+/// warn by: in words, and in a colour that goes with them.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Touchdown {
+    /// Within [`CLOSE`] of the limit, or going away from the ground.
+    #[default]
+    Ok,
+    /// Past [`CLOSE`] of it, and within it.
+    Close,
+    /// Faster than the limit: a touchdown now would be a crash.
+    TooFast,
+}
+
+/// The share of a touchdown limit past which a speed is close to it.
+pub const CLOSE: f64 = 0.75;
+
+impl Touchdown {
+    /// How a speed stands against a limit.
+    ///
+    /// # Arguments
+    ///
+    /// * `speed` - The speed toward the ground or across, in metres a
+    ///             second: nought or less is away from the ground.
+    /// * `limit` - The limit, in metres a second.
+    ///
+    /// # Returns
+    ///
+    /// Where it stands.
+    pub fn of(speed: f64, limit: f64) -> Touchdown {
+        if speed > limit {
+            Touchdown::TooFast
+        } else if speed > CLOSE * limit {
+            Touchdown::Close
+        } else {
+            Touchdown::Ok
+        }
+    }
+
+    /// What the pane says of it.
+    ///
+    /// # Returns
+    ///
+    /// The words.
+    pub fn said(self) -> &'static str {
+        match self {
+            Touchdown::Ok => "ok",
+            Touchdown::Close => "close",
+            Touchdown::TooFast => "too fast",
+        }
+    }
+
+    /// The colour it is said in, with its words, never instead of them:
+    /// Okabe-Ito's bluish green, orange and vermillion.
+    ///
+    /// # Returns
+    ///
+    /// The colour.
+    pub fn colour(self) -> slint::Color {
+        match self {
+            Touchdown::Ok => slint::Color::from_rgb_u8(0x00, 0x9E, 0x73),
+            Touchdown::Close => slint::Color::from_rgb_u8(0xE6, 0x9F, 0x00),
+            Touchdown::TooFast => slint::Color::from_rgb_u8(0xD5, 0x5E, 0x00),
+        }
+    }
+}
+
 /// What the lander's pane shows at a moment that moves: every picture and
 /// every word, worked out from the lander's outputs, for a window to be set
 /// from. tcs-sim's window sets its pane from the world's lander; a ground
 /// station sets its own from what the vehicles send down.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Frame {
+    /// How the lander's speed along X stands against the touchdown limit
+    /// across, `landing_drift`: see [`Touchdown`].
+    pub touchdown_x: Touchdown,
+    /// How its speed down stands against the limit down, `landing_speed`.
+    pub touchdown_y: Touchdown,
+    /// While it stands on the pad, the whole seconds left before it starts
+    /// again by itself, its pad wait run; `None` otherwise.
+    pub countdown: Option<u32>,
     /// The lander's single lines, as picture commands; empty while it has
     /// crashed.
     pub lander_lines: String,
@@ -2128,6 +2242,13 @@ impl Watch {
             frame.lander_green.clear();
             frame.lander_strobes.clear();
         }
+        if out[LANDED] > 0.5 {
+            let since = *self.landed_since.get_or_insert(simulated);
+            let left = f.pad_wait.as_secs_f64() - (simulated - since);
+            frame.countdown = Some(left.ceil().max(0.0) as u32);
+        } else {
+            self.landed_since = None;
+        }
         self.hold_readouts(&mut frame, seconds);
         frame
     }
@@ -2153,6 +2274,7 @@ impl Watch {
                 frame.acceleration_y = ay;
                 frame.thrust_x = tx;
                 frame.thrust_y = ty;
+                (frame.touchdown_x, frame.touchdown_y) = kept.touchdown;
                 return;
             }
         }
@@ -2170,6 +2292,7 @@ impl Watch {
                 frame.thrust_x.clone(),
                 frame.thrust_y.clone(),
             ],
+            touchdown: (frame.touchdown_x, frame.touchdown_y),
         });
     }
 }
@@ -2199,7 +2322,15 @@ fn set_frame(pane: &LanderScene<'_>, frame: &Frame) {
     pane.set_fire_left(frame.fire_left);
     pane.set_debris(frame.debris.as_str().into());
     pane.set_face(frame.face.as_str().into());
-    pane.set_state(said(frame.state, pane.get_autoland()).into());
+    let state = said(frame.state, pane.get_autoland());
+    pane.set_state(match frame.countdown {
+        Some(left) => format!("{state}\nStarting again in {left} s").into(),
+        None => state.into(),
+    });
+    pane.set_touchdown_x(frame.touchdown_x.said().into());
+    pane.set_touchdown_x_colour(frame.touchdown_x.colour());
+    pane.set_touchdown_y(frame.touchdown_y.said().into());
+    pane.set_touchdown_y_colour(frame.touchdown_y.colour());
     pane.set_fuel(frame.fuel);
     pane.set_position_x(frame.position_x.as_str().into());
     pane.set_position_y(frame.position_y.as_str().into());
@@ -2288,6 +2419,8 @@ fn painted_from(f: &Resolved, out: &[f64], picture: &Drawn) -> Frame {
         acceleration_y: format!("{:.3}", out[ACCELERATION_Y]),
         thrust_x: format!("{:.0}", thrust(f, out).0),
         thrust_y: format!("{:.0}", thrust(f, out).1),
+        touchdown_x: Touchdown::of(out[VELOCITY_X].abs(), f.landing_drift),
+        touchdown_y: Touchdown::of(-out[VELOCITY_Y], f.landing_speed),
         ..Frame::default()
     }
 }
@@ -3115,6 +3248,57 @@ pub(crate) mod tests {
         out[CRASHED] = 1.0;
         let ([glow, _, side, _], _, _) = plumes(&f, &out);
         assert!(glow.is_empty() && side.is_empty());
+    }
+
+    /// A speed is ok within three quarters of its touchdown limit, close
+    /// within it, and too fast past it; a frame says each axis's, down for
+    /// Y, going up being ok; and the words go with their colours.
+    #[test]
+    fn the_landing_speed_is_said_against_the_limits() {
+        assert_eq!(Touchdown::of(4.0, 6.1), Touchdown::Ok);
+        assert_eq!(Touchdown::of(5.0, 6.1), Touchdown::Close);
+        assert_eq!(Touchdown::of(6.2, 6.1), Touchdown::TooFast);
+        assert_eq!(Touchdown::of(-20.0, 6.1), Touchdown::Ok);
+        assert_eq!(
+            [Touchdown::Ok, Touchdown::Close, Touchdown::TooFast]
+                .map(Touchdown::said),
+            ["ok", "close", "too fast"]
+        );
+        let f = Resolved {
+            landing_speed: 6.1,
+            landing_drift: 2.44,
+            ..figures()
+        };
+        let mut out = vec![0.0; RATED + 1];
+        out[FUEL] = 1.0;
+        out[VELOCITY_X] = -2.0;
+        out[VELOCITY_Y] = -7.0;
+        let frame = Watch::default().frame(&f, &out, 0.0, 0.0);
+        assert_eq!(frame.touchdown_x, Touchdown::Close);
+        assert_eq!(frame.touchdown_y, Touchdown::TooFast);
+    }
+
+    /// Standing on the pad, a frame counts down the whole seconds of the
+    /// pad wait left, from when it landed in the time it is given; and not
+    /// at all once it lifts off.
+    #[test]
+    fn the_pad_counts_down_to_the_start_again() {
+        let f = Resolved {
+            pad_wait: Duration::from_secs(10),
+            ..figures()
+        };
+        let mut watch = Watch::default();
+        let mut out = vec![0.0; RATED + 1];
+        out[FUEL] = 1.0;
+        assert_eq!(watch.frame(&f, &out, 50.0, 0.0).countdown, None);
+        out[LANDED] = 1.0;
+        assert_eq!(watch.frame(&f, &out, 100.0, 0.0).countdown, Some(10));
+        assert_eq!(watch.frame(&f, &out, 103.5, 0.0).countdown, Some(7));
+        assert_eq!(watch.frame(&f, &out, 120.0, 0.0).countdown, Some(0));
+        out[LANDED] = 0.0;
+        assert_eq!(watch.frame(&f, &out, 121.0, 0.0).countdown, None);
+        out[LANDED] = 1.0;
+        assert_eq!(watch.frame(&f, &out, 130.0, 0.0).countdown, Some(10));
     }
 
     /// A frame's plumes, drawn with the lander at the middle of the display

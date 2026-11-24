@@ -423,6 +423,64 @@ class Shown(unittest.TestCase):
         readings.values["crashed"] = "0"
         self.assertEqual(readings.thrust("x", lander), 0.0)
 
+    def test_the_landing_speed_is_said_against_the_limits(self):
+        """Across either way and down, within three quarters of the limit
+        is ok, within it close, past it too fast; up is ok."""
+        import yaml
+        lander = lander_yamcs.Lander(lander_yamcs.lander_settings(
+            yaml.safe_load(lander_yamcs.SHIPPED_SIM.read_text())))
+        self.assertEqual(lander.limit, {"x": 2.44, "y": 6.1})
+        readings = lander_yamcs.Readings([])
+        self.assertIsNone(readings.touchdown("y", lander))
+        for velocity, said in ((-4.0, "ok"), (-5.0, "close"),
+                               (-6.2, "too fast"), (20.0, "ok")):
+            readings.values["to_velocity_y"] = velocity
+            self.assertEqual(readings.touchdown("y", lander), said)
+        for velocity, said in ((1.0, "ok"), (-2.0, "close"),
+                               (2.5, "too fast")):
+            readings.values["to_velocity_x"] = velocity
+            self.assertEqual(readings.touchdown("x", lander), said)
+
+    def test_the_pad_counts_down_to_the_start_again(self):
+        """Standing on the pad, the seconds left of the pad wait, from when
+        the landed signal came down; nothing otherwise."""
+        import yaml
+        lander = lander_yamcs.Lander(lander_yamcs.lander_settings(
+            yaml.safe_load(lander_yamcs.SHIPPED_SIM.read_text())))
+        self.assertEqual(lander.pad_wait, 10.0)
+        readings = lander_yamcs.Readings([])
+        self.assertIsNone(readings.countdown(lander, now=100.0))
+        self.assertEqual(readings.state_text(lander), "Flying")
+        readings.values["landed"] = "1"
+        readings.changed["landed"] = 100.0
+        self.assertEqual(readings.countdown(lander, now=100.0), 10)
+        self.assertEqual(readings.countdown(lander, now=103.5), 7)
+        self.assertEqual(readings.countdown(lander, now=120.0), 0)
+
+    def test_ratings_are_listed_the_latest_first(self):
+        """The ratings' records are kept by when, each once however often
+        it comes, the latest first, no more than RATINGS_LISTED, each said
+        as tcs-sim's pane said it."""
+        import struct
+        import time
+
+        def record(when, tenths, autoland):
+            return struct.pack(lander_yamcs.RATING_LAYOUT, when, tenths,
+                               autoland)
+
+        ratings = lander_yamcs.Ratings()
+        self.assertEqual(ratings.lines(), [])
+        noon = int(time.mktime((2026, 11, 23, 12, 0, 0, 0, 0, -1))) * 1000
+        ratings.take(record(noon + 60_000, 520, 1) + record(noon, 874, 0)
+                     + b"\x01\x02")
+        ratings.take(record(noon, 874, 0))
+        self.assertEqual(ratings.lines(),
+                         ["12:01:00  52% w/ Autoland", "12:00:00  87%"])
+        for n in range(lander_yamcs.RATINGS_LISTED + 5):
+            ratings.take(record(noon + 120_000 + n, 500, 0))
+        self.assertEqual(len(ratings.lines()), lander_yamcs.RATINGS_LISTED)
+        self.assertNotIn("12:00:00  87%", ratings.lines())
+
     def test_points_read_back(self):
         """Points written as the simulator file states them read back."""
         points = [(0.0, 1.5), (10.0, 0.0)]

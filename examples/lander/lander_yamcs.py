@@ -129,6 +129,18 @@ LOWEST_PAD = 0.02
 #: What a value is shown as before one has arrived.
 NOTHING_YET = "--"
 
+#: The share of a touchdown limit past which a speed is close to it:
+#: tcs-sim's ``CLOSE``, in tcs-sim/src/lander_view.rs.
+CLOSE = 0.75
+
+#: How a speed stands against its touchdown limit, as the window says it:
+#: the words, and the colour they are set in -- Okabe-Ito's bluish green,
+#: orange and vermillion -- as tcs-sim's pane says it. Never the colour
+#: alone.
+TOUCHDOWN = {"ok": ("ok", "#009E73"),
+             "close": ("close", "#E69F00"),
+             "too fast": ("too fast", "#D55E00")}
+
 #: The least the bottom engine burns at, as a share of its full thrust,
 #: once it burns at all: tcs-sim's ``LEAST_THROTTLE``, in
 #: tcs-sim/src/node/physics/lander.rs.
@@ -171,6 +183,18 @@ ARM = 105
 #: ``node::physics::lander``, "Sky", is where they are said.
 STAR_RECORD = 16
 STAR_LAYOUT = ">HHHBBII"
+
+#: How one of the lander's ratings is laid out in a record of the
+#: ``ratings`` node, :data:`STAR_RECORD` bytes: when it was rated, in
+#: milliseconds since the Unix epoch, eight bytes; the rating, in tenths of
+#: a percent, two bytes; one where Autoland helped and nought where not, a
+#: byte; and five bytes of nought. tcsprotocol's ``node::physics::lander``,
+#: "Ratings", is where they are said.
+RATING_LAYOUT = ">QHB5x"
+
+#: How many ratings the window lists, the latest first: as many as the
+#: lander keeps, tcsprotocol's ``RATINGS_KEPT``.
+RATINGS_LISTED = 20
 
 #: How wide, in pixels, the scene is that a record's radius is given for:
 #: tcsprotocol's ``SKY_WIDTH``, part of the records' layout.
@@ -333,6 +357,14 @@ class Lander:
             #: Each axis's full thrust, in newtons.
             self.thrust = {"x": float(settings["thrust_x"].split()[0]),
                            "y": float(settings["thrust_y"].split()[0])}
+            #: The touchdown limits, across and down, in metres a second.
+            self.limit = {
+                "x": float(settings["landing_drift"].split()[0]),
+                "y": float(settings["landing_speed"].split()[0])}
+            #: How long it stands on the pad after a landing before it
+            #: starts again by itself, in seconds.
+            self.pad_wait = float(settings.get("pad_wait", "10 s")
+                                  .split()[0])
         except (KeyError, IndexError, AttributeError) as why:
             raise ValueError(f"the lander's settings: {why}")
 
@@ -864,6 +896,54 @@ class Sky:
         return cleared, stars
 
 
+class Ratings:
+    """The lander's latest landing ratings, as their records come down.
+
+    tcs-sim sends them round and round, the latest first, four to a packet;
+    Yamcs is read for the latest packet, so one is missed now and then and
+    had on a later pass. Each is kept by when it was rated, which no two
+    share, and no more than :data:`RATINGS_LISTED` of the latest.
+    """
+
+    def __init__(self):
+        #: Each rating, by when it was rated, in milliseconds since the
+        #: Unix epoch: ``(rating, autoland)``, the rating a share of one.
+        self.by_when = {}
+        self._lock = threading.Lock()
+
+    def take(self, data):
+        """Takes a packet of records.
+
+        Args:
+            data: The packet's bytes: whole records, a trailing part of one
+                  left alone.
+        """
+        with self._lock:
+            for at in range(0, len(data) - STAR_RECORD + 1, STAR_RECORD):
+                when, tenths, autoland = struct.unpack(
+                    RATING_LAYOUT, data[at:at + STAR_RECORD])
+                self.by_when[when] = (tenths / 1000, autoland != 0)
+            for when in sorted(self.by_when)[:-RATINGS_LISTED]:
+                del self.by_when[when]
+
+    def lines(self):
+        """The ratings as the window lists them, the latest first: the time
+        of day each was rated, and the rating as tcs-sim's pane said it,
+        *w/ Autoland* where Autoland helped.
+
+        Returns:
+            Each as a line of text.
+        """
+        with self._lock:
+            listed = sorted(self.by_when.items(), reverse=True)
+        said = []
+        for when, (rating, autoland) in listed:
+            at = time.strftime("%H:%M:%S", time.localtime(when / 1000))
+            with_autoland = " w/ Autoland" if autoland else ""
+            said.append(f"{at}  {rating * 100:.0f}%{with_autoland}")
+        return said
+
+
 class Readings:
     """What the two vehicles last said, read from Yamcs.
 
@@ -887,6 +967,9 @@ class Readings:
         #: Each axis's thrust as last worked out before a crash, which
         #: stands from the crash until the lander starts again.
         self._thrust_before = {}
+        #: The lander's ratings, which each new packet of the ``ratings``
+        #: node's records is given to.
+        self.ratings = Ratings()
 
     def read(self):
         """Reads each vehicle's latest values from Yamcs."""
@@ -903,6 +986,8 @@ class Readings:
                             self.changed[node] = now
                             if node == "sky" and self.sky is not None:
                                 fresh.append(value)
+                            if node == "ratings":
+                                self.ratings.take(value)
                         self.values[node] = value
             # Outside the lock: a whole sky sends a quench.
             for value in fresh:
@@ -1025,6 +1110,66 @@ class Readings:
             thrust = throttle * lander.thrust[axis]
         self._thrust_before[axis] = thrust
         return thrust
+
+    def touchdown(self, axis, lander):
+        """How an axis's speed stands against its touchdown limit: across
+        within ``landing_drift`` either way; down within ``landing_speed``,
+        going up being well within it.
+
+        Args:
+            axis:   ``"x"`` or ``"y"``.
+            lander: The :class:`Lander`, whose limits these are.
+
+        Returns:
+            ``"ok"``, ``"close"`` or ``"too fast"`` -- keys of
+            :data:`TOUCHDOWN` -- or ``None`` before the velocity has
+            arrived.
+        """
+        velocity = self.number(f"to_velocity_{axis}")
+        if velocity is None:
+            return None
+        speed = abs(velocity) if axis == "x" else -velocity
+        limit = lander.limit[axis]
+        if speed > limit:
+            return "too fast"
+        if speed > CLOSE * limit:
+            return "close"
+        return "ok"
+
+    def countdown(self, lander, now=None):
+        """The whole seconds left before the lander, standing on the pad,
+        starts again by itself: its pad wait, counted from when the landed
+        signal came down.
+
+        Args:
+            lander: The :class:`Lander`, whose pad wait it is.
+            now:    The moment, on this program's monotonic clock; now if
+                    ``None``.
+
+        Returns:
+            The seconds, or ``None`` while it does not stand on the pad.
+        """
+        if not self.said("landed"):
+            return None
+        now = time.monotonic() if now is None else now
+        with self._lock:
+            since = self.changed.get("landed", now)
+        return max(0, math.ceil(lander.pad_wait - (now - since)))
+
+    def state_text(self, lander):
+        """What the lander is doing, as the window says it: with the
+        seconds before it starts again, while it stands on the pad.
+
+        Args:
+            lander: The :class:`Lander`.
+
+        Returns:
+            The words.
+        """
+        left = self.countdown(lander)
+        if left is None:
+            return self.state()
+        return f"{self.state()}\nStarting again in {left} s"
 
     def thrust_text(self, axis, lander):
         """An axis's thrust as the window shows it.
@@ -1428,6 +1573,12 @@ def run_the_window(readings, lander, delay, stopped, restarter,
                               text="Flying",
                               fill="#ffffff",
                               font=("TkDefaultFont", 14, "bold"))
+    # The lander's ratings, as they come down, at the top right of the sky,
+    # which the ground never reaches.
+    listed = scene.create_text(wide - 8 * zoom, 6 * zoom, anchor="ne",
+                               justify="right", text="",
+                               fill="#ffffff",
+                               font=("TkDefaultFont", fonts.POINTS - 2))
     drawn = []
     opened = time.monotonic()
     green, whites = lander_lights(lander)
@@ -1458,10 +1609,45 @@ def run_the_window(readings, lander, delay, stopped, restarter,
     # Each row's name, its unit, and what says its X and its Y: a node's
     # value, or for the thrust, worked out from the joystick's -- under the
     # accelerations, as in tcs-sim's lander pane.
+    def coloured(text, axis):
+        """A value with the colour its axis's touchdown is said in.
+
+        Args:
+            text: The value, as written.
+            axis: ``"x"`` or ``"y"``.
+
+        Returns:
+            ``(text, colour)``, the colour ``None`` for the window's own.
+        """
+        said = readings.touchdown(axis, lander)
+        return text, None if said is None else TOUCHDOWN[said][1]
+
+    def touchdown(axis):
+        """An axis's touchdown, in words and their colour.
+
+        Args:
+            axis: ``"x"`` or ``"y"``.
+
+        Returns:
+            ``(words, colour)``.
+        """
+        said = readings.touchdown(axis, lander)
+        return (NOTHING_YET, None) if said is None else TOUCHDOWN[said]
+
     rows = [(name, unit, (lambda node=x: readings.text(node)),
              (lambda node=y: readings.text(node)))
             for name, unit, x, y in ROWS]
-    below_acceleration = 1 + [row[0] for row in ROWS].index("Acceleration")
+    # The velocity in the colour of how it stands against the limits, and
+    # under it, those words.
+    at_velocity = [row[0] for row in ROWS].index("Velocity")
+    rows[at_velocity] = (
+        "Velocity", "m/s",
+        lambda: coloured(readings.text("to_velocity_x"), "x"),
+        lambda: coloured(readings.text("to_velocity_y"), "y"))
+    rows.insert(at_velocity + 1, ("Landing speed", "",
+                                  lambda: touchdown("x"),
+                                  lambda: touchdown("y")))
+    below_acceleration = 1 + [row[0] for row in rows].index("Acceleration")
     rows.insert(below_acceleration, ("Thrust", "N",
                     lambda: readings.thrust_text("x", lander),
                     lambda: readings.thrust_text("y", lander)))
@@ -1538,11 +1724,16 @@ def run_the_window(readings, lander, delay, stopped, restarter,
             window.destroy()
             return
         for value, get in shown:
-            value.configure(text=get())
+            said = get()
+            text, colour = said if isinstance(said, tuple) else (said, None)
+            value.configure(text=text, foreground=colour or "")
         left = readings.number("to_fuel")
         fuel.configure(text="Fuel --" if left is None
                        else f"Fuel {round(left * 100)}%")
-        scene.itemconfigure(state, text=readings.state())
+        scene.itemconfigure(state, text=readings.state_text(lander))
+        lines = readings.ratings.lines()
+        scene.itemconfigure(listed, text="\n".join(
+            ["Ratings"] + lines if lines else []))
         draw_the_sky()
         for item in drawn:
             scene.delete(item)

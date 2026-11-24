@@ -149,6 +149,15 @@ simulated_payloads:
         configuration: lander-b
         connects: lander.crashed
         group: readings
+      # The lander's latest landing ratings, four a packet, round and
+      # round, which lander-b passes down to the ground to list.
+      - payload: ratings
+        configuration: lander-b
+        connects: lander.ratings
+        enable: true
+        packet_interval: 200 ms
+        protocol: udp
+        simulate: true
       # What the ground's Restart reaches, through lander-b's gateway: a
       # count, each new one starting the lander again.
       - payload: restart

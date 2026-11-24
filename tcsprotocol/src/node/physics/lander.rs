@@ -73,6 +73,19 @@
 //! bytes each. A ground station that has every star of a generation drives
 //! `sky_quench` to that generation, and the lander stops sending until its
 //! sky is made again, with a new generation.
+//!
+//! # Ratings
+//!
+//! tcs-sim's window rates each landing (see its `landing_rating`) and gives
+//! the rating to the lander: it drives `rating` to it and
+//! `rating_autoland` to whether Autoland helped, then `rated` to a new
+//! count, which takes the two, stamped with the time, into the lander's
+//! latest [`RATINGS_KEPT`] ratings. Its `ratings` output sends them as
+//! records, the latest first, round and round as the sky goes, so that the
+//! ground lists them. Each is [`STAR_RECORD`] bytes, most significant byte
+//! first: when, in milliseconds since the Unix epoch, eight bytes; the
+//! rating, in tenths of a percent, two bytes; one for Autoland's help and
+//! nought for none, a byte; and five bytes of nought.
 
 use tcsos::time::Duration;
 
@@ -110,7 +123,70 @@ pub const TERMINALS: &[Terminal] = &[
     // Driven to the generation of its sky that the ground has whole: while
     // it is the sky's own, the sky is not sent.
     Terminal::input("sky_quench", Kind::Decision),
+    // A landing's rating, as tcs-sim's window shows it, a share of one:
+    // what `rated` takes into its ratings. See the module's "Ratings".
+    Terminal::input("rating", Kind::Value(Unit::Ratio)),
+    // Whether Autoland flew any of that landing past its first two
+    // seconds: the rating's *w/ Autoland*.
+    Terminal::input("rating_autoland", Kind::Decision),
+    // Takes `rating` and `rating_autoland` into its ratings, stamped with
+    // the time, each time it is driven to a new value other than nought: a
+    // count, as `restart` is, so that two equal ratings are two.
+    Terminal::input("rated", Kind::Decision),
+    // Its latest ratings' records: see the module's "Ratings".
+    Terminal::output("ratings", Kind::Records),
 ];
+
+/// How many ratings the lander keeps, and sends: the latest.
+pub const RATINGS_KEPT: usize = 20;
+
+/// One rating, as a record of `ratings` carries it: [`STAR_RECORD`] bytes,
+/// so that a simulated payload sends it as it sends a star.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RatingRecord {
+    /// When the landing was rated, in milliseconds since the Unix epoch.
+    pub when: u64,
+    /// The rating, a share of one.
+    pub rating: f64,
+    /// Whether Autoland helped fly the landing.
+    pub autoland: bool,
+}
+
+impl RatingRecord {
+    /// Its bytes, as the module's "Ratings" lays them out.
+    ///
+    /// # Returns
+    ///
+    /// The record. A rating is held between nought and one.
+    pub fn to_bytes(&self) -> [u8; STAR_RECORD] {
+        let mut out = [0u8; STAR_RECORD];
+        out[0..8].copy_from_slice(&self.when.to_be_bytes());
+        let tenths = (self.rating * 1000.0).round().clamp(0.0, 1000.0) as u16;
+        out[8..10].copy_from_slice(&tenths.to_be_bytes());
+        out[10] = u8::from(self.autoland);
+        out
+    }
+
+    /// A record read back from its bytes.
+    ///
+    /// # Arguments
+    ///
+    /// * `bytes` - The record's bytes.
+    ///
+    /// # Returns
+    ///
+    /// The rating, to the tenth of a percent its field holds.
+    pub fn from_bytes(bytes: &[u8; STAR_RECORD]) -> RatingRecord {
+        let mut when = [0u8; 8];
+        when.copy_from_slice(&bytes[0..8]);
+        RatingRecord {
+            when: u64::from_be_bytes(when),
+            rating: f64::from(u16::from_be_bytes([bytes[8], bytes[9]]))
+                / 1000.0,
+            autoland: bytes[10] != 0,
+        }
+    }
+}
 
 /// How many bytes one of the sky's records is.
 pub const STAR_RECORD: usize = 16;

@@ -490,6 +490,16 @@ output, carrying a value in one unit, a decision, or records:
                   sky_quench    in    a whole number: while it is the
                                       sky's generation, the sky is not
                                       sent
+                  rating        in    a ratio: a landing's rating, as
+                                      tcs-sim's window shows it
+                  rating_autoland in  a decision: whether Autoland helped
+                                      fly that landing
+                  rated         in    a whole number: each new one other
+                                      than nought takes rating and
+                                      rating_autoland, stamped with the
+                                      time, into its ratings
+                  ratings       out   records: its latest 20 ratings,
+                                      the latest first, sent down
    joystick_3_4   set_x         in    a ratio, driven by tcs-sim's window
                   set_y         in    a ratio, driven by tcs-sim's window
                   x, y          out   a ratio each, held within minus one

@@ -387,9 +387,10 @@ ul.auto-toc {
 <li><a class="reference internal" href="#tcs-sim-s-window" id="toc-entry-14">tcs-sim's window</a></li>
 <li><a class="reference internal" href="#the-ground-s-window" id="toc-entry-15">The ground's window</a></li>
 <li><a class="reference internal" href="#the-sky-sent-down" id="toc-entry-16">The sky, sent down</a></li>
+<li><a class="reference internal" href="#the-ratings-sent-down" id="toc-entry-17">The ratings, sent down</a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#how-it-was-made" id="toc-entry-17">How it was made</a></li>
+<li><a class="reference internal" href="#how-it-was-made" id="toc-entry-18">How it was made</a></li>
 </ul>
 </div>
 <div class="admonition note">
@@ -539,7 +540,8 @@ is in the loop and nothing aboard needs floating point;</li>
 <li>a <tt class="docutils literal">gateway_yamcs</tt> gateway, which takes the four values to the ground;
 lander-b's takes the <tt class="docutils literal">landed</tt> and <tt class="docutils literal">crashed</tt> signals too, each the
 text <tt class="docutils literal">1</tt> or <tt class="docutils literal">0</tt>, typed <tt class="docutils literal">string(1)</tt> so that Yamcs shows that text
-rather than its bytes.</li>
+rather than its bytes, and the lander's ratings (see &quot;The ratings, sent
+down&quot;).</li>
 </ul>
 <p><tt class="docutils literal"><span class="pre">lander-a</span></tt> also sends the fuel left, and <tt class="docutils literal"><span class="pre">lander-b</span></tt> whether the lander
 has landed or crashed. Each logs to its own directory under
@@ -579,8 +581,16 @@ white with thin black lines so that it shows against the sky and the
 ground, with the smiling face after a landing;</li>
 <li>&quot;Landed&quot;, or on a crash &quot;On the Moon, no one can hear you CRASH!&quot;, in
 words, and the fuel left, in words and as a
-bar;</li>
-<li>below them, the X and Y position, velocity, acceleration and thrust,
+bar; standing on the pad, under &quot;Landed&quot;, &quot;Starting again in N s&quot;, the
+whole seconds of the pad wait left, so that a visitor knows how long
+there is to read the rating or to lift off again;</li>
+<li>below them, the X and Y position, velocity, &quot;Landing speed&quot;,
+acceleration and thrust. &quot;Landing speed&quot; says how each axis's speed
+stands against its touchdown limit -- across either way against
+<tt class="docutils literal">landing_drift</tt>, down against <tt class="docutils literal">landing_speed</tt> -- as &quot;ok&quot; within
+three quarters of it, &quot;close&quot; within it, and &quot;too fast&quot; past it, in
+bold, in Okabe-Ito's bluish green, orange and vermillion; the velocity
+is shown in the same colour, always beside those words. The values are
 each named and with its unit, the thrust in newtons: the throttle the
 lander burns at times the axis's full thrust, nought with the tank
 empty. From a crash until the lander starts again they stand at what
@@ -607,15 +617,21 @@ second and shows:</p>
 position sent down, smaller than tcs-sim's;</li>
 <li>the stars of tcs-sim's sky, as they are sent down: none at first, each
 appearing as its record arrives (see &quot;The sky, sent down&quot;);</li>
-<li>the six values sent down, with the thrust under the accelerations,
-worked out from the joystick's values as tcs-sim works it out from the
+<li>the six values sent down, with &quot;Landing speed&quot; under the velocity, as
+tcs-sim's pane has it, and the thrust under the accelerations, worked
+out from the joystick's values as tcs-sim works it out from the
 throttles, and standing from a crash at what it was before it, as
 tcs-sim's does; and the fuel left;</li>
+<li>at the top right of the landscape, over the sky, the lander's latest
+landing ratings as they come down, the latest first: the time of day
+each was rated and the rating as tcs-sim's pane said it, <em>w/ Autoland</em>
+where Autoland helped (see &quot;The ratings, sent down&quot;);</li>
 <li>a joystick like tcs-sim's, its two lines at the X and Y values the
 joystick sent down, or its plus when they are nought; the pointer does
 nothing there;</li>
 <li>&quot;Landed&quot;, or &quot;On the Moon, no one can hear you CRASH!&quot;, when the values
-sent down say so;</li>
+sent down say so; and under &quot;Landed&quot; the seconds left before the lander
+starts again, counted from when the landed signal came down;</li>
 <li>a Restart button, which sends a command up through lander-b's gateway to
 a simulated payload, <tt class="docutils literal">restart</tt>, joined to the lander's <tt class="docutils literal">restart</tt>
 input: each press a new count, the lander starting again at each, a light
@@ -660,9 +676,27 @@ would have read a quench as an order. A sky made again would have a new generati
 afresh and gathered afresh; tcs-sim makes its sky once a run, as
 generation 1.</p>
 </div>
+<div class="section" id="the-ratings-sent-down">
+<h2><a class="toc-backref" href="#toc-entry-17">The ratings, sent down</a></h2>
+<p>tcs-sim's window rates each landing (see the requirement for its rating
+in docs/tcs-sim-design.rst) and gives the rating to the lander as it
+shows it: it drives the lander's <tt class="docutils literal">rating</tt> input to the rating,
+<tt class="docutils literal">rating_autoland</tt> to whether Autoland helped, and then <tt class="docutils literal">rated</tt> to a
+new count, which takes the two, stamped with the time of day, into the
+lander's latest 20 ratings. The lander's <tt class="docutils literal">ratings</tt> output sends them
+as records of 16 bytes, the latest first, four to a packet every fifth
+of a second, round and round as the sky goes: when it was rated, in
+milliseconds since the Unix epoch, eight bytes; the rating, in tenths of
+a percent, two bytes; one where Autoland helped and nought where not, a
+byte; and five bytes of nought. The simulated payload <tt class="docutils literal">ratings</tt> sends
+them to lander-b, whose gateway passes them down, as bytes, to Yamcs's
+<tt class="docutils literal">ratings</tt> parameter, and the ground's window lists them. A packet
+missed is had on a later pass, and the ground keeps each rating by when
+it was rated, so a rating comes once however often it arrives.</p>
+</div>
 </div>
 <div class="section" id="how-it-was-made">
-<h1><a class="toc-backref" href="#toc-entry-17">How it was made</a></h1>
+<h1><a class="toc-backref" href="#toc-entry-18">How it was made</a></h1>
 <p>In this order, each stage checked before the next:</p>
 <ol class="arabic simple">
 <li><strong>One world for two tcspecials.</strong> tcs-sim takes more than one

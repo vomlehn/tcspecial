@@ -52,6 +52,7 @@
                 <moc-out>restart.gateway</moc-out>
                 <world-in>crashed</world-in>
                 <world-in>landed</world-in>
+                <world-in>ratings</world-in>
                 <world-in>to_accel_y</world-in>
                 <world-in>to_joystick_3_4_y</world-in>
                 <world-in>to_velocity_y</world-in>
@@ -127,6 +128,12 @@
                 <protocol>udp</protocol>
                 <world-out-type>string(1)</world-out-type>
                 <world-out>gateway.landed</world-out>
+            </payload>
+            <payload name="ratings">
+                <read_size>64</read_size>
+                <address>127.0.0.24:20809</address>
+                <protocol>udp</protocol>
+                <world-out>gateway.ratings</world-out>
             </payload>
             <payload name="restart">
                 <address>127.0.0.24:20808</address>

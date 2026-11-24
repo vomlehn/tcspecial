@@ -95,10 +95,27 @@
           </Variable>
         </StringDataEncoding>
       </StringParameterType>
+      <IntegerParameterType name="bytes_length" signed="false"
+          sizeInBits="32">
+        <IntegerDataEncoding sizeInBits="32" encoding="unsigned"/>
+        <ValidRange minInclusive="0" maxInclusive="4096"/>
+      </IntegerParameterType>
+      <BinaryParameterType name="bytes">
+        <BinaryDataEncoding>
+          <SizeInBits>
+            <DynamicValue>
+              <ParameterInstanceRef parameterRef="bytes_length"/>
+              <LinearAdjustment slope="8"/>
+            </DynamicValue>
+          </SizeInBits>
+        </BinaryDataEncoding>
+      </BinaryParameterType>
     </ParameterTypeSet>
     <ParameterSet>
+      <Parameter name="bytes_length" parameterTypeRef="bytes_length"/>
       <Parameter name="crashed" parameterTypeRef="string"/>
       <Parameter name="landed" parameterTypeRef="string"/>
+      <Parameter name="ratings" parameterTypeRef="bytes"/>
       <Parameter name="to_accel_y" parameterTypeRef="metre_per_second_squared"/>
       <Parameter name="to_joystick_3_4_y" parameterTypeRef="ratio"/>
       <Parameter name="to_velocity_y" parameterTypeRef="metre_per_second"/>
@@ -113,6 +130,12 @@
       <SequenceContainer name="landed_packet">
         <EntryList>
           <ParameterRefEntry parameterRef="landed"/>
+        </EntryList>
+      </SequenceContainer>
+      <SequenceContainer name="ratings_packet">
+        <EntryList>
+          <ParameterRefEntry parameterRef="bytes_length"/>
+          <ParameterRefEntry parameterRef="ratings"/>
         </EntryList>
       </SequenceContainer>
       <SequenceContainer name="to_accel_y_packet">

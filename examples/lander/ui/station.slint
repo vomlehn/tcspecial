@@ -108,6 +108,17 @@ export component StationWindow inherits Window {
                     unit: "m/s";
                     first: LanderScene.velocity-x;
                     second: LanderScene.velocity-y;
+                    first-colour: LanderScene.touchdown-x-colour;
+                    second-colour: LanderScene.touchdown-y-colour;
+                }
+                Values {
+                    name: "Landing speed";
+                    unit: "";
+                    first: LanderScene.touchdown-x;
+                    second: LanderScene.touchdown-y;
+                    first-colour: LanderScene.touchdown-x-colour;
+                    second-colour: LanderScene.touchdown-y-colour;
+                    bold: true;
                 }
                 Values {
                     name: "Acceleration";

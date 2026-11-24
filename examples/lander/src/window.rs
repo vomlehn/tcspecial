@@ -244,7 +244,12 @@ fn set_frame(scene: &LanderScene<'_>, frame: &Frame) {
     scene.set_fire_left(frame.fire_left);
     scene.set_debris(frame.debris.as_str().into());
     scene.set_face(frame.face.as_str().into());
-    scene.set_state(frame.state.into());
+    scene.set_state(match frame.countdown {
+        Some(left) => {
+            format!("{}\nStarting again in {left} s", frame.state).into()
+        }
+        None => frame.state.into(),
+    });
     scene.set_fuel(frame.fuel);
     scene.set_position_x(frame.position_x.as_str().into());
     scene.set_position_y(frame.position_y.as_str().into());
@@ -252,5 +257,11 @@ fn set_frame(scene: &LanderScene<'_>, frame: &Frame) {
     scene.set_velocity_y(frame.velocity_y.as_str().into());
     scene.set_acceleration_x(frame.acceleration_x.as_str().into());
     scene.set_acceleration_y(frame.acceleration_y.as_str().into());
+    scene.set_thrust_x(frame.thrust_x.as_str().into());
+    scene.set_thrust_y(frame.thrust_y.as_str().into());
+    scene.set_touchdown_x(frame.touchdown_x.said().into());
+    scene.set_touchdown_x_colour(frame.touchdown_x.colour());
+    scene.set_touchdown_y(frame.touchdown_y.said().into());
+    scene.set_touchdown_y_colour(frame.touchdown_y.colour());
     scene.set_strobe_lit(frame.strobe_lit);
 }

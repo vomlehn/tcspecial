@@ -43,7 +43,9 @@
 //! nothing is found ahead, the lander's next event is the end of the look,
 //! where it looks again.
 
-use tcsprotocol::node::physics::lander::{Point, Resolved};
+use tcsprotocol::node::physics::lander::{
+    Point, RatingRecord, Resolved, RATINGS_KEPT, STAR_RECORD,
+};
 
 use super::component::Component;
 
@@ -64,6 +66,10 @@ const ACCELERATION_Y: usize = 10;
 const RESTART: usize = 11;
 const SKY: usize = 12;
 const SKY_QUENCH: usize = 13;
+const RATING: usize = 14;
+const RATING_AUTOLAND: usize = 15;
+const RATED: usize = 16;
+const RATINGS: usize = 17;
 
 /// The generation of the lander's sky: made once, as it is started, and
 /// never made again in a run, so always the first.
@@ -181,6 +187,13 @@ pub struct Lander {
     /// The generation of its sky the ground last said it has whole: while
     /// it is [`SKY_GENERATION`], the sky is not sent.
     sky_quench: f64,
+    /// What its `rated` input was last held at: a new value other than
+    /// nought takes a rating.
+    rated: f64,
+    /// Its latest ratings, the latest first, no more than
+    /// [`RATINGS_KEPT`], as the records its `ratings` output sends: see
+    /// `tcsprotocol::node::physics::lander`'s "Ratings".
+    ratings: std::collections::VecDeque<[u8; STAR_RECORD]>,
 }
 
 /// `h(u) = (1 - u) ln(1 - u) + u`, by its series where `u` is small: see
@@ -273,6 +286,8 @@ impl Lander {
             restart: 0.0,
             sky: super::sky::records(&figures, SKY_GENERATION),
             sky_quench: 0.0,
+            rated: 0.0,
+            ratings: std::collections::VecDeque::new(),
             figures,
         }
     }
@@ -564,6 +579,22 @@ impl Component for Lander {
         }
         self.restart = restart;
         self.sky_quench = inputs[SKY_QUENCH];
+        // Driven to a new count, it takes the rating it is given, stamped
+        // with the time of day, as the latest of those it sends.
+        let rated = inputs[RATED];
+        if rated != self.rated && rated != 0.0 {
+            let when = tcsos::time::SystemTime::now()
+                .duration_since(tcsos::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis() as u64);
+            let record = RatingRecord {
+                when,
+                rating: inputs[RATING],
+                autoland: inputs[RATING_AUTOLAND] > 0.5,
+            };
+            self.ratings.push_front(record.to_bytes());
+            self.ratings.truncate(RATINGS_KEPT);
+        }
+        self.rated = rated;
     }
 
     fn advance(&mut self, from: f64, to: f64) {
@@ -614,6 +645,13 @@ impl Component for Lander {
         most: usize,
         out: &mut Vec<u8>,
     ) -> usize {
+        if terminal == RATINGS {
+            let total = self.ratings.len();
+            for n in 0..most.min(total) {
+                out.extend_from_slice(&self.ratings[(from + n) % total]);
+            }
+            return total;
+        }
         let quenched = self.sky_quench == f64::from(SKY_GENERATION);
         if terminal != SKY || quenched || self.sky.is_empty() {
             return 0;
@@ -797,7 +835,7 @@ mod tests {
     /// another generation, it goes on.
     #[test]
     fn the_sky_is_sent_until_it_is_quenched() {
-        use tcsprotocol::node::physics::lander::{StarRecord, STAR_RECORD};
+        use tcsprotocol::node::physics::lander::StarRecord;
         let mut l = Lander::new(figures());
         let total = l.sky.len();
         assert!(total > 4);
@@ -890,6 +928,49 @@ mod tests {
         assert_eq!(names[ACCELERATION_X], "acceleration_x");
         assert_eq!(names[ACCELERATION_Y], "acceleration_y");
         assert_eq!(names[RESTART], "restart");
+        assert_eq!(names[SKY], "sky");
+        assert_eq!(names[SKY_QUENCH], "sky_quench");
+        assert_eq!(names[RATING], "rating");
+        assert_eq!(names[RATING_AUTOLAND], "rating_autoland");
+        assert_eq!(names[RATED], "rated");
+        assert_eq!(names[RATINGS], "ratings");
+        assert_eq!(names.len(), RATINGS + 1);
+    }
+
+    /// Each new count driven to `rated` takes the rating and Autoland's
+    /// help it is given, stamped with the time, as the latest of its
+    /// ratings, which `ratings` sends the latest first; the same count
+    /// again takes nothing, and it keeps no more than [`RATINGS_KEPT`].
+    #[test]
+    fn a_rating_is_kept_and_sent() {
+        let mut l = Lander::new(figures());
+        let mut inputs = held(0.0, 0.0, 0.0);
+        let give = |l: &mut Lander, inputs: &mut Vec<f64>, rating, autoland| {
+            inputs[RATING] = rating;
+            inputs[RATING_AUTOLAND] = f64::from(u8::from(autoland));
+            inputs[RATED] = inputs[RATED] % 255.0 + 1.0;
+            l.hold(inputs);
+        };
+        assert_eq!(l.records(RATINGS, 0, 4, &mut Vec::new()), 0);
+        give(&mut l, &mut inputs, 0.87, false);
+        give(&mut l, &mut inputs, 0.52, true);
+        let mut out = Vec::new();
+        assert_eq!(l.records(RATINGS, 0, 4, &mut out), 2);
+        let said: Vec<RatingRecord> = out
+            .chunks(STAR_RECORD)
+            .map(|c| RatingRecord::from_bytes(c.try_into().expect("whole")))
+            .collect();
+        assert_eq!((said[0].rating, said[0].autoland), (0.52, true));
+        assert_eq!((said[1].rating, said[1].autoland), (0.87, false));
+        assert!(said[0].when >= said[1].when && said[1].when > 0);
+
+        // The same count again is no new rating.
+        l.hold(&inputs);
+        assert_eq!(l.ratings.len(), 2);
+        for _ in 0..RATINGS_KEPT {
+            give(&mut l, &mut inputs, 0.5, false);
+        }
+        assert_eq!(l.ratings.len(), RATINGS_KEPT);
     }
 
     /// Thrust accelerates it at its force over its mass, more as the tank

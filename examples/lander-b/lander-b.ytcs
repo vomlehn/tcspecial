@@ -47,7 +47,7 @@ gateways:
         ground_base: "127.0.0.1:20700"
         moc-out:
           - restart.gateway
-        world-in: [crashed, landed, to_accel_y, to_joystick_3_4_y,
+        world-in: [crashed, landed, ratings, to_accel_y, to_joystick_3_4_y,
           to_velocity_y, to_y]
 
 vehicle:
@@ -119,6 +119,12 @@ payloads:
         protocol: "udp"
         world-out:
           - gateway.landed
+      - payload: ratings
+        read_size: "64"
+        address: "127.0.0.24:20809"
+        protocol: "udp"
+        world-out:
+          - gateway.ratings
       - payload: restart
         address: "127.0.0.24:20808"
         protocol: "udp"

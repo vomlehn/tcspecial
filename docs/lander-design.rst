@@ -169,7 +169,8 @@ run at once; ``tcs-conflict`` checks the pair. Each has:
 * a ``gateway_yamcs`` gateway, which takes the four values to the ground;
   lander-b's takes the ``landed`` and ``crashed`` signals too, each the
   text ``1`` or ``0``, typed ``string(1)`` so that Yamcs shows that text
-  rather than its bytes.
+  rather than its bytes, and the lander's ratings (see "The ratings, sent
+  down").
 
 ``lander-a`` also sends the fuel left, and ``lander-b`` whether the lander
 has landed or crashed. Each logs to its own directory under
@@ -214,8 +215,16 @@ pane at the left of its payload panels:
   ground, with the smiling face after a landing;
 * "Landed", or on a crash "On the Moon, no one can hear you CRASH!", in
   words, and the fuel left, in words and as a
-  bar;
-* below them, the X and Y position, velocity, acceleration and thrust,
+  bar; standing on the pad, under "Landed", "Starting again in N s", the
+  whole seconds of the pad wait left, so that a visitor knows how long
+  there is to read the rating or to lift off again;
+* below them, the X and Y position, velocity, "Landing speed",
+  acceleration and thrust. "Landing speed" says how each axis's speed
+  stands against its touchdown limit -- across either way against
+  ``landing_drift``, down against ``landing_speed`` -- as "ok" within
+  three quarters of it, "close" within it, and "too fast" past it, in
+  bold, in Okabe-Ito's bluish green, orange and vermillion; the velocity
+  is shown in the same colour, always beside those words. The values are
   each named and with its unit, the thrust in newtons: the throttle the
   lander burns at times the axis's full thrust, nought with the tank
   empty. From a crash until the lander starts again they stand at what
@@ -243,15 +252,21 @@ second and shows:
   position sent down, smaller than tcs-sim's;
 * the stars of tcs-sim's sky, as they are sent down: none at first, each
   appearing as its record arrives (see "The sky, sent down");
-* the six values sent down, with the thrust under the accelerations,
-  worked out from the joystick's values as tcs-sim works it out from the
+* the six values sent down, with "Landing speed" under the velocity, as
+  tcs-sim's pane has it, and the thrust under the accelerations, worked
+  out from the joystick's values as tcs-sim works it out from the
   throttles, and standing from a crash at what it was before it, as
   tcs-sim's does; and the fuel left;
+* at the top right of the landscape, over the sky, the lander's latest
+  landing ratings as they come down, the latest first: the time of day
+  each was rated and the rating as tcs-sim's pane said it, *w/ Autoland*
+  where Autoland helped (see "The ratings, sent down");
 * a joystick like tcs-sim's, its two lines at the X and Y values the
   joystick sent down, or its plus when they are nought; the pointer does
   nothing there;
 * "Landed", or "On the Moon, no one can hear you CRASH!", when the values
-  sent down say so;
+  sent down say so; and under "Landed" the seconds left before the lander
+  starts again, counted from when the landed signal came down;
 * a Restart button, which sends a command up through lander-b's gateway to
   a simulated payload, ``restart``, joined to the lander's ``restart``
   input: each press a new count, the lander starting again at each, a light
@@ -297,6 +312,25 @@ it feeds, and lander-a's first gateway once fed ``autorestart``, which
 would have read a quench as an order. A sky made again would have a new generation, sent
 afresh and gathered afresh; tcs-sim makes its sky once a run, as
 generation 1.
+
+The ratings, sent down
+----------------------
+
+tcs-sim's window rates each landing (see the requirement for its rating
+in docs/tcs-sim-design.rst) and gives the rating to the lander as it
+shows it: it drives the lander's ``rating`` input to the rating,
+``rating_autoland`` to whether Autoland helped, and then ``rated`` to a
+new count, which takes the two, stamped with the time of day, into the
+lander's latest 20 ratings. The lander's ``ratings`` output sends them
+as records of 16 bytes, the latest first, four to a packet every fifth
+of a second, round and round as the sky goes: when it was rated, in
+milliseconds since the Unix epoch, eight bytes; the rating, in tenths of
+a percent, two bytes; one where Autoland helped and nought where not, a
+byte; and five bytes of nought. The simulated payload ``ratings`` sends
+them to lander-b, whose gateway passes them down, as bytes, to Yamcs's
+``ratings`` parameter, and the ground's window lists them. A packet
+missed is had on a later pass, and the ground keeps each rating by when
+it was rated, so a rating comes once however often it arrives.
 
 How it was made
 ===============

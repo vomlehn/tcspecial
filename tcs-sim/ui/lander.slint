@@ -273,6 +273,12 @@ export component Values inherits HorizontalLayout {
     in property <string> unit;
     in property <string> first;
     in property <string> second;
+    // The values' colour, each said in words as well: see Touchdown in
+    // lander_view.rs.
+    in property <color> first-colour: #000000;
+    in property <color> second-colour: #000000;
+    // Whether the values are set in bold, as a warning is.
+    in property <bool> bold;
     spacing: 6px;
     alignment: start;
     Text {
@@ -282,12 +288,16 @@ export component Values inherits HorizontalLayout {
     }
     Text {
         text: root.first;
+        color: root.first-colour;
+        font-weight: root.bold ? 700 : 400;
         min-width: 60px;
         horizontal-alignment: right;
         vertical-alignment: center;
     }
     Text {
         text: root.second;
+        color: root.second-colour;
+        font-weight: root.bold ? 700 : 400;
         min-width: 60px;
         horizontal-alignment: right;
         vertical-alignment: center;
@@ -362,6 +372,13 @@ export global LanderScene {
     in-out property <string> acceleration-y: "-";
     in-out property <string> thrust-x: "-";
     in-out property <string> thrust-y: "-";
+    // How each axis's speed stands against its touchdown limit, in words
+    // -- "ok", "close", "too fast" -- and in the colour that goes with
+    // them, which the velocity is shown in too.
+    in-out property <string> touchdown-x: "ok";
+    in-out property <string> touchdown-y: "ok";
+    in-out property <color> touchdown-x-colour: #009E73;
+    in-out property <color> touchdown-y-colour: #009E73;
     // Where the joystick's dot is: set by Rust.
     in-out property <length> dot-x;
     in-out property <length> dot-y;
@@ -753,6 +770,17 @@ export component LanderPane inherits Rectangle {
                         unit: "m/s";
                         first: LanderScene.velocity-x;
                         second: LanderScene.velocity-y;
+                        first-colour: LanderScene.touchdown-x-colour;
+                        second-colour: LanderScene.touchdown-y-colour;
+                    }
+                    Values {
+                        name: "Landing speed";
+                        unit: "";
+                        first: LanderScene.touchdown-x;
+                        second: LanderScene.touchdown-y;
+                        first-colour: LanderScene.touchdown-x-colour;
+                        second-colour: LanderScene.touchdown-y-colour;
+                        bold: true;
                     }
                     Values {
                         name: "Acceleration";
